@@ -199,4 +199,9 @@ build\_run_tests.bat
 
 ## Licence
 
-MIT.
+MIT, (c) 2026 Paul Squires -- see [LICENSE](LICENSE).
+
+The server links [yyjson](https://github.com/ibireme/yyjson), which is MIT,
+(c) YaoYuan (ibireme). It is not vendored here; a build needs the FreeBASIC
+bindings at `C:\dev\yyjson`, and a distributed binary ships `yyjson64.dll`
+beside it, so carry yyjson's licence with any release.
