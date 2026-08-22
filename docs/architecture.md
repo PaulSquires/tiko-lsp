@@ -1,0 +1,159 @@
+# Architecture
+
+## Layering
+
+Each layer knows only about the one below it.
+
+```
+main.bas            arguments, the message loop, the exit code
+  |
+lsp/dispatcher      lifecycle state machine, handler registry
+  |                 knows LSP, does not know how bytes are framed
+handlers/*          one function per method; build a result, or set an error
+  |                        |
+  |                        +--> document/*   open buffers, edits, line index
+  |                        +--> utils/*      positions, URIs, logging
+rpc/jsonrpc         jsonrpc / id / method / params / result / error
+  |                 knows JSON-RPC, does not know LSP
+rpc/transport       Content-Length framing; stdin and stdout
+  |                 knows bytes, does not know JSON
+json/json           JsonDoc, JsonValue, JsonBuilder, JsonNode
+                    the ONLY place yyjson is named
+```
+
+The direction that matters is the one that is missing: no lower layer calls
+upwards, and no handler touches a byte or a yyjson symbol.
+
+### Why the JSON library is behind a facade
+
+`json.bi` and `json.bas` are the only two files that include `yyjson.bi`. Replacing
+yyjson means rewriting those two and nothing else. The facade also enforces two
+yyjson rules that are silent when broken — see "Traps that cost a run" below.
+
+### Why the compiler frontend is not here yet
+
+`Server` and the handlers deal in `RpcMessage` and `JsonBuilder`, never in text
+offsets or tokens. When the compiler frontend arrives it plugs in under
+`src/analysis/` and hands the handlers symbols; the dispatcher does not change.
+This is what keeps "run the compiler as a subprocess" from ever becoming tempting:
+there is no place in the design where a process boundary would fit.
+
+## Ownership
+
+| Type | Owns | Rule |
+| --- | --- | --- |
+| `JsonDoc` | one parsed `yyjson_doc` | frees it; copy and assignment deep-copy |
+| `JsonValue` | nothing | borrows a node; dies with its `JsonDoc` |
+| `JsonBuilder` | one `yyjson_mut_doc` | frees it and every node in it |
+| `JsonNode` | nothing | borrows a node; dies with its `JsonBuilder` |
+| `RpcMessage` | its `JsonDoc` | `Params()` is derived, never stored, so a copied message never views the original |
+| `MessageFramer` | its byte buffer | compacts once the consumed prefix passes 64 KB |
+| `DocumentManager` | every `TextDocument` it opened | `new` on open, `delete` on close; frees the rest in its destructor |
+| `TextDocumentPtr` | nothing | borrowed; valid until that document is closed |
+| `Server` | its `DocumentManager` | holds a `StdioTransport ptr` it does not free |
+
+There are no smart pointers and no shared ownership anywhere in the server. Every
+allocation has exactly one owner whose destructor releases it.
+
+Documents are stored as pointers rather than by value on purpose: a handler may
+hold a `TextDocumentPtr` across a call, and a value-typed table would move its
+contents on rehash. Re-opening a URI that is already open therefore refills the
+existing object instead of replacing it.
+
+## The lifecycle rules
+
+All of them live in `Server.Dispatch`, and each is asserted by the piped-session
+test:
+
+| Situation | Response |
+| --- | --- |
+| request other than `initialize` before initialisation | error `-32002` ServerNotInitialized |
+| notification other than `exit` before initialisation | dropped, logged, no reply |
+| second `initialize` | error `-32600` InvalidRequest |
+| any request after `shutdown` | error `-32600` InvalidRequest |
+| unknown request | error `-32601` MethodNotFound |
+| unknown `$/...` notification | ignored in silence |
+| unparseable payload | error against a **null** id |
+| `exit` | process ends: 0 if `shutdown` came first, else 1 |
+| stdin closes with no `exit` | process ends 1 (0 if `shutdown` had been received) |
+
+A notification never produces a reply, including when its handler fails — the
+failure is logged instead, because there is no id to answer.
+
+## Threading
+
+There is none. One message is read, dispatched and answered before the next is
+read. Phase 6 moves analysis onto a worker; the seam is already in place, because
+the dispatcher's only shared state is the `Server` object and the handler registry.
+
+## Traps that cost a run
+
+Recorded here because each one fails **silently** — no crash, no error return, a
+plausible-looking wrong result.
+
+**yyjson does not copy object keys.** `yyjson_mut_obj_add_sint( doc, obj, "code", n )`
+stores the key *pointer*. A FreeBASIC string literal at a call site is a temporary,
+so the key dangles and the document serialises as `{"{\"{\\":-32700}` — the value is
+right, the key is garbage, and nothing reports an error. Every writer in
+`JsonBuilder` therefore goes through `SetNode`, which copies the key with
+`yyjson_mut_strncpy`. The `_strcpy` variants copy the *value* only and do not fix
+this.
+
+**`STRPTR()` on an empty FreeBASIC string is NULL**, and yyjson reads NULL as
+"invalid parameter" rather than "empty". Everything that could receive an empty
+string goes through `TextPtr()`, which substitutes a one-byte static.
+
+**A writer buffer belongs to yyjson's heap.** `yyjson_free_buf`, never
+`DEALLOCATE`; the wrong one corrupts the process heap. Only `Serialize()` ever
+holds such a buffer.
+
+**FreeBASIC cannot resolve a circular by-value return between two types.** An
+iterator whose `Value()` returns `JsonValue` cannot be reached from a
+`JsonValue.GetIterator()`, in either declaration order: a forward type alias is an
+incomplete type and a prototype cannot return one by value (error 71). Hence
+`ArrayOf( v )`, which returns a separate `JsonArray` view that owns the iterator
+protocol:
+
+```freebasic
+for each folder in ArrayOf( params.Member( "workspaceFolders" ) )
+```
+
+**A container held as a type FIELD must be a named instantiation.** `Items as
+FB.Array( of T )` written inline in a field declaration does not instantiate, and
+every later member access fails with "Element not defined". `StringArray` and
+`WorkspaceFolderArray` in `dispatcher.bi` exist for that reason.
+
+**A parameter may not share a name with a member of its own type.** `RpcError.Code`
+and a parameter named `code` collide (error 4), which is why the setter takes
+`codeVal`. `name`, `data` and `base` are reserved outright.
+
+**`FB.Map` used to be limited to one compilation unit — fixed upstream, 2026-08-22.**
+`fb/hash.bi` defined its `HashOf` overloads without `private`, so a second unit
+that included `fb/map.bi` failed to link with ~18 "multiple definition of
+FB::HASHOF" errors — naming a standard-library function and neither of the two
+files responsible. The overloads are `private` now, as `HashBytes` and `HashInt`
+in the same header always were, so a map may be used from any number of modules;
+`document_manager.bas` and `dispatcher.bas` both do. A header-only `fb/*.bi`
+module needs `private` on every implementation it contains, members included.
+
+**A stray NUL byte in a source file truncates it silently.** fbc stops reading at
+the byte, the rest of the file simply does not exist, and the object links with
+"undefined reference" errors that name functions plainly visible in the source.
+Worth remembering when a build fails that way.
+
+## Position encoding
+
+LSP positions count **UTF-16 code units** unless the client and server agree
+otherwise. `utils/position.bas` is the single place where `line + UTF-16 column`
+becomes a byte offset into UTF-8 source, and no other module does that arithmetic
+— `TextDocument` and every handler call into it.
+
+The rules it implements, and why each one exists, are in
+[phase2.md](phase2.md#coordinates): clamping rather than errors, CRLF as one
+terminator, mid-surrogate columns rounding down, and malformed UTF-8 counted
+rather than rejected.
+
+`Server.PositionEncoding` records the negotiated encoding, which is `utf-16` and
+is now stated explicitly in the advertised capabilities. Supporting `utf-8` as
+well would mean one more branch inside this module and nowhere else — which is
+the point of keeping it here.

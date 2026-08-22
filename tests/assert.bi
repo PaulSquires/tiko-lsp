@@ -1,0 +1,78 @@
+'' ############################################################################
+''  tests/assert.bi -- a very small assertion harness
+''
+''  Counts, reports and sets the process exit code. Test output goes to
+''  stdout here, which is safe because a test binary is not the server and
+''  never speaks the protocol on its own handles.
+'' ############################################################################
+
+#pragma once
+
+dim shared as long g_TestsRun
+dim shared as long g_TestsFailed
+dim shared as string g_CurrentGroup
+
+sub TestGroup( byref groupName as string )
+    g_CurrentGroup = groupName
+    print
+    print "-- " & groupName
+end sub
+
+sub TestFail( byref what_ as string, byref detail as string )
+    g_TestsRun += 1
+    g_TestsFailed += 1
+    print "   FAIL  " & what_
+    if( len(detail) > 0 ) then print "         " & detail
+end sub
+
+sub TestPass( byref what_ as string )
+    g_TestsRun += 1
+    print "   ok    " & what_
+end sub
+
+sub AssertTrue( byval cond as boolean, byref what_ as string )
+    if( cond ) then
+        TestPass( what_ )
+    else
+        TestFail( what_, "expected true" )
+    end if
+end sub
+
+sub AssertFalse( byval cond as boolean, byref what_ as string )
+    AssertTrue( cond = false, what_ )
+end sub
+
+sub AssertEqStr( byref got as string, byref want as string, byref what_ as string )
+    if( got = want ) then
+        TestPass( what_ )
+    else
+        TestFail( what_, "got [" & got & "] want [" & want & "]" )
+    end if
+end sub
+
+sub AssertEqInt( byval got as longint, byval want as longint, byref what_ as string )
+    if( got = want ) then
+        TestPass( what_ )
+    else
+        TestFail( what_, "got " & got & " want " & want )
+    end if
+end sub
+
+sub AssertContains( byref haystack as string, byref needle as string, byref what_ as string )
+    if( instr( haystack, needle ) > 0 ) then
+        TestPass( what_ )
+    else
+        TestFail( what_, "[" & needle & "] not found in [" & haystack & "]" )
+    end if
+end sub
+
+function TestSummary( byref suiteName as string ) as long
+    print
+    print string( 60, "=" )
+    if( g_TestsFailed = 0 ) then
+        print suiteName & ": " & g_TestsRun & " assertions, all passed"
+        return 0
+    end if
+    print suiteName & ": " & g_TestsRun & " assertions, " & g_TestsFailed & " FAILED"
+    return 1
+end function

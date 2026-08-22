@@ -1,0 +1,198 @@
+'' ############################################################################
+''  handlers/text_document.bas -- document synchronisation
+'' ############################################################################
+
+#include once "text_document.bi"
+#include once "../utils/logging.bi"
+#include once "../utils/uri.bi"
+
+'' Every one of these params objects starts with a TextDocumentIdentifier.
+private function ParamUri( byref req as RpcMessage ) as string
+    return req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+end function
+
+private function DescribeDoc( byval doc as TextDocumentPtr ) as string
+    if( doc = 0 ) then return "<none>"
+    return UriFileName( doc->Uri( ) ) & " v" & doc->Version( ) & _
+           ", " & doc->LineCount( ) & " line(s), " & doc->TextLength( ) & " byte(s)"
+end function
+
+'' ----------------------------------------------------------------------------
+''  textDocument/didOpen
+''
+''  From here until didClose the client's copy is the only one that counts, and
+''  nothing in the server may read the file from disk.
+'' ----------------------------------------------------------------------------
+private function OnDidOpen( byref srv as Server, _
+                            byref req as RpcMessage, _
+                            byref rb as JsonBuilder, _
+                            byref err_ as RpcError ) as JsonNode
+
+    dim as JsonValue td = req.Params( ).Member( "textDocument" )
+
+    dim as string uriText = td.Member( "uri" ).AsString( "" )
+    if( len(uriText) = 0 ) then
+        LogWarn( "didOpen without a uri -- ignored" )
+        return JsonNode( )
+    end if
+
+    dim as string  langId  = td.Member( "languageId" ).AsString( "" )
+    dim as longint version_ = td.Member( "version" ).AsLongInt( 0 )
+
+    '' `text` is REQUIRED on didOpen. An absent one means an empty buffer, not
+    '' "read it yourself".
+    dim as string body = td.Member( "text" ).AsString( "" )
+
+    dim as TextDocumentPtr doc = srv.Documents.Open( uriText, langId, version_, body )
+    if( doc = 0 ) then
+        LogError( "didOpen failed to allocate a document for " & uriText )
+        return JsonNode( )
+    end if
+
+    LogInfo( "opened " & DescribeDoc( doc ) & " [" & langId & "], " & _
+             srv.Documents.Count( ) & " open" )
+    srv.SendTrace( "didOpen " & UriFileName( uriText ), DescribeDoc( doc ) )
+
+    '' Phase 3 parses here and publishes diagnostics.
+    return JsonNode( )
+end function
+
+'' ----------------------------------------------------------------------------
+''  textDocument/didChange
+''
+''  contentChanges is an ORDERED list and each entry applies to the document as
+''  left by the previous one. Applying them out of order, or computing all the
+''  offsets against the original text, corrupts the buffer in a way that only
+''  shows up several edits later.
+'' ----------------------------------------------------------------------------
+private function OnDidChange( byref srv as Server, _
+                              byref req as RpcMessage, _
+                              byref rb as JsonBuilder, _
+                              byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = ParamUri( req )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+
+    if( doc = 0 ) then
+        '' A change for a document we were never told about. Dropping it is
+        '' the only safe answer -- there is no base text to apply it to.
+        LogWarn( "didChange for a document that is not open: " & uriText )
+        return JsonNode( )
+    end if
+
+    dim as longint version_ = req.Params( ).Member( "textDocument" ).Member( "version" ) _
+                                 .AsLongInt( doc->Version( ) )
+
+    dim as long applied = 0
+    dim as long fullReplacements = 0
+
+    for each change in ArrayOf( req.Params( ).Member( "contentChanges" ) )
+        dim as string newText = change.Member( "text" ).AsString( "" )
+        dim as JsonValue rangeVal = change.Member( "range" )
+
+        if( rangeVal.IsObject( ) = false ) then
+            '' No range: this entry replaces the whole document. Legal even
+            '' under incremental sync, and what clients send after an external
+            '' change such as a git checkout.
+            doc->ReplaceAll( newText, version_ )
+            fullReplacements += 1
+            applied += 1
+            continue for
+        end if
+
+        dim as JsonValue startVal = rangeVal.Member( "start" )
+        dim as JsonValue endVal   = rangeVal.Member( "end" )
+
+        '' rangeLength is deliberately ignored: it is deprecated, it is in
+        '' UTF-16 units, and the range already says what to replace.
+        doc->ApplyRange( clng( startVal.Member( "line"      ).AsLongInt( 0 ) ), _
+                         clng( startVal.Member( "character" ).AsLongInt( 0 ) ), _
+                         clng( endVal  .Member( "line"      ).AsLongInt( 0 ) ), _
+                         clng( endVal  .Member( "character" ).AsLongInt( 0 ) ), _
+                         newText, version_ )
+        applied += 1
+    next
+
+    if( applied = 0 ) then
+        '' An empty contentChanges array is legal and means "nothing changed";
+        '' the version still moves.
+        doc->SetVersion( version_ )
+    end if
+
+    LogDebug( "changed " & DescribeDoc( doc ) & " (" & applied & " edit(s), " & _
+              fullReplacements & " full)" )
+    srv.SendTrace( "didChange " & UriFileName( uriText ) & " (" & applied & " edit(s))", _
+                   DescribeDoc( doc ) )
+
+    '' Phase 3 re-parses here, debounced, and republishes diagnostics.
+    return JsonNode( )
+end function
+
+'' ----------------------------------------------------------------------------
+''  textDocument/didSave
+''
+''  The server advertises includeText:false, so `text` is normally absent and
+''  the buffer is already correct. It is honoured when present anyway, because
+''  a client may send it regardless.
+'' ----------------------------------------------------------------------------
+private function OnDidSave( byref srv as Server, _
+                            byref req as RpcMessage, _
+                            byref rb as JsonBuilder, _
+                            byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = ParamUri( req )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+
+    if( doc = 0 ) then
+        LogWarn( "didSave for a document that is not open: " & uriText )
+        return JsonNode( )
+    end if
+
+    dim as JsonValue textVal = req.Params( ).Member( "text" )
+    if( textVal.IsString( ) ) then
+        doc->ReplaceAll( textVal.AsString( ), doc->Version( ) )
+    end if
+
+    doc->MarkSaved( )
+
+    LogInfo( "saved " & DescribeDoc( doc ) )
+    srv.SendTrace( "didSave " & UriFileName( uriText ), DescribeDoc( doc ) )
+    return JsonNode( )
+end function
+
+'' ----------------------------------------------------------------------------
+''  textDocument/didClose
+''
+''  After this the file on disk becomes the truth again, and everything the
+''  server cached for this buffer is released.
+'' ----------------------------------------------------------------------------
+private function OnDidClose( byref srv as Server, _
+                             byref req as RpcMessage, _
+                             byref rb as JsonBuilder, _
+                             byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = ParamUri( req )
+
+    if( srv.Documents.Close( uriText ) = false ) then
+        LogWarn( "didClose for a document that is not open: " & uriText )
+        return JsonNode( )
+    end if
+
+    LogInfo( "closed " & UriFileName( uriText ) & ", " & srv.Documents.Count( ) & " still open" )
+    srv.SendTrace( "didClose " & UriFileName( uriText ), _
+                   srv.Documents.Count( ) & " document(s) still open" )
+
+    '' Phase 3 clears this document's published diagnostics here, by sending
+    '' publishDiagnostics with an empty list -- otherwise the editor keeps
+    '' showing squiggles for a file that is no longer open.
+    return JsonNode( )
+end function
+
+'' ----------------------------------------------------------------------------
+
+sub RegisterTextDocumentHandlers( )
+    RegisterHandler( LSP_DID_OPEN,   @OnDidOpen )
+    RegisterHandler( LSP_DID_CHANGE, @OnDidChange )
+    RegisterHandler( LSP_DID_SAVE,   @OnDidSave )
+    RegisterHandler( LSP_DID_CLOSE,  @OnDidClose )
+end sub

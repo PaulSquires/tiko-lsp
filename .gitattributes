@@ -1,0 +1,8 @@
+# Line endings.
+#
+# The shell scripts MUST stay LF: a build script checked out with CRLF fails on
+# Linux with "\r: command not found", which reads as a missing program rather
+# than a line-ending problem.
+* text=auto
+*.sh  text eol=lf
+*.bat text eol=crlf

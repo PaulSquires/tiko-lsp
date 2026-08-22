@@ -1,0 +1,77 @@
+#!/bin/sh
+# ============================================================================
+#  Build and run the whole test suite (Linux x64).
+#  Mirrors build/_run_tests.bat exactly, including the piped session.
+# ============================================================================
+set -e
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+FBC=${TIKO_LSP_FBC:-"$ROOT/../fbc-modern/toolchains/fbc-modern-linux/bin/fbc"}
+YYJSON=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
+
+[ -x "$FBC" ] || FBC=$(command -v fbc)
+INC="-i $YYJSON/inc -p $YYJSON/lib/linux64"
+FAILED=0
+
+mkdir -p "$ROOT/bin"
+
+echo "[1/6] building the server"
+sh "$ROOT/build/_compile.sh"
+
+echo "[2/6] framing tests"
+"$FBC" -w all $INC "$ROOT/tests/test_framing.bas" \
+    "$ROOT/src/rpc/transport.bas" "$ROOT/src/utils/logging.bas" \
+    -x "$ROOT/bin/test_framing"
+"$ROOT/bin/test_framing" || FAILED=1
+
+echo "[3/6] json and json-rpc tests"
+"$FBC" -w all $INC "$ROOT/tests/test_json.bas" \
+    "$ROOT/src/json/json.bas" "$ROOT/src/rpc/jsonrpc.bas" "$ROOT/src/utils/logging.bas" \
+    -x "$ROOT/bin/test_json"
+"$ROOT/bin/test_json" || FAILED=1
+
+echo "[4/6] position tests"
+"$FBC" -w all $INC "$ROOT/tests/test_position.bas" \
+    "$ROOT/src/utils/position.bas" \
+    -x "$ROOT/bin/test_position"
+"$ROOT/bin/test_position" || FAILED=1
+
+echo "[5/6] uri and document tests"
+"$FBC" -w all $INC "$ROOT/tests/test_document.bas" \
+    "$ROOT/src/document/document.bas" "$ROOT/src/document/document_manager.bas" \
+    "$ROOT/src/utils/position.bas" "$ROOT/src/utils/uri.bas" "$ROOT/src/utils/logging.bas" \
+    -x "$ROOT/bin/test_document"
+"$ROOT/bin/test_document" || FAILED=1
+
+echo "[6/6] piped session against the real server"
+"$FBC" -w all $INC "$ROOT/tests/session_tool.bas" \
+    "$ROOT/src/json/json.bas" "$ROOT/src/rpc/transport.bas" "$ROOT/src/rpc/jsonrpc.bas" \
+    "$ROOT/src/lsp/protocol.bas" "$ROOT/src/utils/logging.bas" \
+    -x "$ROOT/bin/session_tool"
+
+"$ROOT/bin/session_tool" --write "$ROOT/bin/session.bin"
+
+# stderr is redirected only to keep the transcript readable; the server writes
+# diagnostics there, never to stdout.
+set +e
+"$ROOT/bin/tiko-lsp" --log-level info \
+    < "$ROOT/bin/session.bin" > "$ROOT/bin/captured.bin" 2> "$ROOT/bin/server.log"
+SERVER_EXIT=$?
+set -e
+
+if [ "$SERVER_EXIT" -ne 0 ]; then
+    echo "   FAIL  the server exited with $SERVER_EXIT, expected 0 after shutdown+exit"
+    FAILED=1
+else
+    echo "   ok    the server exited 0 after shutdown+exit"
+fi
+
+"$ROOT/bin/session_tool" --check "$ROOT/bin/captured.bin" || FAILED=1
+
+echo
+if [ "$FAILED" -eq 0 ]; then
+    echo "ALL SUITES PASSED"
+    exit 0
+fi
+echo "SUITE FAILURES -- see above"
+exit 1

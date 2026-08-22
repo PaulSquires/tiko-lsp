@@ -1,0 +1,285 @@
+'' ############################################################################
+''  rpc/jsonrpc.bas -- JSON-RPC 2.0 message model
+'' ############################################################################
+
+#include once "jsonrpc.bi"
+#include once "../utils/logging.bi"
+
+'' ############################################################################
+''  RpcId
+'' ############################################################################
+
+constructor RpcId( )
+    this.m_kind = RPCID_NONE
+    this.m_int  = 0
+end constructor
+
+constructor RpcId( byval v as longint )
+    this.m_kind = RPCID_INT
+    this.m_int  = v
+end constructor
+
+constructor RpcId( byref v as string )
+    this.m_kind = RPCID_STRING
+    this.m_int  = 0
+    this.m_str  = v
+end constructor
+
+sub RpcId.FromJson( byval v as JsonValue )
+    this.m_kind = RPCID_NONE
+    this.m_int  = 0
+    this.m_str  = ""
+
+    if( v.IsValid( ) = false orelse v.IsNull( ) ) then exit sub
+
+    if( v.IsNumber( ) ) then
+        this.m_kind = RPCID_INT
+        this.m_int  = v.AsLongInt( 0 )
+    elseif( v.IsString( ) ) then
+        this.m_kind = RPCID_STRING
+        this.m_str  = v.AsString( )
+    end if
+    '' Anything else (object, array, bool) is not a legal id and stays NONE,
+    '' which the caller reports as an invalid request.
+end sub
+
+function RpcId.Kind( ) as RpcIdKind
+    return this.m_kind
+end function
+
+function RpcId.IsNone( ) as boolean
+    return this.m_kind = RPCID_NONE
+end function
+
+function RpcId.IntValue( ) as longint
+    return this.m_int
+end function
+
+function RpcId.StrValue( ) as string
+    return this.m_str
+end function
+
+function RpcId.ToText( ) as string
+    select case this.m_kind
+        case RPCID_INT    : return str( this.m_int )
+        case RPCID_STRING : return """" & this.m_str & """"
+    end select
+    return "null"
+end function
+
+sub RpcId.WriteTo( byref rb as JsonBuilder, byval obj as JsonNode )
+    select case this.m_kind
+        case RPCID_INT    : rb.SetInt ( obj, "id", this.m_int )
+        case RPCID_STRING : rb.SetStr ( obj, "id", this.m_str )
+        case else         : rb.SetNull( obj, "id" )
+    end select
+end sub
+
+'' ############################################################################
+''  RpcError
+'' ############################################################################
+
+constructor RpcError( )
+    this.m_code = 0
+end constructor
+
+sub RpcError.SetErr( byval codeVal as long, byref msgText as string )
+    this.m_code = codeVal
+    this.m_msg  = msgText
+end sub
+
+sub RpcError.Clear( )
+    this.m_code = 0
+    this.m_msg  = ""
+end sub
+
+function RpcError.IsSet( ) as boolean
+    return this.m_code <> 0
+end function
+
+function RpcError.Code( ) as long
+    return this.m_code
+end function
+
+function RpcError.Message_( ) as string
+    if( len(this.m_msg) > 0 ) then return this.m_msg
+    return RpcErrorText( this.m_code )
+end function
+
+'' ############################################################################
+''  RpcMessage
+'' ############################################################################
+
+constructor RpcMessage( )
+    this.m_kind = RPC_INVALID
+end constructor
+
+function RpcMessage.ParseFrom( byref text_ as string, byref err_ as RpcError ) as boolean
+    err_.Clear( )
+    this.m_kind   = RPC_INVALID
+    this.m_method = ""
+    this.m_id     = RpcId( )
+
+    if( this.m_doc.Parse( text_ ) = false ) then
+        err_.SetErr( RPC_PARSE_ERROR, "invalid JSON: " & this.m_doc.ErrorText( ) )
+        return false
+    end if
+
+    dim as JsonValue rootVal = this.m_doc.Root( )
+
+    if( rootVal.IsArray( ) ) then
+        '' Batches are legal JSON-RPC but the LSP base protocol does not use
+        '' them, and a batch has no single id to answer with.
+        err_.SetErr( RPC_INVALID_REQUEST, "batch requests are not supported" )
+        return false
+    end if
+
+    if( rootVal.IsObject( ) = false ) then
+        err_.SetErr( RPC_INVALID_REQUEST, "message is not a JSON object" )
+        return false
+    end if
+
+    dim as string version = rootVal.Member( "jsonrpc" ).AsString( )
+    if( version <> "2.0" ) then
+        err_.SetErr( RPC_INVALID_REQUEST, "expected jsonrpc 2.0, got " & _
+                     iif( len(version) = 0, "nothing", version ) )
+        return false
+    end if
+
+    dim as boolean hasId = rootVal.Has( "id" ) andalso (rootVal.Member( "id" ).IsNull( ) = false)
+    if( hasId ) then this.m_id.FromJson( rootVal.Member( "id" ) )
+
+    if( rootVal.Has( "method" ) ) then
+        dim as JsonValue methodVal = rootVal.Member( "method" )
+        if( methodVal.IsString( ) = false ) then
+            err_.SetErr( RPC_INVALID_REQUEST, "method is not a string" )
+            return false
+        end if
+
+        this.m_method = methodVal.AsString( )
+        if( len(this.m_method) = 0 ) then
+            err_.SetErr( RPC_INVALID_REQUEST, "method is empty" )
+            return false
+        end if
+
+        if( hasId ) then
+            if( this.m_id.IsNone( ) ) then
+                err_.SetErr( RPC_INVALID_REQUEST, "id is neither a number nor a string" )
+                return false
+            end if
+            this.m_kind = RPC_REQUEST
+        else
+            this.m_kind = RPC_NOTIFICATION
+        end if
+        return true
+    end if
+
+    if( rootVal.Has( "result" ) orelse rootVal.Has( "error" ) ) then
+        '' A reply to a request WE sent. Phase 1 sends none, so nothing
+        '' correlates it -- it is parsed, logged and dropped by the dispatcher.
+        this.m_kind = RPC_RESPONSE
+        return true
+    end if
+
+    err_.SetErr( RPC_INVALID_REQUEST, "message has neither method nor result/error" )
+    return false
+end function
+
+function RpcMessage.Kind( ) as RpcMessageKind
+    return this.m_kind
+end function
+
+function RpcMessage.Id( ) as RpcId
+    return this.m_id
+end function
+
+function RpcMessage.MethodName( ) as string
+    return this.m_method
+end function
+
+function RpcMessage.Root( ) as JsonValue
+    return this.m_doc.Root( )
+end function
+
+function RpcMessage.Params( ) as JsonValue
+    '' Derived rather than stored, so a copied RpcMessage never hands out a
+    '' view into the ORIGINAL document.
+    return this.m_doc.Root( ).Member( "params" )
+end function
+
+function RpcMessage.IsDollarMethod( ) as boolean
+    return left( this.m_method, 2 ) = "$/"
+end function
+
+'' ############################################################################
+''  Serialisers
+'' ############################################################################
+
+function RpcErrorText( byval code as long ) as string
+    select case code
+        case RPC_PARSE_ERROR            : return "Parse error"
+        case RPC_INVALID_REQUEST        : return "Invalid Request"
+        case RPC_METHOD_NOT_FOUND       : return "Method not found"
+        case RPC_INVALID_PARAMS         : return "Invalid params"
+        case RPC_INTERNAL_ERROR         : return "Internal error"
+        case RPC_SERVER_NOT_INITIALIZED : return "Server not initialized"
+        case RPC_REQUEST_FAILED         : return "Request failed"
+        case RPC_SERVER_CANCELLED       : return "Server cancelled the request"
+        case RPC_CONTENT_MODIFIED       : return "Content modified"
+        case RPC_REQUEST_CANCELLED      : return "Request cancelled"
+    end select
+    return "Error " & code
+end function
+
+function RpcBuildResponse( byref id as RpcId, byref rb as JsonBuilder, byval resultNode as JsonNode ) as string
+    dim as JsonNode root = rb.NewObject( )
+    if( root.IsValid( ) = false ) then return ""
+
+    rb.SetStr( root, "jsonrpc", "2.0" )
+    id.WriteTo( rb, root )
+
+    '' "result" is REQUIRED on success, even when the answer is nothing at
+    '' all -- shutdown returns null, not an absent member.
+    if( resultNode.IsValid( ) ) then
+        rb.SetNode( root, "result", resultNode )
+    else
+        rb.SetNull( root, "result" )
+    end if
+
+    rb.SetRoot( root )
+    return rb.Serialize( )
+end function
+
+function RpcBuildError( byref id as RpcId, byval code as long, byref msg as string ) as string
+    dim as JsonBuilder rb
+
+    dim as JsonNode root = rb.NewObject( )
+    if( root.IsValid( ) = false ) then return ""
+
+    rb.SetStr( root, "jsonrpc", "2.0" )
+    id.WriteTo( rb, root )
+
+    dim as JsonNode errObj = rb.NewObject( )
+    rb.SetInt( errObj, "code", code )
+    if( len(msg) > 0 ) then
+        rb.SetStr( errObj, "message", msg )
+    else
+        rb.SetStr( errObj, "message", RpcErrorText( code ) )
+    end if
+    rb.SetNode( root, "error", errObj )
+
+    rb.SetRoot( root )
+    return rb.Serialize( )
+end function
+
+function RpcBuildNotification( byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
+    dim as JsonNode root = rb.NewObject( )
+    if( root.IsValid( ) = false ) then return ""
+
+    rb.SetStr( root, "jsonrpc", "2.0" )
+    rb.SetStr( root, "method", methodName )
+    if( paramsNode.IsValid( ) ) then rb.SetNode( root, "params", paramsNode )
+
+    rb.SetRoot( root )
+    return rb.Serialize( )
+end function
