@@ -24,6 +24,7 @@ sub TextDocument.Reset( byref uriText as string, byref langId as string, _
     this.m_version    = version_
     this.m_text       = text_
     this.m_dirty      = false
+    this.Invalidate( )
     this.m_index.Rebuild( this.m_text )
 end sub
 
@@ -73,6 +74,7 @@ sub TextDocument.ReplaceAll( byref text_ as string, byval version_ as longint )
     this.m_text    = text_
     this.m_version = version_
     this.m_dirty   = true
+    this.Invalidate( )
     this.m_index.Rebuild( this.m_text )
 end sub
 
@@ -100,6 +102,7 @@ sub TextDocument.ApplyRange( byval startLine as long, byval startChar as long, _
     '' The index is rebuilt in full. Patching it in place would have to handle
     '' a terminator split across the edit boundary, and one linear pass over a
     '' document is not what makes a language server slow.
+    this.Invalidate( )
     this.m_index.Rebuild( this.m_text )
 end sub
 
@@ -121,4 +124,33 @@ end function
 
 function TextDocument.Index( ) byref as LineIndex
     return this.m_index
+end function
+
+'' ----------------------------------------------------------------------------
+''  Cached analysis
+'' ----------------------------------------------------------------------------
+
+sub TextDocument.Invalidate( )
+    this.m_analysed = false
+end sub
+
+sub TextDocument.EnsureAnalysed( )
+    if( this.m_analysed ) then exit sub
+    this.m_analysed = true
+    AnalyzeFull( this.m_text, this.m_tokens, this.m_diags, this.m_symbols )
+end sub
+
+function TextDocument.Tokens( ) byref as TokenArray
+    this.EnsureAnalysed( )
+    return this.m_tokens
+end function
+
+function TextDocument.Symbols( ) byref as SymbolTable
+    this.EnsureAnalysed( )
+    return this.m_symbols
+end function
+
+function TextDocument.Diagnostics( ) byref as DiagnosticArray
+    this.EnsureAnalysed( )
+    return this.m_diags
 end function

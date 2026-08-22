@@ -21,3 +21,9 @@ declare sub PublishDocumentDiagnostics( byref srv as Server, byval doc as TextDo
 '' Sends an empty list for `uri`. Used on didClose, where the document is gone
 '' but the editor may still be showing what we last said about it.
 declare sub ClearDocumentDiagnostics( byref srv as Server, byref uri as string )
+
+'' Byte offsets -> an LSP Range, using a document's line index. Shared with the
+'' hover, definition and outline handlers, which all have to answer in ranges.
+declare function BuildLspRange( byref rb as JsonBuilder, byref text_ as string, _
+                                byref idx as LineIndex, _
+                                byval startOffset as long, byval endOffset as long ) as JsonNode

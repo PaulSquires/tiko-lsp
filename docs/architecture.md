@@ -12,7 +12,7 @@ lsp/dispatcher      lifecycle state machine, handler registry
 handlers/*          one function per method; build a result, or set an error
   |                        |
   |                        +--> document/*   open buffers, edits, line index
-  |                        +--> analysis/*   lexer, parser, diagnostics
+  |                        +--> analysis/*   lexer, parser, symbols, diagnostics
   |                        +--> utils/*      positions, URIs, logging
 rpc/jsonrpc         jsonrpc / id / method / params / result / error
   |                 knows JSON-RPC, does not know LSP
@@ -52,6 +52,7 @@ there is no place in the design where a process boundary would fit.
 | `DocumentManager` | every `TextDocument` it opened | `new` on open, `delete` on close; frees the rest in its destructor |
 | `TextDocumentPtr` | nothing | borrowed; valid until that document is closed |
 | `Server` | its `DocumentManager` | holds a `StdioTransport ptr` it does not free |
+| `SymbolTable` | its symbols | a value, with PARENT INDICES rather than pointers: copying it copies everything, and no symbol outlives its table |
 | `TokenArray`, `DiagnosticArray` | their elements | plain values, no pointers, freed with the array |
 
 There are no smart pointers and no shared ownership anywhere in the server. Every
@@ -85,8 +86,8 @@ failure is logged instead, because there is no id to answer.
 ## Analysis
 
 `analysis/` knows nothing about LSP: the lexer and parser work in BYTE OFFSETS
-and produce `Diagnostic` records, and `lsp/publish.bas` is the only place an
-offset becomes a line and a UTF-16 character. That is what will let the same
+and produce `Diagnostic` and `SymbolInfo` records, and `lsp/publish.bas` is the
+only place an offset becomes a line and a UTF-16 character. That is what will let the same
 analyser be driven by a command-line tool, or replaced by the real compiler
 frontend, without touching a handler.
 
@@ -95,6 +96,17 @@ The parser is structural, not semantic — see
 [phase3.md](phase3.md#false-positives-are-the-failure-mode-that-matters) for the
 corpus it was developed against and why that mattered more than the sample
 tests.
+
+The same pass builds the SYMBOL TABLE: the block stack already knew the kind,
+name and extent of every `sub`, `type`, `enum` and `namespace`, so extracting
+symbols cost a second walk over nothing. `documentSymbol`, `hover` and
+`definition` all read that one table, which is why they cannot disagree —
+see [phase4.md](phase4.md#resolution).
+
+A document analyses itself AT MOST ONCE PER VERSION: `Tokens()`, `Symbols()` and
+`Diagnostics()` re-analyse first if the text changed, so four features asking
+after one edit cost one analysis, and no caller has to know whether the cache is
+warm.
 
 ## Threading
 

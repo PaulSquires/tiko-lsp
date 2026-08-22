@@ -1,0 +1,21 @@
+'' ############################################################################
+''  handlers/hover.bi -- textDocument/hover
+''
+''  Also the home of the shared "what symbol is under this position" step,
+''  because hover and definition resolve identically and must agree: an editor
+''  that shows one thing on hover and jumps to another is worse than one that
+''  does neither.
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.bi"
+
+declare sub RegisterHoverHandlers( )
+
+'' Resolves the identifier at `offset` in `doc`. Returns the symbol index, or
+'' -1 when the position is not on a name or the name is not declared in this
+'' file. `wordRangeStart` / `wordRangeEnd` come back as the identifier's byte
+'' range, so a caller can tell the editor what was hovered.
+declare function ResolveAtOffset( byval doc as TextDocumentPtr, byval offset as long, _
+                                  byref wordRangeStart as long, byref wordRangeEnd as long ) as long

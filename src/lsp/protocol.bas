@@ -11,9 +11,10 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     ''  A capability announced here is a promise that the corresponding request
     ''  works. Nothing is listed before the phase that implements it:
     ''
-    ''      phase 2   textDocumentSync, positionEncoding      <- here now
+    ''      phase 2   textDocumentSync, positionEncoding
     ''      phase 3   (diagnostics are pushed, not advertised, before 3.17)
-    ''      phase 4   documentSymbolProvider, hoverProvider, definitionProvider
+    ''      phase 4   documentSymbolProvider, hoverProvider,
+    ''                definitionProvider                       <- here now
     ''      phase 5   completionProvider { triggerCharacters: [".", ":"] }
     ''      phase 6   workspaceSymbolProvider, referencesProvider
     ''      phase 7   renameProvider, signatureHelpProvider, semanticTokens...
@@ -37,6 +38,14 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     rb.SetNode( sync, "save", saveOpts )
 
     rb.SetNode( caps, "textDocumentSync", sync )
+
+    '' Phase 4. Each of these is answered from the document's own symbol table,
+    '' so each is honest for the file being edited -- and only for that file:
+    '' definition does not follow an #include yet, and says nothing rather than
+    '' guessing.
+    rb.SetBool( caps, "documentSymbolProvider", true )
+    rb.SetBool( caps, "hoverProvider",          true )
+    rb.SetBool( caps, "definitionProvider",     true )
 
     return caps
 end function

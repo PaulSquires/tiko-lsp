@@ -1,7 +1,8 @@
 '' ############################################################################
 ''  main.bas -- tiko-lsp, a Language Server Protocol server for fbc-modern
 ''
-''  Phase 1: transport, JSON-RPC, dispatcher, lifecycle.
+''  Phases 1-4: transport, JSON-RPC, dispatcher, lifecycle, document sync,
+''  analysis, and the first language features.
 ''
 ''  The whole program is one thread and one loop: read a framed message,
 ''  dispatch it, write the response. Analysis work moves off this loop in a
@@ -21,6 +22,9 @@
 #include once "lsp/dispatcher.bi"
 #include once "handlers/lifecycle.bi"
 #include once "handlers/text_document.bi"
+#include once "handlers/document_symbols.bi"
+#include once "handlers/hover.bi"
+#include once "handlers/definition.bi"
 
 using FB
 
@@ -115,6 +119,9 @@ private function RunServer( ) as long
     srv.Attach( @tp )
     RegisterLifecycleHandlers( )
     RegisterTextDocumentHandlers( )
+    RegisterDocumentSymbolHandlers( )
+    RegisterHoverHandlers( )
+    RegisterDefinitionHandlers( )
     LogDebug( RegisteredCount( ) & " methods registered" )
 
     dim as string payload

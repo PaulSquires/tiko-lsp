@@ -15,9 +15,9 @@ private function BuildPosition( byref rb as JsonBuilder, byref p as SourcePositi
     return node
 end function
 
-private function BuildRange( byref rb as JsonBuilder, byref text_ as string, _
-                             byref idx as LineIndex, _
-                             byval startOffset as long, byval endOffset as long ) as JsonNode
+function BuildLspRange( byref rb as JsonBuilder, byref text_ as string, _
+                        byref idx as LineIndex, _
+                        byval startOffset as long, byval endOffset as long ) as JsonNode
     dim as SourcePosition s = OffsetToSourcePosition( text_, idx, startOffset )
     dim as SourcePosition e = OffsetToSourcePosition( text_, idx, endOffset )
 
@@ -45,7 +45,7 @@ private sub SendDiagnostics( byref srv as Server, byref uri as string, _
         dim as Diagnostic d = diags[i]
 
         dim as JsonNode item = rb.NewObject( )
-        rb.SetNode( item, "range", BuildRange( rb, text_, idx, d.StartOffset, d.EndOffset ) )
+        rb.SetNode( item, "range", BuildLspRange( rb, text_, idx, d.StartOffset, d.EndOffset ) )
         rb.SetInt ( item, "severity", clngint( d.Severity ) )
         rb.SetStr ( item, "code",     d.Code_ )
         rb.SetStr ( item, "source",   DIAG_SOURCE )
@@ -60,14 +60,15 @@ end sub
 sub PublishDocumentDiagnostics( byref srv as Server, byval doc as TextDocumentPtr )
     if( doc = 0 ) then exit sub
 
-    dim as DiagnosticArray diags
+    '' The document analyses itself at most once per version, so publishing
+    '' after an edit costs one analysis no matter how many features ask for it.
     dim as string body = doc->Text( )
-    AnalyzeSource( body, diags )
 
     LogDebug( "analysed " & UriFileName( doc->Uri( ) ) & " v" & doc->Version( ) & _
-              ": " & diags.Count( ) & " diagnostic(s)" )
+              ": " & doc->Diagnostics( ).Count( ) & " diagnostic(s), " & _
+              doc->Symbols( ).Count( ) & " symbol(s)" )
 
-    SendDiagnostics( srv, doc->Uri( ), doc->Version( ), true, body, doc->Index( ), diags )
+    SendDiagnostics( srv, doc->Uri( ), doc->Version( ), true, body, doc->Index( ), doc->Diagnostics( ) )
 end sub
 
 sub ClearDocumentDiagnostics( byref srv as Server, byref uri as string )

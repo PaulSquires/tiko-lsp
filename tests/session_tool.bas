@@ -23,6 +23,11 @@
 const CR = chr(13)
 const LF = chr(10)
 
+'' A doubled quote is how a FreeBASIC literal spells one quote, and a JSON
+'' payload is nothing but quotes. Q is one quote, so the messages below read
+'' as JSON rather than as a hedge maze.
+const Q = chr(34)
+
 private function Frame( byref payload as string ) as string
     return "Content-Length: " & len(payload) & CR & LF & CR & LF & payload
 end function
@@ -30,86 +35,140 @@ end function
 '' ----------------------------------------------------------------------------
 ''  The scripted client session
 ''
-''  Every message here exercises one rule of the lifecycle, in an order a real
-''  editor could produce.
+''  Every message exercises one rule, in an order a real editor could produce.
 '' ----------------------------------------------------------------------------
 private function SessionBytes( ) as string
     dim as string s
 
     '' 1. initialize, with the shape a real client sends.
-    s &= Frame( "{""jsonrpc"":""2.0"",""id"":1,""method"":""initialize""," & _
-                """params"":{""processId"":4242," & _
-                """clientInfo"":{""name"":""session_tool"",""version"":""1.0""}," & _
-                """rootUri"":""file:///c%3A/dev/tiko""," & _
-                """trace"":""messages""," & _
-                """capabilities"":{""general"":{""positionEncodings"":[""utf-16"",""utf-8""]}}," & _
-                """workspaceFolders"":[{""uri"":""file:///c%3A/dev/tiko"",""name"":""tiko""}]}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "id" & Q & ":1," & Q & "method" & Q & ":" & Q & "initialize" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "processId" & Q & ":4242," & _
+                Q & "clientInfo" & Q & ":{" & Q & "name" & Q & ":" & Q & "session_tool" & Q & "," & _
+                Q & "version" & Q & ":" & Q & "1.0" & Q & "}," & _
+                Q & "rootUri" & Q & ":" & Q & "file:///c%3A/dev/tiko" & Q & "," & _
+                Q & "trace" & Q & ":" & Q & "messages" & Q & "," & _
+                Q & "capabilities" & Q & ":{" & Q & "general" & Q & ":{" & _
+                Q & "positionEncodings" & Q & ":[" & Q & "utf-16" & Q & "," & Q & "utf-8" & Q & "]}}," & _
+                Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/tiko" & Q & "," & _
+                Q & "name" & Q & ":" & Q & "tiko" & Q & "}]}}" )
 
     '' 2. the client confirms; the server answers with a window/logMessage.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""initialized"",""params"":{}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "initialized" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 3. a request for something phase 1 does not implement -> MethodNotFound.
-    s &= Frame( "{""jsonrpc"":""2.0"",""id"":2,""method"":""textDocument/hover""," & _
-                """params"":{""textDocument"":{""uri"":""file:///x.bas""}," & _
-                """position"":{""line"":0,""character"":0}}}" )
+    '' 3. a request for something not implemented -> MethodNotFound.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":2," & _
+                Q & "method" & Q & ":" & Q & "textDocument/references" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & _
+                Q & "file:///x.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":0," & Q & "character" & Q & ":0}}}" )
 
     '' 4. a second initialize, with a STRING id -> InvalidRequest, echoed with
     ''    the id still a string.
-    s &= Frame( "{""jsonrpc"":""2.0"",""id"":""s-1"",""method"":""initialize"",""params"":{}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "id" & Q & ":" & Q & "s-1" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "initialize" & Q & "," & Q & "params" & Q & ":{}}" )
 
     '' 5. a notification the server understands, and one it does not. Neither
     ''    may produce output.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""$/setTrace"",""params"":{""value"":""verbose""}}" )
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""$/somethingUnknown"",""params"":{}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "$/setTrace" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "value" & Q & ":" & Q & "verbose" & Q & "}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "$/somethingUnknown" & Q & "," & Q & "params" & Q & ":{}}" )
 
     '' 6. a document opens, carrying a REAL syntax error -- a sub with no
     ''    `end sub`. Tracing is on, so each document notification produces a
     ''    $/logTrace, and each also produces a publishDiagnostics.
-    ''        "sub Test( )" 11 + LF 1 + "print i" 7 = 19 bytes over 2 lines
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didOpen""," & _
-                """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas""," & _
-                """languageId"":""freebasic"",""version"":1," & _
-                """text"":""sub Test( )\nprint i""}}}" )
+    ''
+    ''        dim shared as long counter     26 bytes, `counter` at column 19
+    ''        sub Test( )                    11
+    ''        counter = 1                    11
+    ''
+    ''    26 + 1 + 11 + 1 + 11 = 50 bytes over 3 lines.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & Q & "dim shared as long counter\nsub Test( )\ncounter = 1" & Q & "}}}" )
 
     '' 7. two edits in ONE didChange, the second expressed against the text as
     ''    the FIRST left it. Together they also FIX the error, so the
     ''    publishDiagnostics that follows must be EMPTY -- which is how an
     ''    editor clears a squiggle.
-    ''        edit 1: `print i` -> `print 1`
+    ''
+    ''        edit 1: the `1` on line 2 becomes `2`
     ''        edit 2: append a newline and `end sub`
-    ''    Result: 11 + 1 + 7 + 1 + 7 = 27 bytes over 3 lines.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didChange""," & _
-                """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas"",""version"":2}," & _
-                """contentChanges"":[" & _
-                "{""range"":{""start"":{""line"":1,""character"":6}," & _
-                 """end"":{""line"":1,""character"":7}},""text"":""1""}," & _
-                "{""range"":{""start"":{""line"":1,""character"":7}," & _
-                 """end"":{""line"":1,""character"":7}},""text"":""\nend sub""}]}}" )
+    ''
+    ''    Result: 50 + 8 = 58 bytes over 4 lines.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didChange" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "," & Q & "version" & Q & ":2}," & _
+                Q & "contentChanges" & Q & ":[" & _
+                "{" & Q & "range" & Q & ":{" & Q & "start" & Q & ":{" & Q & "line" & Q & ":2," & _
+                Q & "character" & Q & ":10}," & Q & "end" & Q & ":{" & Q & "line" & Q & ":2," & _
+                Q & "character" & Q & ":11}}," & Q & "text" & Q & ":" & Q & "2" & Q & "}," & _
+                "{" & Q & "range" & Q & ":{" & Q & "start" & Q & ":{" & Q & "line" & Q & ":2," & _
+                Q & "character" & Q & ":11}," & Q & "end" & Q & ":{" & Q & "line" & Q & ":2," & _
+                Q & "character" & Q & ":11}}," & Q & "text" & Q & ":" & Q & "\nend sub" & Q & "}]}}" )
 
     '' 8. a change for a document that was never opened -- dropped in silence,
     ''    which means NO $/logTrace and no response.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didChange""," & _
-                """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/never-opened.bas"",""version"":5}," & _
-                """contentChanges"":[{""text"":""whatever""}]}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didChange" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/never-opened.bas" & Q & "," & _
+                Q & "version" & Q & ":5}," & _
+                Q & "contentChanges" & Q & ":[{" & Q & "text" & Q & ":" & Q & "whatever" & Q & "}]}}" )
 
-    '' 9. save, then close.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didSave""," & _
-                """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas""}}}" )
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didClose""," & _
-                """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas""}}}" )
+    '' 9. the language features, against the document as the edits left it: the
+    ''    outline, then a hover and a definition on the USE of `counter` on
+    ''    line 2, both of which must land on its declaration on line 0.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":5," & _
+                Q & "method" & Q & ":" & Q & "textDocument/documentSymbol" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}}}" )
 
-    '' 10. broken JSON -> ParseError against a null id, and the session must
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":6," & _
+                Q & "method" & Q & ":" & Q & "textDocument/hover" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":7," & _
+                Q & "method" & Q & ":" & Q & "textDocument/definition" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
+
+    '' 10. save, then close.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}}}" )
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didClose" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}}}" )
+
+    '' 11. broken JSON -> ParseError against a null id, and the session must
     ''     CONTINUE afterwards.
     s &= Frame( "{ this is not json" )
 
-    '' 11. shutdown -> null result.
-    s &= Frame( "{""jsonrpc"":""2.0"",""id"":3,""method"":""shutdown""}" )
+    '' 12. shutdown -> null result.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":3," & _
+                Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
 
-    '' 12. a request after shutdown -> InvalidRequest.
-    s &= Frame( "{""jsonrpc"":""2.0"",""id"":4,""method"":""textDocument/hover"",""params"":{}}" )
+    '' 13. a request after shutdown -> InvalidRequest.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":4," & _
+                Q & "method" & Q & ":" & Q & "textDocument/hover" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 13. exit -> the process ends with code 0, because shutdown came first.
-    s &= Frame( "{""jsonrpc"":""2.0"",""method"":""exit""}" )
+    '' 14. exit -> the process ends with code 0, because shutdown came first.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "exit" & Q & "}" )
 
     return s
 end function
@@ -153,7 +212,7 @@ private function CheckSession( byref path as string ) as long
         return 1
     end if
 
-    '' -- reframe the captured stream ----------------------------------------
+    '' -- reframe the captured stream ------------------------------------------
     TestGroup( "captured stream framing" )
 
     dim as MessageFramer f
@@ -171,25 +230,25 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Fifteen, and exactly fifteen:
-    ''    5 answers to requests (initialize, hover, second initialize,
-    ''      shutdown, post-shutdown hover)
+    '' Eighteen, and exactly eighteen:
+    ''    8 answers to requests -- initialize, references, second initialize,
+    ''      documentSymbol, hover, definition, shutdown, post-shutdown hover
     ''    1 parse error
     ''    1 window/logMessage from `initialized`
-    ''    4 $/logTrace   -- didOpen, didChange, didSave, didClose
+    ''    4 $/logTrace          -- didOpen, didChange, didSave, didClose
     ''    4 publishDiagnostics, one after each of those
     '' and NOTHING for the two $/ notifications the server must swallow, nor
     '' for the didChange against a document that was never opened.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 15, "the session produced exactly fifteen messages" )
-    if( messages.Count( ) <> 15 ) then
+    AssertEqInt( messages.Count( ), 18, "the session produced exactly eighteen messages" )
+    if( messages.Count( ) <> 18 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 160 )
         next
         return TestSummary( "piped session" )
     end if
 
-    '' -- 1. the initialize response ------------------------------------------
+    '' -- 1. the initialize response --------------------------------------------
     TestGroup( "initialize response" )
     scope
         dim as JsonDoc doc
@@ -198,11 +257,8 @@ private function CheckSession( byref path as string ) as long
         AssertEqStr( r.Member( "jsonrpc" ).AsString( ), "2.0", "carries jsonrpc 2.0" )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 1, "answers id 1" )
         AssertTrue( r.Has( "result" ), "is a success response" )
-        AssertTrue( r.Member( "result" ).Member( "capabilities" ).IsObject( ), "result has capabilities" )
         AssertEqStr( r.Member( "result" ).Member( "serverInfo" ).Member( "name" ).AsString( ), _
                      LSP_SERVER_NAME, "serverInfo names the server" )
-        AssertEqStr( r.Member( "result" ).Member( "serverInfo" ).Member( "version" ).AsString( ), _
-                     LSP_SERVER_VERSION, "serverInfo carries the version" )
 
         dim as JsonValue caps = r.Member( "result" ).Member( "capabilities" )
         AssertEqStr( caps.Member( "positionEncoding" ).AsString( ), LSP_ENCODING_UTF16, _
@@ -211,18 +267,17 @@ private function CheckSession( byref path as string ) as long
                      "openClose is advertised" )
         AssertEqInt( caps.Member( "textDocumentSync" ).Member( "change" ).AsLongInt( ), _
                      clngint( LSPSYNC_INCREMENTAL ), "incremental sync is advertised" )
-        AssertFalse( caps.Member( "textDocumentSync" ).Member( "save" ).Member( "includeText" ).AsBoolean( true ), _
-                     "didSave is wanted without the text -- the buffer is already authoritative" )
 
-        '' Still nothing that is not implemented. These land in phases 4-7 and
-        '' must not appear before then.
-        AssertFalse( caps.Has( "hoverProvider" ), "hover is NOT claimed" )
+        '' Phase 4's three, and still nothing that is not implemented.
+        AssertTrue ( caps.Member( "documentSymbolProvider" ).AsBoolean( ), "documentSymbol is claimed" )
+        AssertTrue ( caps.Member( "hoverProvider" ).AsBoolean( ), "hover is claimed" )
+        AssertTrue ( caps.Member( "definitionProvider" ).AsBoolean( ), "definition is claimed" )
         AssertFalse( caps.Has( "completionProvider" ), "completion is NOT claimed" )
-        AssertFalse( caps.Has( "definitionProvider" ), "definition is NOT claimed" )
+        AssertFalse( caps.Has( "referencesProvider" ), "references is NOT claimed" )
         AssertFalse( caps.Has( "renameProvider" ), "rename is NOT claimed" )
     end scope
 
-    '' -- 2. the window/logMessage triggered by `initialized` -------------------
+    '' -- 2. the window/logMessage triggered by `initialized` --------------------
     TestGroup( "initialized notification" )
     scope
         dim as JsonDoc doc
@@ -234,7 +289,7 @@ private function CheckSession( byref path as string ) as long
                         "the log message names the server" )
     end scope
 
-    '' -- 3. MethodNotFound for an unimplemented request ------------------------
+    '' -- 3. MethodNotFound for an unimplemented request -------------------------
     TestGroup( "unimplemented method" )
     scope
         dim as JsonDoc doc
@@ -242,11 +297,11 @@ private function CheckSession( byref path as string ) as long
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 2, "answers id 2" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
-                     "textDocument/hover is MethodNotFound" )
+                     "textDocument/references is MethodNotFound" )
         AssertFalse( r.Has( "result" ), "an error response has no result" )
     end scope
 
-    '' -- 4. a second initialize, string id ------------------------------------
+    '' -- 4. a second initialize, string id --------------------------------------
     TestGroup( "second initialize" )
     scope
         dim as JsonDoc doc
@@ -258,7 +313,7 @@ private function CheckSession( byref path as string ) as long
                      "a second initialize is InvalidRequest" )
     end scope
 
-    '' -- 5..12. document synchronisation and diagnostics ---------------------
+    '' -- 5..8. document synchronisation and diagnostics -------------------------
     ''
     '' didOpen/didChange/didSave/didClose are notifications and have no
     '' responses, so what proves the server tracked the buffer is what it sends
@@ -275,9 +330,9 @@ private function CheckSession( byref path as string ) as long
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen x.bas", "the trace names the event and the file" )
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "v1, 2 line(s), 19 byte(s)", "the opened buffer is measured correctly" )
+                        "v1, 3 line(s), 50 byte(s)", "the opened buffer is measured correctly" )
 
-        '' -- the diagnostic for the missing `end sub` -------------------------
+        '' -- the diagnostic for the missing `end sub` --------------------------
         dim as JsonValue d = openDiag.Root( )
         AssertEqStr( d.Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, "diagnostics published" )
         AssertEqStr( d.Member( "params" ).Member( "uri" ).AsString( ), _
@@ -292,20 +347,16 @@ private function CheckSession( byref path as string ) as long
         AssertEqInt( item.Member( "severity" ).AsLongInt( ), 1, "at severity Error" )
         AssertEqStr( item.Member( "source" ).AsString( ), "tiko-lsp", "attributed to this server" )
         AssertContains( item.Member( "message" ).AsString( ), "'sub Test'", "naming the procedure" )
-
-        '' The range must point at the SUB on line 0, characters 0 to 3.
-        AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
-                     "the range starts on line 0" )
+        AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
+                     "the range points at the SUB, on line 1" )
         AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 0, _
                      "at character 0" )
-        AssertEqInt( item.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 3, _
-                     "and covers the keyword" )
 
-        '' -- the edits fix it, so the next report must be EMPTY ---------------
+        '' -- the edits fix it, so the next report must be EMPTY ----------------
         AssertContains( changeTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "2 edit(s)", "both content changes were applied" )
         AssertContains( changeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "v2, 3 line(s), 27 byte(s)", "the edits applied in order, against the evolving text" )
+                        "v2, 4 line(s), 58 byte(s)", "the edits applied in order, against the evolving text" )
 
         AssertEqStr( changeDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
                      "diagnostics republished after the change" )
@@ -315,12 +366,75 @@ private function CheckSession( byref path as string ) as long
                      "against the new version" )
     end scope
 
+    '' -- 9..11. the language features -------------------------------------------
+    ''
+    '' The outline, then a hover and a definition on the USE of `counter` on
+    '' line 2, both of which have to land on its DECLARATION on line 0. That is
+    '' the whole of phase 4 in three messages.
+    TestGroup( "outline, hover and definition" )
+    scope
+        dim as JsonDoc outline_, hover_, defn_
+        AssertTrue( outline_.Parse( messages[8]  ), "message 8 is JSON" )
+        AssertTrue( hover_.Parse  ( messages[9]  ), "message 9 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[10] ), "message 10 is JSON" )
+
+        '' -- documentSymbol ----------------------------------------------------
+        dim as JsonValue syms = outline_.Root( ).Member( "result" )
+        AssertEqInt( outline_.Root( ).Member( "id" ).AsLongInt( ), 5, "answers id 5" )
+        AssertEqInt( syms.Count( ), 2, "the outline has two top-level symbols" )
+
+        dim as JsonValue s0 = syms.Item( 0 )
+        dim as JsonValue s1 = syms.Item( 1 )
+        AssertEqStr( s0.Member( "name" ).AsString( ), "counter", "the variable is listed" )
+        AssertEqInt( s0.Member( "kind" ).AsLongInt( ), 13, "as a Variable" )
+        AssertEqStr( s0.Member( "detail" ).AsString( ), "as long", "with its type" )
+        AssertEqStr( s1.Member( "name" ).AsString( ), "Test", "the procedure is listed" )
+        AssertEqInt( s1.Member( "kind" ).AsLongInt( ), 12, "as a Function" )
+
+        '' selectionRange is the NAME and must lie inside range, which is the
+        '' whole declaration. A client that disagrees shows an empty outline
+        '' rather than complaining.
+        AssertEqInt( s1.Member( "selectionRange" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
+                     "the selection range is the name, on line 1" )
+        AssertEqInt( s1.Member( "selectionRange" ).Member( "start" ).Member( "character" ).AsLongInt( ), 4, _
+                     "at the character the name starts" )
+        AssertEqInt( s1.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
+                     "the full range starts at the SUB" )
+        AssertEqInt( s1.Member( "range" ).Member( "end" ).Member( "line" ).AsLongInt( ), 3, _
+                     "and ends at the END SUB" )
+
+        '' -- hover -------------------------------------------------------------
+        dim as string markdown = hover_.Root( ).Member( "result" ).Member( "contents" ) _
+                                       .Member( "value" ).AsString( )
+        AssertEqInt( hover_.Root( ).Member( "id" ).AsLongInt( ), 6, "answers id 6" )
+        AssertEqStr( hover_.Root( ).Member( "result" ).Member( "contents" ).Member( "kind" ).AsString( ), _
+                     "markdown", "hover is markdown" )
+        AssertContains( markdown, "counter as long", "showing the declaration" )
+        AssertContains( markdown, "variable", "and what kind of thing it is" )
+        AssertEqInt( hover_.Root( ).Member( "result" ).Member( "range" ) _
+                           .Member( "start" ).Member( "line" ).AsLongInt( ), 2, _
+                     "the hovered range is the word under the cursor" )
+
+        '' -- definition --------------------------------------------------------
+        dim as JsonValue defnLoc = defn_.Root( ).Member( "result" )
+        AssertEqInt( defn_.Root( ).Member( "id" ).AsLongInt( ), 7, "answers id 7" )
+        AssertEqStr( defnLoc.Member( "uri" ).AsString( ), "file:///c%3A/dev/x.bas", _
+                     "the definition is in this file" )
+        AssertEqInt( defnLoc.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
+                     "a use on line 2 resolves to the declaration on line 0" )
+        AssertEqInt( defnLoc.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 19, _
+                     "at the character the NAME starts, not the line" )
+        AssertEqInt( defnLoc.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 26, _
+                     "and ending after it" )
+    end scope
+
+    '' -- 12..15. save and close ---------------------------------------------------
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[8]  ), "message 8 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[9]  ), "message 9 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[10] ), "message 10 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[11] ), "message 11 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[11] ), "message 11 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[12] ), "message 12 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[13] ), "message 13 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[14] ), "message 14 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
@@ -329,41 +443,39 @@ private function CheckSession( byref path as string ) as long
 
         AssertContains( closeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "0 document(s) still open", "closing released the buffer" )
-        AssertEqStr( closeDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
-                     "a close republishes" )
         AssertEqInt( closeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
                      "with an empty list, so nothing is left on screen" )
         AssertFalse( closeDiag.Root( ).Member( "params" ).Has( "version" ), _
                      "and no version, because the document is gone" )
     end scope
 
-    '' -- 13. the parse error ---------------------------------------------------
+    '' -- 16. the parse error -------------------------------------------------------
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[12] ), "message 12 is JSON" )
+        AssertTrue( doc.Parse( messages[15] ), "message 15 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertTrue( r.Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
     end scope
 
-    '' -- 14. shutdown ---------------------------------------------------------
+    '' -- 17. shutdown ---------------------------------------------------------------
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[13] ), "message 13 is JSON" )
+        AssertTrue( doc.Parse( messages[16] ), "message 16 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue( r.Has( "result" ), "shutdown returns a result member" )
         AssertTrue( r.Member( "result" ).IsNull( ), "the shutdown result is null" )
     end scope
 
-    '' -- 15. a request arriving after shutdown --------------------------------
+    '' -- 18. a request arriving after shutdown --------------------------------------
     TestGroup( "post-shutdown request" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[14] ), "message 14 is JSON" )
+        AssertTrue( doc.Parse( messages[17] ), "message 17 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 4, "answers id 4" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _

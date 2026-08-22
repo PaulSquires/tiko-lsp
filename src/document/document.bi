@@ -11,6 +11,7 @@
 #pragma once
 
 #include once "../utils/position.bi"
+#include once "../analysis/parser.bi"
 
 type TextDocument
     private:
@@ -21,6 +22,17 @@ type TextDocument
         m_text       as string    '' UTF-8
         m_index      as LineIndex
         m_dirty      as boolean   '' changed since the last didSave
+
+        '' -- cached analysis --------------------------------------------------
+        ''
+        '' Lexing and parsing a document costs a millisecond or so, and hover,
+        '' definition, the outline and diagnostics all want the same result
+        '' from the same version. It is computed at most once per edit, on
+        '' demand, and thrown away by any mutation.
+        m_tokens     as TokenArray
+        m_symbols    as SymbolTable
+        m_diags      as DiagnosticArray
+        m_analysed   as boolean
 
     public:
         declare constructor( )
@@ -66,8 +78,15 @@ type TextDocument
 
         '' -- analysis ----------------------------------------------------------
         ''
-        '' Phase 3 adds the parse tree, phase 4 the symbol table and phase 3's
-        '' diagnostics, each as a typed member with its own lifetime tied to
-        '' this document. They are deliberately absent rather than present as
-        '' ANY PTR placeholders that nothing would free.
+        '' Each of these re-analyses first if the document has changed since
+        '' the last call, so a caller never has to ask whether the cache is
+        '' warm. They return BYREF: the tables are large and nobody owns them
+        '' but the document.
+        declare sub      Invalidate ( )
+        declare function Tokens     ( ) byref as TokenArray
+        declare function Symbols    ( ) byref as SymbolTable
+        declare function Diagnostics( ) byref as DiagnosticArray
+
+    private:
+        declare sub EnsureAnalysed( )
 end type

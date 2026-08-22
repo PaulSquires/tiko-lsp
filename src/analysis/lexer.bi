@@ -90,6 +90,9 @@ enum FbKeyword
     KW_VIRTUAL
     KW_ABSTRACT
     KW_CONST
+    KW_DIM
+    KW_VAR
+    KW_REDIM
     KW_DEFINE
 
     '' preprocessor

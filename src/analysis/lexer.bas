@@ -107,6 +107,9 @@ private sub EnsureKeywords( )
     Register( "virtual",     KW_VIRTUAL )
     Register( "abstract",    KW_ABSTRACT )
     Register( "const",       KW_CONST )
+    Register( "dim",         KW_DIM )
+    Register( "var",         KW_VAR )
+    Register( "redim",       KW_REDIM )
 end sub
 
 function KeywordOf( byref word_ as string ) as FbKeyword

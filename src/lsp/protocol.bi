@@ -36,6 +36,11 @@ const LSP_DID_CHANGE = "textDocument/didChange"
 const LSP_DID_SAVE   = "textDocument/didSave"
 const LSP_DID_CLOSE  = "textDocument/didClose"
 
+'' Language features (phase 4).
+const LSP_DOCUMENT_SYMBOL = "textDocument/documentSymbol"
+const LSP_HOVER           = "textDocument/hover"
+const LSP_DEFINITION      = "textDocument/definition"
+
 '' Diagnostics are PUSHED (phase 3). There is no capability to advertise for
 '' this: a server may publish whenever it likes, and the pull-based
 '' textDocument/diagnostic of 3.17 is a separate feature this does not claim.
