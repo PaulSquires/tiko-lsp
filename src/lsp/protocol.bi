@@ -40,6 +40,7 @@ const LSP_DID_CLOSE  = "textDocument/didClose"
 const LSP_DOCUMENT_SYMBOL = "textDocument/documentSymbol"
 const LSP_HOVER           = "textDocument/hover"
 const LSP_DEFINITION      = "textDocument/definition"
+const LSP_COMPLETION      = "textDocument/completion"
 
 '' Diagnostics are PUSHED (phase 3). There is no capability to advertise for
 '' this: a server may publish whenever it likes, and the pull-based

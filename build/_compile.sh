@@ -41,11 +41,13 @@ echo "Building tiko-lsp"
     "$ROOT/src/handlers/document_symbols.bas" \
     "$ROOT/src/handlers/hover.bas" \
     "$ROOT/src/handlers/definition.bas" \
+    "$ROOT/src/handlers/completion.bas" \
     "$ROOT/src/document/document.bas" \
     "$ROOT/src/document/document_manager.bas" \
     "$ROOT/src/analysis/lexer.bas" \
     "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" \
+    "$ROOT/src/analysis/completion.bas" \
     "$ROOT/src/analysis/diagnostics.bas" \
     "$ROOT/src/utils/logging.bas" \
     "$ROOT/src/utils/position.bas" \

@@ -30,7 +30,7 @@ here launches a compiler process, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-4 complete
+## Status: phases 1-5 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -38,15 +38,16 @@ here launches a compiler process, and nothing ever will.
 | 2 | documents, `didOpen` / `didChange` / `didSave` / `didClose`, line index, UTF-16 positions | **done** |
 | 3 | lexer, parser with error recovery, diagnostics | **done** |
 | 4 | symbols, document symbols, hover, go to definition | **done** |
-| 5 | completion | |
+| 5 | completion | **done** |
 | 6 | workspace index, workspace symbols, references | |
 | 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
-(incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider` and
-`definitionProvider`. Nothing else — promising `completionProvider` before phase 5
-would make every keystroke time out, so each capability is added in the phase that
-implements it. See `LspBuildCapabilities` in
+(incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
+`definitionProvider` and `completionProvider`. Nothing else — promising
+`referencesProvider` before phase 6 would make every "find all references" come
+back empty, so each capability is added in the phase that implements it. See
+`LspBuildCapabilities` in
 [src/lsp/protocol.bas](src/lsp/protocol.bas). Diagnostics need no capability: they
 are pushed, and the server publishes them on open, change and save.
 
@@ -77,20 +78,22 @@ tiko-lsp/
     analysis/   lexer.bi/.bas         FreeBASIC tokens, 247 reserved words
                 parser.bi/.bas        block structure and symbols, with recovery
                 symbols.bi/.bas       the symbol table, scope resolution, hover text
+                completion.bi/.bas    what could be typed here
                 diagnostics.bi/.bas   the problem model, in byte offsets
     handlers/   lifecycle.bi/.bas     initialize / initialized / shutdown / exit
                 text_document.bi/.bas didOpen / didChange / didSave / didClose
                 document_symbols.bi/.bas   the outline
                 hover.bi/.bas         hover, and the shared resolution step
                 definition.bi/.bas    go to definition
+                completion.bi/.bas    completion
     utils/      logging.bi/.bas       stderr and optional log file, never stdout
                 position.bi/.bas      line index, UTF-16 <-> byte offsets
                 uri.bi/.bas           file: URI <-> filesystem path
   tests/        assert.bi, test_framing.bas, test_json.bas, test_position.bas,
                 test_document.bas, test_analysis.bas, test_symbols.bas,
-                session_tool.bas
+                test_completion.bas, session_tool.bas
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md, phase2.md, phase3.md, phase4.md
+  docs/         architecture.md, phase1.md .. phase5.md
 ```
 
 `src/workspace/` arrives with the phase that fills it; empty placeholder files
@@ -190,7 +193,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Seven suites, 627 assertions:
+(or `sh build/_run_tests.sh`). Eight suites, 699 assertions:
 
 - **framing** — 41 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -216,15 +219,20 @@ build\_run_tests.bat
   symbol carries, scope resolution (a parameter shadows a global of the same
   name), member resolution, the token-under-the-cursor rules, hover markdown,
   and half-typed code — an unclosed `type` must still produce an outline.
-- **piped session** — 93 assertions against a **real `tiko-lsp` process** driven
+- **completion** — 63 assertions over context detection (including inside a
+  string and inside a comment, where the answer is nothing), member completion
+  through a declared type, a pointer, `this.`, an enum and a namespace, the
+  scope list with its group ordering, and case-insensitive de-duplication.
+- **piped session** — 102 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
   stream — including that two edits in one `didChange` applied in order against
   the evolving text, that a syntax error becomes a `publishDiagnostics` with the
   right range and code, that fixing it publishes an **empty** list, that an
-  outline, a hover and a go-to-definition come back with the right kinds and
-  land on the declaration's name, that the notifications which must be swallowed
-  produced no output, and that the process exited 0.
+  outline, a hover, a go-to-definition and a completion list come back with the
+  right kinds — the definition landing on the declaration's name, the completion
+  sorting a declaration above a keyword — that the notifications which must be
+  swallowed produced no output, and that the process exited 0.
 
 ## Licence
 

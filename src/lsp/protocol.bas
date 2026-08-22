@@ -14,8 +14,8 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     ''      phase 2   textDocumentSync, positionEncoding
     ''      phase 3   (diagnostics are pushed, not advertised, before 3.17)
     ''      phase 4   documentSymbolProvider, hoverProvider,
-    ''                definitionProvider                       <- here now
-    ''      phase 5   completionProvider { triggerCharacters: [".", ":"] }
+    ''                definitionProvider
+    ''      phase 5   completionProvider                       <- here now
     ''      phase 6   workspaceSymbolProvider, referencesProvider
     ''      phase 7   renameProvider, signatureHelpProvider, semanticTokens...
     '' ------------------------------------------------------------------------
@@ -46,6 +46,22 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     rb.SetBool( caps, "documentSymbolProvider", true )
     rb.SetBool( caps, "hoverProvider",          true )
     rb.SetBool( caps, "definitionProvider",     true )
+
+    '' Phase 5. The trigger characters are the ones after which a client should
+    '' ask WITHOUT being asked to: a dot begins a member expression, and a
+    '' colon ends a statement, so the next thing typed is a fresh identifier.
+    ''
+    '' resolveProvider is FALSE: every item already carries its detail and its
+    '' documentation, so there is no second round trip to serve.
+    dim as JsonNode completion = rb.NewObject( )
+    rb.SetBool( completion, "resolveProvider", false )
+
+    dim as JsonNode triggers = rb.NewArray( )
+    rb.PushStr( triggers, "." )
+    rb.PushStr( triggers, ":" )
+    rb.SetNode( completion, "triggerCharacters", triggers )
+
+    rb.SetNode( caps, "completionProvider", completion )
 
     return caps
 end function

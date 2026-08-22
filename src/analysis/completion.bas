@@ -1,0 +1,312 @@
+'' ############################################################################
+''  analysis/completion.bas -- what could be typed here
+'' ############################################################################
+
+#include once "completion.bi"
+
+'' ############################################################################
+''  Context
+'' ############################################################################
+
+'' The index of the last token that STARTS before `offset`. That is the token
+'' the cursor is in or just past, which is what decides the context: a caret
+'' sitting after `customer.` is past the dot, and after `customer.Na` is past
+'' the partial name.
+private function TokenBefore( byref tokens as TokenArray, byval offset as long ) as long
+    dim as long found = -1
+
+    for i as long = 0 to tokens.Count( ) - 1
+        dim as Token t = tokens[i]
+        if( t.Kind = TK_EOF ) then exit for
+        if( t.Kind = TK_EOL ) then continue for
+        if( t.Start_ >= offset ) then exit for
+        found = i
+    next
+
+    return found
+end function
+
+private function IsDot( byref text_ as string, byref t as Token ) as boolean
+    if( t.Kind <> TK_OP ) then return false
+    return TokenText( text_, t ) = "."
+end function
+
+function CompletionContextAt( byref text_ as string, byref tokens as TokenArray, _
+                              byval offset as long ) as CompletionContext
+    dim as CompletionContext ctx
+    ctx.Kind_      = CMPCTX_SCOPE
+    ctx.BaseOffset = -1
+
+    dim as long i = TokenBefore( tokens, offset )
+    if( i < 0 ) then return ctx
+
+    dim as Token last_ = tokens[i]
+
+    '' Inside a comment or a string, there is nothing to complete. Returning
+    '' the scope list there is how an editor ends up offering `function` in the
+    '' middle of a sentence.
+    if( last_.Kind = TK_COMMENT orelse last_.Kind = TK_STRING ) then
+        if( offset <= last_.Start_ + last_.Length_ ) then
+            ctx.Kind_ = CMPCTX_NONE
+            return ctx
+        end if
+    end if
+
+    '' `something.` -- the cursor is right after the dot.
+    if( IsDot( text_, last_ ) ) then
+        ctx.Kind_ = CMPCTX_MEMBER
+        if( i > 0 ) then
+            dim as Token base_ = tokens[i - 1]
+            if( base_.Kind = TK_IDENT orelse base_.Kind = TK_KEYWORD ) then
+                ctx.BaseName   = lcase( TokenText( text_, base_ ) )
+                ctx.BaseOffset = base_.Start_
+            end if
+        end if
+        return ctx
+    end if
+
+    '' A partial word. It may or may not follow a dot.
+    if( last_.Kind = TK_IDENT orelse last_.Kind = TK_KEYWORD ) then
+        if( offset <= last_.Start_ + last_.Length_ ) then
+            ctx.Prefix = lcase( mid( text_, last_.Start_ + 1, offset - last_.Start_ ) )
+
+            if( i >= 2 ) then
+                if( IsDot( text_, tokens[i - 1] ) ) then
+                    dim as Token base_ = tokens[i - 2]
+                    if( base_.Kind = TK_IDENT orelse base_.Kind = TK_KEYWORD ) then
+                        ctx.Kind_      = CMPCTX_MEMBER
+                        ctx.BaseName   = lcase( TokenText( text_, base_ ) )
+                        ctx.BaseOffset = base_.Start_
+                    end if
+                end if
+            end if
+        end if
+    end if
+
+    return ctx
+end function
+
+'' ############################################################################
+''  Candidates
+'' ############################################################################
+
+function CompletionKindOf( byval kind as SymbolKind ) as CompletionKind
+    select case kind
+        case SYM_METHOD      : return CMP_METHOD
+        case SYM_FUNCTION    : return CMP_FUNCTION
+        case SYM_CONSTRUCTOR : return CMP_CONSTRUCTOR
+        case SYM_PROPERTY    : return CMP_PROPERTY
+        case SYM_OPERATOR    : return CMP_OPERATOR
+        case SYM_FIELD       : return CMP_FIELD
+        case SYM_VARIABLE    : return CMP_VARIABLE
+        case SYM_CONSTANT    : return CMP_CONSTANT
+        case SYM_ENUM        : return CMP_ENUM
+        case SYM_ENUMMEMBER  : return CMP_ENUMMEMBER
+        case SYM_STRUCT      : return CMP_STRUCT
+        case SYM_CLASS       : return CMP_CLASS
+        case SYM_NAMESPACE   : return CMP_MODULE
+    end select
+    return CMP_TEXT
+end function
+
+function DeclaredTypeName( byref sym as SymbolInfo ) as string
+    '' The detail of a variable or field is `as <type>`; of a procedure, its
+    '' signature. Only the first form names a type.
+    if( lcase( left( sym.Detail_, 3 ) ) <> "as " ) then return ""
+
+    dim as string rest = trim( mid( sym.Detail_, 4 ) )
+    if( len(rest) = 0 ) then return ""
+
+    '' Take the first word, and stop at anything that is not part of a name --
+    '' `Customer ptr`, `FB.Array( of string )` and `long` all end here.
+    dim as string word_
+    for i as long = 0 to len(rest) - 1
+        dim as ubyte c = rest[i]
+        dim as boolean part = false
+        if( c >= asc("a") andalso c <= asc("z") ) then part = true
+        if( c >= asc("A") andalso c <= asc("Z") ) then part = true
+        if( c >= asc("0") andalso c <= asc("9") ) then part = true
+        if( c = asc("_") ) then part = true
+        if( part = false ) then exit for
+        word_ &= chr( c )
+    next
+
+    return word_
+end function
+
+'' The name of the symbol a member expression is reaching into, resolved to a
+'' CONTAINER symbol index, or -1.
+''
+'' Three cases are worth having, and the third is why this is not just a name
+'' lookup:
+''
+''     Colour.       the base IS a type, enum or namespace
+''     this.         inside a method, the type it belongs to
+''     customer.     a variable, whose DECLARED TYPE is the container
+''
+'' That last one is the whole of phase 5's type knowledge: the type NAME is
+'' read out of the declaration and looked up. It is not inference -- an
+'' expression like `arr(0).` or `GetCustomer().` is not resolved, and falls
+'' back to the file-wide member list.
+private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as CompletionContext ) as long
+    if( len(ctx.BaseName) = 0 ) then return -1
+
+    '' `this` means the type whose method we are inside.
+    if( ctx.BaseName = "this" ) then
+        dim as long scope_ = syms.InnermostAt( ctx.BaseOffset )
+        while( scope_ >= 0 )
+            if( syms.IsContainer( scope_ ) ) then return scope_
+
+            '' An out-of-line member -- `sub Customer.SetName` -- is parented
+            '' to the file, so its type is found through its own name.
+            dim as string nm = syms.Items[scope_].Name_
+            dim as long dotAt = instr( nm, "." )
+            if( dotAt > 0 ) then
+                dim as string typeName = lcase( left( nm, dotAt - 1 ) )
+                for i as long = 0 to syms.Count( ) - 1
+                    if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = typeName ) then return i
+                next
+            end if
+
+            scope_ = syms.Items[scope_].Parent
+        wend
+        return -1
+    end if
+
+    '' A container named directly: `Colour.`, `App.`
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = ctx.BaseName ) then return i
+    next
+
+    '' A variable, field or parameter: follow its declared type.
+    dim as long v = syms.Resolve( ctx.BaseName, ctx.BaseOffset )
+    if( v >= 0 ) then
+        dim as string typeName = lcase( DeclaredTypeName( syms.Items[v] ) )
+        if( len(typeName) > 0 ) then
+            for i as long = 0 to syms.Count( ) - 1
+                if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = typeName ) then return i
+            next
+        end if
+    end if
+
+    return -1
+end function
+
+'' Appends, unless that label is already there. FreeBASIC is case-insensitive,
+'' so the comparison is too -- and a DECLARE plus its body must not show the
+'' same name twice.
+private sub AddItem( byref items as CompletionItemArray, byref label_ as string, _
+                     byval kind as CompletionKind, byref detail as string, _
+                     byref doc as string, byval group as CompletionGroup )
+    if( len(label_) = 0 ) then exit sub
+
+    dim as string want = lcase( label_ )
+    for i as long = 0 to items.Count( ) - 1
+        if( items[i].LowerLabel = want ) then exit sub
+    next
+
+    dim as CompletionItem it
+    it.Label      = label_
+    it.LowerLabel = want
+    it.Kind_      = kind
+    it.Detail_    = detail
+    it.Doc_       = doc
+    it.SortGroup  = group
+    items.Push( it )
+end sub
+
+private sub AddSymbolItem( byref items as CompletionItemArray, byref sym as SymbolInfo, _
+                           byval group as CompletionGroup )
+    '' A dotted name is offered by its LAST segment: after `Customer.` the
+    '' member is `SetName`, not `Customer.SetName`.
+    dim as string label_ = sym.Name_
+    dim as long dotAt = instrrev( label_, "." )
+    if( dotAt > 0 ) then label_ = mid( label_, dotAt + 1 )
+
+    AddItem( items, label_, CompletionKindOf( sym.Kind_ ), sym.Detail_, sym.Doc_, group )
+end sub
+
+'' Children of `parent`, for a member list.
+private sub AddMembersOf( byref syms as SymbolTable, byref items as CompletionItemArray, _
+                          byval parent as long )
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.Items[i].Parent <> parent ) then continue for
+        if( syms.Items[i].IsLocal ) then continue for
+        AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
+    next
+
+    '' Members defined OUT OF LINE are parented to the file, not to the type,
+    '' so they are found by their dotted name instead.
+    dim as string typeName = lcase( syms.Items[parent].Name_ ) & "."
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.Items[i].IsLocal ) then continue for
+        if( left( lcase( syms.Items[i].Name_ ), len(typeName) ) = typeName ) then
+            AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
+        end if
+    next
+end sub
+
+sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
+                        byref syms as SymbolTable, byval offset as long, _
+                        byref items as CompletionItemArray )
+    items.Clear( )
+
+    dim as CompletionContext ctx = CompletionContextAt( text_, tokens, offset )
+
+    '' -- nowhere -------------------------------------------------------------
+    if( ctx.Kind_ = CMPCTX_NONE ) then exit sub
+
+    '' -- after a dot ---------------------------------------------------------
+    if( ctx.Kind_ = CMPCTX_MEMBER ) then
+        dim as long base_ = ResolveMemberBase( syms, ctx )
+
+        if( base_ >= 0 ) then
+            AddMembersOf( syms, items, base_ )
+            exit sub
+        end if
+
+        '' The base could not be resolved -- an expression, an #included type,
+        '' something half-typed. Offering every member in the file is a guess,
+        '' but a useful one, and it is strictly better than offering keywords.
+        for i as long = 0 to syms.Count( ) - 1
+            select case syms.Items[i].Kind_
+                case SYM_FIELD, SYM_METHOD, SYM_PROPERTY, SYM_ENUMMEMBER
+                    AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
+            end select
+        next
+        exit sub
+    end if
+
+    '' -- an ordinary position -------------------------------------------------
+    ''
+    '' Nearest scope first. The groups are what make a local outrank a keyword
+    '' in the client's list even when the keyword sorts earlier.
+    dim as long scope_ = syms.InnermostAt( offset )
+
+    '' 1. locals and parameters of the enclosing procedure, then whatever
+    ''    encloses that, walking outwards.
+    dim as long walk = scope_
+    while( walk >= 0 )
+        for i as long = 0 to syms.Count( ) - 1
+            if( syms.Items[i].Parent <> walk ) then continue for
+
+            dim as CompletionGroup g = CMPGROUP_TYPE
+            if( syms.Items[i].IsLocal ) then g = CMPGROUP_LOCAL
+            AddSymbolItem( items, syms.Items[i], g )
+        next
+        walk = syms.Items[walk].Parent
+    wend
+
+    '' 2. everything the file declares, including the procedure we are in.
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.Items[i].IsLocal ) then continue for
+        AddSymbolItem( items, syms.Items[i], CMPGROUP_FILE )
+    next
+
+    '' 3. the language. Last, because a reserved word is almost never what the
+    ''    user is reaching for, and there are 247 of them.
+    dim words as FB.Array( of string ) = AllKeywords( )
+    for i as long = 0 to words.Count( ) - 1
+        AddItem( items, words[i], CMP_KEYWORD, "keyword", "", CMPGROUP_KEYWORD )
+    next
+end sub

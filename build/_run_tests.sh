@@ -15,53 +15,64 @@ FAILED=0
 
 mkdir -p "$ROOT/bin"
 
-echo "[1/8] building the server"
+echo "[1/9] building the server"
 sh "$ROOT/build/_compile.sh"
 
-echo "[2/8] framing tests"
+echo "[2/9] framing tests"
 "$FBC" -w all $INC "$ROOT/tests/test_framing.bas" \
     "$ROOT/src/rpc/transport.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_framing"
 "$ROOT/bin/test_framing" || FAILED=1
 
-echo "[3/8] json and json-rpc tests"
+echo "[3/9] json and json-rpc tests"
 "$FBC" -w all $INC "$ROOT/tests/test_json.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/jsonrpc.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_json"
 "$ROOT/bin/test_json" || FAILED=1
 
-echo "[4/8] position tests"
+echo "[4/9] position tests"
 "$FBC" -w all $INC "$ROOT/tests/test_position.bas" \
     "$ROOT/src/utils/position.bas" \
     -x "$ROOT/bin/test_position"
 "$ROOT/bin/test_position" || FAILED=1
 
-echo "[5/8] uri and document tests"
+echo "[5/9] uri and document tests"
 "$FBC" -w all $INC "$ROOT/tests/test_document.bas" \
     "$ROOT/src/document/document.bas" "$ROOT/src/document/document_manager.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
-    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/diagnostics.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" \
     "$ROOT/src/utils/position.bas" "$ROOT/src/utils/uri.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_document"
 "$ROOT/bin/test_document" || FAILED=1
 
-echo "[6/8] lexer and parser tests"
+echo "[6/9] lexer and parser tests"
 "$FBC" -w all $INC "$ROOT/tests/test_analysis.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
-    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/diagnostics.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" \
     -x "$ROOT/bin/test_analysis"
 # The project root is passed so the suite can analyse this project's OWN
 # source and require zero diagnostics from it.
 "$ROOT/bin/test_analysis" "$ROOT" || FAILED=1
 
-echo "[7/8] symbol tests"
+echo "[7/9] symbol tests"
 "$FBC" -w all $INC "$ROOT/tests/test_symbols.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
-    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/diagnostics.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" \
     -x "$ROOT/bin/test_symbols"
 "$ROOT/bin/test_symbols" || FAILED=1
 
-echo "[8/8] piped session against the real server"
+echo "[8/9] completion tests"
+"$FBC" -w all $INC "$ROOT/tests/test_completion.bas" \
+    "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" \
+    -x "$ROOT/bin/test_completion"
+"$ROOT/bin/test_completion" || FAILED=1
+
+echo "[9/9] piped session against the real server"
 "$FBC" -w all $INC "$ROOT/tests/session_tool.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/transport.bas" "$ROOT/src/rpc/jsonrpc.bas" \
     "$ROOT/src/lsp/protocol.bas" "$ROOT/src/utils/logging.bas" \

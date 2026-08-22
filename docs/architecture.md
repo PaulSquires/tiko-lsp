@@ -12,7 +12,8 @@ lsp/dispatcher      lifecycle state machine, handler registry
 handlers/*          one function per method; build a result, or set an error
   |                        |
   |                        +--> document/*   open buffers, edits, line index
-  |                        +--> analysis/*   lexer, parser, symbols, diagnostics
+  |                        +--> analysis/*   lexer, parser, symbols,
+  |                        |                 completion, diagnostics
   |                        +--> utils/*      positions, URIs, logging
 rpc/jsonrpc         jsonrpc / id / method / params / result / error
   |                 knows JSON-RPC, does not know LSP
@@ -107,6 +108,11 @@ A document analyses itself AT MOST ONCE PER VERSION: `Tokens()`, `Symbols()` and
 `Diagnostics()` re-analyse first if the text changed, so four features asking
 after one edit cost one analysis, and no caller has to know whether the cache is
 warm.
+
+Completion reads the same table and adds the one piece of type knowledge the
+server has: a variable's DECLARED TYPE NAME, read out of its detail and looked
+up. See [phase5.md](phase5.md#the-type-knowledge-behind-customer) for what that
+does and does not reach.
 
 ## Threading
 

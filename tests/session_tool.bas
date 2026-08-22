@@ -144,7 +144,16 @@ private function SessionBytes( ) as string
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
                 Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
 
-    '' 10. save, then close.
+    '' 10. completion, in an ordinary position on line 2. The answer must
+    ''     carry the file's own declarations AND the language's reserved
+    ''     words, with the declarations sorting first.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":8," & _
+                Q & "method" & Q & ":" & Q & "textDocument/completion" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
+
+    '' 11. save, then close.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
@@ -154,19 +163,19 @@ private function SessionBytes( ) as string
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}}}" )
 
-    '' 11. broken JSON -> ParseError against a null id, and the session must
+    '' 12. broken JSON -> ParseError against a null id, and the session must
     ''     CONTINUE afterwards.
     s &= Frame( "{ this is not json" )
 
-    '' 12. shutdown -> null result.
+    '' 13. shutdown -> null result.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":3," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
 
-    '' 13. a request after shutdown -> InvalidRequest.
+    '' 14. a request after shutdown -> InvalidRequest.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":4," & _
                 Q & "method" & Q & ":" & Q & "textDocument/hover" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 14. exit -> the process ends with code 0, because shutdown came first.
+    '' 15. exit -> the process ends with code 0, because shutdown came first.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "exit" & Q & "}" )
 
@@ -230,9 +239,10 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Eighteen, and exactly eighteen:
-    ''    8 answers to requests -- initialize, references, second initialize,
-    ''      documentSymbol, hover, definition, shutdown, post-shutdown hover
+    '' Nineteen, and exactly nineteen:
+    ''    9 answers to requests -- initialize, references, second initialize,
+    ''      documentSymbol, hover, definition, completion, shutdown,
+    ''      post-shutdown hover
     ''    1 parse error
     ''    1 window/logMessage from `initialized`
     ''    4 $/logTrace          -- didOpen, didChange, didSave, didClose
@@ -240,8 +250,8 @@ private function CheckSession( byref path as string ) as long
     '' and NOTHING for the two $/ notifications the server must swallow, nor
     '' for the didChange against a document that was never opened.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 18, "the session produced exactly eighteen messages" )
-    if( messages.Count( ) <> 18 ) then
+    AssertEqInt( messages.Count( ), 19, "the session produced exactly nineteen messages" )
+    if( messages.Count( ) <> 19 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 160 )
         next
@@ -272,7 +282,11 @@ private function CheckSession( byref path as string ) as long
         AssertTrue ( caps.Member( "documentSymbolProvider" ).AsBoolean( ), "documentSymbol is claimed" )
         AssertTrue ( caps.Member( "hoverProvider" ).AsBoolean( ), "hover is claimed" )
         AssertTrue ( caps.Member( "definitionProvider" ).AsBoolean( ), "definition is claimed" )
-        AssertFalse( caps.Has( "completionProvider" ), "completion is NOT claimed" )
+        AssertTrue ( caps.Member( "completionProvider" ).IsObject( ), "completion is claimed" )
+        AssertEqStr( caps.Member( "completionProvider" ).Member( "triggerCharacters" ).Item( 0 ).AsString( ), _
+                     ".", "with a dot as a trigger character" )
+        AssertFalse( caps.Member( "completionProvider" ).Member( "resolveProvider" ).AsBoolean( true ), _
+                     "and no resolve round trip, because items are already complete" )
         AssertFalse( caps.Has( "referencesProvider" ), "references is NOT claimed" )
         AssertFalse( caps.Has( "renameProvider" ), "rename is NOT claimed" )
     end scope
@@ -428,13 +442,54 @@ private function CheckSession( byref path as string ) as long
                      "and ending after it" )
     end scope
 
-    '' -- 12..15. save and close ---------------------------------------------------
+    '' -- 12. completion ------------------------------------------------------
+    TestGroup( "completion" )
+    scope
+        dim as JsonDoc cmp_
+        AssertTrue( cmp_.Parse( messages[11] ), "message 11 is JSON" )
+        AssertEqInt( cmp_.Root( ).Member( "id" ).AsLongInt( ), 8, "answers id 8" )
+
+        dim as JsonValue items = cmp_.Root( ).Member( "result" )
+        AssertTrue( items.Count( ) > 200, "the list carries the language as well as the file" )
+
+        '' Find the three that matter: a variable this file declares, the
+        '' procedure it declares, and a reserved word.
+        dim as string counterSort, subSort
+        dim as long counterKind = -1, subKind = -1
+        dim as boolean sawTest = false
+
+        for i as long = 0 to items.Count( ) - 1
+            dim as JsonValue it = items.Item( i )
+            dim as string label_ = lcase( it.Member( "label" ).AsString( ) )
+
+            select case label_
+                case "counter"
+                    counterKind = clng( it.Member( "kind" ).AsLongInt( ) )
+                    counterSort = it.Member( "sortText" ).AsString( )
+                case "sub"
+                    subKind = clng( it.Member( "kind" ).AsLongInt( ) )
+                    subSort = it.Member( "sortText" ).AsString( )
+                case "test"
+                    sawTest = true
+            end select
+        next
+
+        AssertEqInt( counterKind, 6, "the file's variable is offered, as a Variable" )
+        AssertEqInt( subKind, 14, "and the reserved word `sub`, as a Keyword" )
+        AssertTrue ( sawTest, "along with the procedure this file declares" )
+
+        '' The ordering rule, on the wire: a declaration outranks a keyword
+        '' even though `counter` sorts after `sub` alphabetically.
+        AssertTrue( counterSort < subSort, "a declaration sorts above a keyword" )
+    end scope
+
+    '' -- 13..16. save and close ------------------------------------------------
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[11] ), "message 11 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[12] ), "message 12 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[13] ), "message 13 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[14] ), "message 14 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[12] ), "message 12 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[13] ), "message 13 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[14] ), "message 14 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[15] ), "message 15 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
@@ -449,33 +504,33 @@ private function CheckSession( byref path as string ) as long
                      "and no version, because the document is gone" )
     end scope
 
-    '' -- 16. the parse error -------------------------------------------------------
+    '' -- 17. the parse error -------------------------------------------------------
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[15] ), "message 15 is JSON" )
+        AssertTrue( doc.Parse( messages[16] ), "message 16 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertTrue( r.Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
     end scope
 
-    '' -- 17. shutdown ---------------------------------------------------------------
+    '' -- 18. shutdown ---------------------------------------------------------------
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[16] ), "message 16 is JSON" )
+        AssertTrue( doc.Parse( messages[17] ), "message 17 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue( r.Has( "result" ), "shutdown returns a result member" )
         AssertTrue( r.Member( "result" ).IsNull( ), "the shutdown result is null" )
     end scope
 
-    '' -- 18. a request arriving after shutdown --------------------------------------
+    '' -- 19. a request arriving after shutdown --------------------------------------
     TestGroup( "post-shutdown request" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[17] ), "message 17 is JSON" )
+        AssertTrue( doc.Parse( messages[18] ), "message 18 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 4, "answers id 4" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
