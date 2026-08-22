@@ -35,10 +35,14 @@ set SOURCES=^
  "%ROOT%\src\rpc\jsonrpc.bas"^
  "%ROOT%\src\lsp\protocol.bas"^
  "%ROOT%\src\lsp\dispatcher.bas"^
+ "%ROOT%\src\lsp\publish.bas"^
  "%ROOT%\src\handlers\lifecycle.bas"^
  "%ROOT%\src\handlers\text_document.bas"^
  "%ROOT%\src\document\document.bas"^
  "%ROOT%\src\document\document_manager.bas"^
+ "%ROOT%\src\analysis\lexer.bas"^
+ "%ROOT%\src\analysis\parser.bas"^
+ "%ROOT%\src\analysis\diagnostics.bas"^
  "%ROOT%\src\utils\logging.bas"^
  "%ROOT%\src\utils\position.bas"^
  "%ROOT%\src\utils\uri.bas"

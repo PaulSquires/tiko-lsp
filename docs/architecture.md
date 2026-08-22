@@ -12,6 +12,7 @@ lsp/dispatcher      lifecycle state machine, handler registry
 handlers/*          one function per method; build a result, or set an error
   |                        |
   |                        +--> document/*   open buffers, edits, line index
+  |                        +--> analysis/*   lexer, parser, diagnostics
   |                        +--> utils/*      positions, URIs, logging
 rpc/jsonrpc         jsonrpc / id / method / params / result / error
   |                 knows JSON-RPC, does not know LSP
@@ -51,6 +52,7 @@ there is no place in the design where a process boundary would fit.
 | `DocumentManager` | every `TextDocument` it opened | `new` on open, `delete` on close; frees the rest in its destructor |
 | `TextDocumentPtr` | nothing | borrowed; valid until that document is closed |
 | `Server` | its `DocumentManager` | holds a `StdioTransport ptr` it does not free |
+| `TokenArray`, `DiagnosticArray` | their elements | plain values, no pointers, freed with the array |
 
 There are no smart pointers and no shared ownership anywhere in the server. Every
 allocation has exactly one owner whose destructor releases it.
@@ -79,6 +81,20 @@ test:
 
 A notification never produces a reply, including when its handler fails — the
 failure is logged instead, because there is no id to answer.
+
+## Analysis
+
+`analysis/` knows nothing about LSP: the lexer and parser work in BYTE OFFSETS
+and produce `Diagnostic` records, and `lsp/publish.bas` is the only place an
+offset becomes a line and a UTF-16 character. That is what will let the same
+analyser be driven by a command-line tool, or replaced by the real compiler
+frontend, without touching a handler.
+
+The parser is structural, not semantic — see
+[phase3.md](phase3.md#what-is-checked) for exactly what it checks, and
+[phase3.md](phase3.md#false-positives-are-the-failure-mode-that-matters) for the
+corpus it was developed against and why that mattered more than the sample
+tests.
 
 ## Threading
 
@@ -117,6 +133,19 @@ protocol:
 ```freebasic
 for each folder in ArrayOf( params.Member( "workspaceFolders" ) )
 ```
+
+**`for each` over a TEMPORARY container reads freed memory.**
+
+```freebasic
+for each w in FB.Split( SomeText( ), " " )     '' segfault
+```
+
+The loop lowers to `dim __it = c.GetIterator( )`, and the temporary the split
+returned is destroyed before the body runs, so the iterator walks a freed array.
+Bind it to a local first — `dim words as FB.Array( of string ) = FB.Split( ... )`
+— and iterate that. It crashes immediately and every time, which is the one
+mercy: the equivalent mistake with a borrowed view (`ArrayOf( v )` above) is
+safe only because that view owns nothing.
 
 **A container held as a type FIELD must be a named instantiation.** `Items as
 FB.Array( of T )` written inline in a field declaration does not instantiate, and

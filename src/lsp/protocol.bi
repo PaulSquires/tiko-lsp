@@ -36,6 +36,11 @@ const LSP_DID_CHANGE = "textDocument/didChange"
 const LSP_DID_SAVE   = "textDocument/didSave"
 const LSP_DID_CLOSE  = "textDocument/didClose"
 
+'' Diagnostics are PUSHED (phase 3). There is no capability to advertise for
+'' this: a server may publish whenever it likes, and the pull-based
+'' textDocument/diagnostic of 3.17 is a separate feature this does not claim.
+const LSP_PUBLISH_DIAGNOSTICS = "textDocument/publishDiagnostics"
+
 '' Server -> client notifications used in phase 1.
 const LSP_WINDOW_LOG_MESSAGE  = "window/logMessage"
 const LSP_WINDOW_SHOW_MESSAGE = "window/showMessage"

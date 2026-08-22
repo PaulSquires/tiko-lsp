@@ -1,0 +1,80 @@
+'' ############################################################################
+''  lsp/publish.bas -- turning diagnostics into notifications
+'' ############################################################################
+
+#include once "publish.bi"
+#include once "../analysis/parser.bi"
+#include once "../utils/uri.bi"
+#include once "../utils/logging.bi"
+
+'' { line, character } -- 0-based, character in UTF-16 code units.
+private function BuildPosition( byref rb as JsonBuilder, byref p as SourcePosition ) as JsonNode
+    dim as JsonNode node = rb.NewObject( )
+    rb.SetInt( node, "line",      p.Line )
+    rb.SetInt( node, "character", p.Column )
+    return node
+end function
+
+private function BuildRange( byref rb as JsonBuilder, byref text_ as string, _
+                             byref idx as LineIndex, _
+                             byval startOffset as long, byval endOffset as long ) as JsonNode
+    dim as SourcePosition s = OffsetToSourcePosition( text_, idx, startOffset )
+    dim as SourcePosition e = OffsetToSourcePosition( text_, idx, endOffset )
+
+    dim as JsonNode node = rb.NewObject( )
+    rb.SetNode( node, "start", BuildPosition( rb, s ) )
+    rb.SetNode( node, "end",   BuildPosition( rb, e ) )
+    return node
+end function
+
+private sub SendDiagnostics( byref srv as Server, byref uri as string, _
+                             byval version_ as longint, byval hasVersion as boolean, _
+                             byref text_ as string, byref idx as LineIndex, _
+                             byref diags as DiagnosticArray )
+    dim as JsonBuilder rb
+    dim as JsonNode params = rb.NewObject( )
+
+    rb.SetStr( params, "uri", uri )
+
+    '' The version lets a client discard a report that arrived after the edit
+    '' it describes -- which happens whenever analysis lags typing.
+    if( hasVersion ) then rb.SetInt( params, "version", version_ )
+
+    dim as JsonNode list_ = rb.NewArray( )
+    for i as long = 0 to diags.Count( ) - 1
+        dim as Diagnostic d = diags[i]
+
+        dim as JsonNode item = rb.NewObject( )
+        rb.SetNode( item, "range", BuildRange( rb, text_, idx, d.StartOffset, d.EndOffset ) )
+        rb.SetInt ( item, "severity", clngint( d.Severity ) )
+        rb.SetStr ( item, "code",     d.Code_ )
+        rb.SetStr ( item, "source",   DIAG_SOURCE )
+        rb.SetStr ( item, "message",  d.Message_ )
+        rb.PushNode( list_, item )
+    next
+    rb.SetNode( params, "diagnostics", list_ )
+
+    srv.SendNotification( LSP_PUBLISH_DIAGNOSTICS, rb, params )
+end sub
+
+sub PublishDocumentDiagnostics( byref srv as Server, byval doc as TextDocumentPtr )
+    if( doc = 0 ) then exit sub
+
+    dim as DiagnosticArray diags
+    dim as string body = doc->Text( )
+    AnalyzeSource( body, diags )
+
+    LogDebug( "analysed " & UriFileName( doc->Uri( ) ) & " v" & doc->Version( ) & _
+              ": " & diags.Count( ) & " diagnostic(s)" )
+
+    SendDiagnostics( srv, doc->Uri( ), doc->Version( ), true, body, doc->Index( ), diags )
+end sub
+
+sub ClearDocumentDiagnostics( byref srv as Server, byref uri as string )
+    dim as DiagnosticArray none_
+    dim as LineIndex idx
+    dim as string empty_ = ""
+
+    '' No version: the document is closed, so there is no version to speak of.
+    SendDiagnostics( srv, uri, 0, false, empty_, idx, none_ )
+end sub

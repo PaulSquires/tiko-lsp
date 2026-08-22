@@ -30,13 +30,13 @@ here launches a compiler process, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-2 complete
+## Status: phases 1-3 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
 | 1 | transport, JSON-RPC, dispatcher, `initialize` / `initialized` / `shutdown` / `exit`, logging | **done** |
 | 2 | documents, `didOpen` / `didChange` / `didSave` / `didClose`, line index, UTF-16 positions | **done** |
-| 3 | lexer, parser with error recovery, diagnostics | |
+| 3 | lexer, parser with error recovery, diagnostics | **done** |
 | 4 | symbols, document symbols, hover, go to definition | |
 | 5 | completion | |
 | 6 | workspace index, workspace symbols, references | |
@@ -46,7 +46,14 @@ The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental) and `positionEncoding`, and nothing else. Promising `hoverProvider`
 before phase 4 would make every hover time out, so each capability is added in the
 phase that implements it — see `LspBuildCapabilities` in
-[src/lsp/protocol.bas](src/lsp/protocol.bas).
+[src/lsp/protocol.bas](src/lsp/protocol.bas). Diagnostics need no capability: they
+are pushed, and the server publishes them on open, change and save.
+
+The parser was developed against **435,000 lines of real FreeBASIC** — fbc's own
+compiler, the fbc-modern standard library, AfxNova and the fbc test suite — and
+produces zero diagnostics on all of it except the files fbc itself expects to
+reject. False positives are the failure mode that matters for a language server;
+see [docs/phase3.md](docs/phase3.md) for the fourteen that were found and fixed.
 
 Positions are UTF-16 code units, handled in one place
 ([src/utils/position.bas](src/utils/position.bas)): `中` is one column and three
@@ -63,21 +70,25 @@ tiko-lsp/
                 jsonrpc.bi/.bas       RpcMessage / RpcId / RpcError + serialisers
     lsp/        protocol.bi/.bas      method names, capabilities, LSP constants
                 dispatcher.bi/.bas    Server, lifecycle rules, handler registry
+                publish.bi/.bas       diagnostics -> publishDiagnostics
     document/   document.bi/.bas      TextDocument: text, line index, edits
                 document_manager.bi/.bas   every open buffer, keyed by URI
+    analysis/   lexer.bi/.bas         FreeBASIC tokens, 247 reserved words
+                parser.bi/.bas        block structure, with error recovery
+                diagnostics.bi/.bas   the problem model, in byte offsets
     handlers/   lifecycle.bi/.bas     initialize / initialized / shutdown / exit
                 text_document.bi/.bas didOpen / didChange / didSave / didClose
     utils/      logging.bi/.bas       stderr and optional log file, never stdout
                 position.bi/.bas      line index, UTF-16 <-> byte offsets
                 uri.bi/.bas           file: URI <-> filesystem path
   tests/        assert.bi, test_framing.bas, test_json.bas, test_position.bas,
-                test_document.bas, session_tool.bas
+                test_document.bas, test_analysis.bas, session_tool.bas
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md, phase2.md
+  docs/         architecture.md, phase1.md, phase2.md, phase3.md
 ```
 
-`src/workspace/` and `src/analysis/` arrive with the phases that fill them; empty
-placeholder files would only be noise.
+`src/workspace/` arrives with the phase that fills it; empty placeholder files
+would only be noise.
 
 ## Building
 
@@ -173,7 +184,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Five suites:
+(or `sh build/_run_tests.sh`). Six suites:
 
 - **framing** — 41 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -190,12 +201,19 @@ build\_run_tests.bat
   (including thirteen single-character insertions, edits that join and split
   lines, and edits placed by UTF-16 column over multi-byte text), reversed and
   out-of-range ranges, and the document manager.
-- **piped session** — 53 assertions against a **real `tiko-lsp` process** driven
+- **analysis** — 157 assertions over the lexer and the parser: comments that
+  nest, all three string spellings, malformed numbers, every block form, the
+  recovery rule (one missing `end if` is one diagnostic, pointing at the `if`),
+  half-typed text, and every false positive found in the corpora. The suite also
+  analyses **this project's own source** and requires zero diagnostics from it.
+- **piped session** — 72 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
   stream — including that two edits in one `didChange` applied in order against
-  the evolving text, that the notifications which must be swallowed produced no
-  output, and that the process exited 0.
+  the evolving text, that a syntax error becomes a `publishDiagnostics` with the
+  right range and code, that fixing it publishes an **empty** list, that the
+  notifications which must be swallowed produced no output, and that the process
+  exited 0.
 
 ## Licence
 

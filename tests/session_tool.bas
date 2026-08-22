@@ -62,25 +62,29 @@ private function SessionBytes( ) as string
     s &= Frame( "{""jsonrpc"":""2.0"",""method"":""$/setTrace"",""params"":{""value"":""verbose""}}" )
     s &= Frame( "{""jsonrpc"":""2.0"",""method"":""$/somethingUnknown"",""params"":{}}" )
 
-    '' 6. a document opens. From here the buffer is authoritative. Tracing is
-    ''    on, so each of these produces a $/logTrace notification -- which is
-    ''    the only way to observe a notification's effect over the wire.
+    '' 6. a document opens, carrying a REAL syntax error -- a sub with no
+    ''    `end sub`. Tracing is on, so each document notification produces a
+    ''    $/logTrace, and each also produces a publishDiagnostics.
+    ''        "sub Test( )" 11 + LF 1 + "print i" 7 = 19 bytes over 2 lines
     s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didOpen""," & _
                 """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas""," & _
                 """languageId"":""freebasic"",""version"":1," & _
-                """text"":""dim as long i\nprint i""}}}" )
+                """text"":""sub Test( )\nprint i""}}}" )
 
-    '' 7. two edits in ONE didChange. The second is expressed against the text
-    ''    as the FIRST left it -- 30 bytes out means both were applied in order
-    ''    (18 + 1 + 11); 26 would mean the second was computed against the
-    ''    original text.
+    '' 7. two edits in ONE didChange, the second expressed against the text as
+    ''    the FIRST left it. Together they also FIX the error, so the
+    ''    publishDiagnostics that follows must be EMPTY -- which is how an
+    ''    editor clears a squiggle.
+    ''        edit 1: `print i` -> `print 1`
+    ''        edit 2: append a newline and `end sub`
+    ''    Result: 11 + 1 + 7 + 1 + 7 = 27 bytes over 3 lines.
     s &= Frame( "{""jsonrpc"":""2.0"",""method"":""textDocument/didChange""," & _
                 """params"":{""textDocument"":{""uri"":""file:///c%3A/dev/x.bas"",""version"":2}," & _
                 """contentChanges"":[" & _
-                "{""range"":{""start"":{""line"":0,""character"":13}," & _
-                 """end"":{""line"":0,""character"":13}},""text"":"" = 42""}," & _
                 "{""range"":{""start"":{""line"":1,""character"":6}," & _
-                 """end"":{""line"":1,""character"":7}},""text"":""i * 2""}]}}" )
+                 """end"":{""line"":1,""character"":7}},""text"":""1""}," & _
+                "{""range"":{""start"":{""line"":1,""character"":7}," & _
+                 """end"":{""line"":1,""character"":7}},""text"":""\nend sub""}]}}" )
 
     '' 8. a change for a document that was never opened -- dropped in silence,
     ''    which means NO $/logTrace and no response.
@@ -167,19 +171,20 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Eleven, and exactly eleven:
+    '' Fifteen, and exactly fifteen:
     ''    5 answers to requests (initialize, hover, second initialize,
     ''      shutdown, post-shutdown hover)
     ''    1 parse error
     ''    1 window/logMessage from `initialized`
-    ''    4 $/logTrace, one each for didOpen, didChange, didSave, didClose
+    ''    4 $/logTrace   -- didOpen, didChange, didSave, didClose
+    ''    4 publishDiagnostics, one after each of those
     '' and NOTHING for the two $/ notifications the server must swallow, nor
     '' for the didChange against a document that was never opened.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 11, "the session produced exactly eleven messages" )
-    if( messages.Count( ) <> 11 ) then
+    AssertEqInt( messages.Count( ), 15, "the session produced exactly fifteen messages" )
+    if( messages.Count( ) <> 15 ) then
         for i as long = 0 to messages.Count( ) - 1
-            print "      [" & i & "] " & left( messages[i], 200 )
+            print "      [" & i & "] " & left( messages[i], 160 )
         next
         return TestSummary( "piped session" )
     end if
@@ -253,74 +258,112 @@ private function CheckSession( byref path as string ) as long
                      "a second initialize is InvalidRequest" )
     end scope
 
-    '' -- 5..8. document synchronisation ---------------------------------------
+    '' -- 5..12. document synchronisation and diagnostics ---------------------
     ''
     '' didOpen/didChange/didSave/didClose are notifications and have no
-    '' responses, so $/logTrace is the only wire-visible evidence that the
-    '' server tracked the buffer. Tracing is at "verbose", so each carries a
-    '' `verbose` member describing the document's state afterwards.
-    TestGroup( "document synchronisation" )
+    '' responses, so what proves the server tracked the buffer is what it sends
+    '' on its own: a $/logTrace, then a publishDiagnostics.
+    TestGroup( "document synchronisation and diagnostics" )
     scope
-        dim as JsonDoc openDoc, changeDoc, saveDoc, closeDoc
-        AssertTrue( openDoc.Parse  ( messages[4] ), "message 4 is JSON" )
-        AssertTrue( changeDoc.Parse( messages[5] ), "message 5 is JSON" )
-        AssertTrue( saveDoc.Parse  ( messages[6] ), "message 6 is JSON" )
-        AssertTrue( closeDoc.Parse ( messages[7] ), "message 7 is JSON" )
+        dim as JsonDoc openTrace, openDiag, changeTrace, changeDiag
+        AssertTrue( openTrace.Parse  ( messages[4] ), "message 4 is JSON" )
+        AssertTrue( openDiag.Parse   ( messages[5] ), "message 5 is JSON" )
+        AssertTrue( changeTrace.Parse( messages[6] ), "message 6 is JSON" )
+        AssertTrue( changeDiag.Parse ( messages[7] ), "message 7 is JSON" )
 
-        AssertEqStr( openDoc.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didOpen traced" )
-        AssertContains( openDoc.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+        AssertEqStr( openTrace.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didOpen traced" )
+        AssertContains( openTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen x.bas", "the trace names the event and the file" )
+        AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "v1, 2 line(s), 19 byte(s)", "the opened buffer is measured correctly" )
 
-        '' 21 bytes: "dim as long i" + LF + "print i".
-        AssertContains( openDoc.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "v1, 2 line(s), 21 byte(s)", "the opened buffer is measured correctly" )
+        '' -- the diagnostic for the missing `end sub` -------------------------
+        dim as JsonValue d = openDiag.Root( )
+        AssertEqStr( d.Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, "diagnostics published" )
+        AssertEqStr( d.Member( "params" ).Member( "uri" ).AsString( ), _
+                     "file:///c%3A/dev/x.bas", "published against the right URI" )
+        AssertEqInt( d.Member( "params" ).Member( "version" ).AsLongInt( ), 1, _
+                     "carrying the document version" )
+        AssertEqInt( d.Member( "params" ).Member( "diagnostics" ).Count( ), 1, _
+                     "one diagnostic for the unclosed sub" )
 
-        AssertEqStr( changeDoc.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didChange traced" )
-        AssertContains( changeDoc.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+        dim as JsonValue item = d.Member( "params" ).Member( "diagnostics" ).Item( 0 )
+        AssertEqStr( item.Member( "code" ).AsString( ), "unclosed-block", "with a stable code" )
+        AssertEqInt( item.Member( "severity" ).AsLongInt( ), 1, "at severity Error" )
+        AssertEqStr( item.Member( "source" ).AsString( ), "tiko-lsp", "attributed to this server" )
+        AssertContains( item.Member( "message" ).AsString( ), "'sub Test'", "naming the procedure" )
+
+        '' The range must point at the SUB on line 0, characters 0 to 3.
+        AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
+                     "the range starts on line 0" )
+        AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 0, _
+                     "at character 0" )
+        AssertEqInt( item.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 3, _
+                     "and covers the keyword" )
+
+        '' -- the edits fix it, so the next report must be EMPTY ---------------
+        AssertContains( changeTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "2 edit(s)", "both content changes were applied" )
+        AssertContains( changeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "v2, 3 line(s), 27 byte(s)", "the edits applied in order, against the evolving text" )
 
-        '' 30 bytes: "dim as long i = 42" + LF + "print i * 2". This is the
-        '' assertion that proves the SECOND range was resolved against the text
-        '' the FIRST one produced.
-        AssertContains( changeDoc.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "v2, 2 line(s), 30 byte(s)", "the edits applied in order, against the evolving text" )
-
-        AssertEqStr( saveDoc.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didSave traced" )
-        AssertContains( saveDoc.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
-                        "didSave x.bas", "the save names the file" )
-
-        AssertEqStr( closeDoc.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didClose traced" )
-        AssertContains( closeDoc.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "0 document(s) still open", "closing released the buffer" )
+        AssertEqStr( changeDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
+                     "diagnostics republished after the change" )
+        AssertEqInt( changeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
+                     "and the list is EMPTY -- which is what clears the squiggle" )
+        AssertEqInt( changeDiag.Root( ).Member( "params" ).Member( "version" ).AsLongInt( ), 2, _
+                     "against the new version" )
     end scope
 
-    '' -- 9. the parse error ----------------------------------------------------
+    scope
+        dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
+        AssertTrue( saveTrace.Parse ( messages[8]  ), "message 8 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[9]  ), "message 9 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[10] ), "message 10 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[11] ), "message 11 is JSON" )
+
+        AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        "didSave x.bas", "the save names the file" )
+        AssertEqStr( saveDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
+                     "a save republishes" )
+
+        AssertContains( closeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "0 document(s) still open", "closing released the buffer" )
+        AssertEqStr( closeDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
+                     "a close republishes" )
+        AssertEqInt( closeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
+                     "with an empty list, so nothing is left on screen" )
+        AssertFalse( closeDiag.Root( ).Member( "params" ).Has( "version" ), _
+                     "and no version, because the document is gone" )
+    end scope
+
+    '' -- 13. the parse error ---------------------------------------------------
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[8] ), "message 8 is JSON" )
+        AssertTrue( doc.Parse( messages[12] ), "message 12 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertTrue( r.Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
     end scope
 
-    '' -- 10. shutdown ---------------------------------------------------------
+    '' -- 14. shutdown ---------------------------------------------------------
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[9] ), "message 9 is JSON" )
+        AssertTrue( doc.Parse( messages[13] ), "message 13 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue( r.Has( "result" ), "shutdown returns a result member" )
         AssertTrue( r.Member( "result" ).IsNull( ), "the shutdown result is null" )
     end scope
 
-    '' -- 11. a request arriving after shutdown --------------------------------
+    '' -- 15. a request arriving after shutdown --------------------------------
     TestGroup( "post-shutdown request" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[10] ), "message 10 is JSON" )
+        AssertTrue( doc.Parse( messages[14] ), "message 14 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 4, "answers id 4" )
         AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
