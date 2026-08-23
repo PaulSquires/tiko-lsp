@@ -42,6 +42,11 @@ const LSP_HOVER           = "textDocument/hover"
 const LSP_DEFINITION      = "textDocument/definition"
 const LSP_COMPLETION      = "textDocument/completion"
 
+'' Workspace-wide (phase 6).
+const LSP_REFERENCES        = "textDocument/references"
+const LSP_WORKSPACE_SYMBOL  = "workspace/symbol"
+const LSP_DID_CHANGE_FOLDERS = "workspace/didChangeWorkspaceFolders"
+
 '' Diagnostics are PUSHED (phase 3). There is no capability to advertise for
 '' this: a server may publish whenever it likes, and the pull-based
 '' textDocument/diagnostic of 3.17 is a separate feature this does not claim.

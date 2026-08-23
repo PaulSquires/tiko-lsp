@@ -30,7 +30,7 @@ here launches a compiler process, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-5 complete
+## Status: phases 1-6 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -39,14 +39,15 @@ here launches a compiler process, and nothing ever will.
 | 3 | lexer, parser with error recovery, diagnostics | **done** |
 | 4 | symbols, document symbols, hover, go to definition | **done** |
 | 5 | completion | **done** |
-| 6 | workspace index, workspace symbols, references | |
+| 6 | workspace index, workspace symbols, references | **done** |
 | 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
-`definitionProvider` and `completionProvider`. Nothing else — promising
-`referencesProvider` before phase 6 would make every "find all references" come
-back empty, so each capability is added in the phase that implements it. See
+`definitionProvider`, `completionProvider`, `workspaceSymbolProvider`,
+`referencesProvider` and multi-root `workspace.workspaceFolders`. Nothing else —
+promising `renameProvider` before phase 7 would make every rename silently do
+nothing, so each capability is added in the phase that implements it. See
 `LspBuildCapabilities` in
 [src/lsp/protocol.bas](src/lsp/protocol.bas). Diagnostics need no capability: they
 are pushed, and the server publishes them on open, change and save.
@@ -80,24 +81,29 @@ tiko-lsp/
                 symbols.bi/.bas       the symbol table, scope resolution, hover text
                 completion.bi/.bas    what could be typed here
                 diagnostics.bi/.bas   the problem model, in byte offsets
+    workspace/  workspace.bi/.bas     finding the source files
+                symbol_index.bi/.bas  every symbol in the workspace
     handlers/   lifecycle.bi/.bas     initialize / initialized / shutdown / exit
                 text_document.bi/.bas didOpen / didChange / didSave / didClose
                 document_symbols.bi/.bas   the outline
                 hover.bi/.bas         hover, and the shared resolution step
                 definition.bi/.bas    go to definition
                 completion.bi/.bas    completion
+                workspace_symbols.bi/.bas  workspace/symbol, and the index build
+                references.bi/.bas    find all references
     utils/      logging.bi/.bas       stderr and optional log file, never stdout
                 position.bi/.bas      line index, UTF-16 <-> byte offsets
                 uri.bi/.bas           file: URI <-> filesystem path
   tests/        assert.bi, test_framing.bas, test_json.bas, test_position.bas,
                 test_document.bas, test_analysis.bas, test_symbols.bas,
-                test_completion.bas, session_tool.bas
+                test_completion.bas, test_workspace.bas, session_tool.bas,
+                fixtures/workspace/   a two-file workspace the cross-file
+                                      assertions are made against
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md .. phase5.md
+  docs/         architecture.md, phase1.md .. phase6.md
 ```
 
-`src/workspace/` arrives with the phase that fills it; empty placeholder files
-would only be noise.
+Every directory in the sketch now has something real in it.
 
 ## Building
 
@@ -193,7 +199,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Eight suites, 699 assertions:
+(or `sh build/_run_tests.sh`). Nine suites, 754 assertions:
 
 - **framing** — 41 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -223,6 +229,10 @@ build\_run_tests.bat
   string and inside a comment, where the answer is nothing), member completion
   through a declared type, a pointer, `this.`, an enum and a namespace, the
   scope list with its group ordering, and case-insensitive de-duplication.
+- **workspace** — 64 assertions over discovery rules, indexing and
+  re-indexing, the one-file-one-entry rule (a path through `build/..` is the
+  same file), buffer-beats-disk, query scoring, and identifier scanning —
+  including the strings and comments a reference search must NOT match.
 - **piped session** — 102 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
@@ -232,7 +242,10 @@ build\_run_tests.bat
   outline, a hover, a go-to-definition and a completion list come back with the
   right kinds — the definition landing on the declaration's name, the completion
   sorting a declaration above a keyword — that the notifications which must be
-  swallowed produced no output, and that the process exited 0.
+  swallowed produced no output, and that the process exited 0. It also runs
+  against a **real two-file workspace**: a type used in one file and declared in
+  another resolves across files, references span both, and the workspace picker
+  returns the exact match first.
 
 ## Licence
 

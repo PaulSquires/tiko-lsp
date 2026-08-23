@@ -14,6 +14,7 @@ handlers/*          one function per method; build a result, or set an error
   |                        +--> document/*   open buffers, edits, line index
   |                        +--> analysis/*   lexer, parser, symbols,
   |                        |                 completion, diagnostics
+  |                        +--> workspace/*  discovery, the symbol index
   |                        +--> utils/*      positions, URIs, logging
 rpc/jsonrpc         jsonrpc / id / method / params / result / error
   |                 knows JSON-RPC, does not know LSP
@@ -54,6 +55,7 @@ there is no place in the design where a process boundary would fit.
 | `TextDocumentPtr` | nothing | borrowed; valid until that document is closed |
 | `Server` | its `DocumentManager` | holds a `StdioTransport ptr` it does not free |
 | `SymbolTable` | its symbols | a value, with PARENT INDICES rather than pointers: copying it copies everything, and no symbol outlives its table |
+| `SymbolIndex` | one `SymbolTable` per file | keyed on the RESOLVED PATH, not the URI, so one file cannot be indexed twice |
 | `TokenArray`, `DiagnosticArray` | their elements | plain values, no pointers, freed with the array |
 
 There are no smart pointers and no shared ownership anywhere in the server. Every
@@ -113,6 +115,15 @@ Completion reads the same table and adds the one piece of type knowledge the
 server has: a variable's DECLARED TYPE NAME, read out of its detail and looked
 up. See [phase5.md](phase5.md#the-type-knowledge-behind-customer) for what that
 does and does not reach.
+
+`workspace/` holds the same analysis applied to every file in the folders the
+client named: one `SymbolTable` per file, so a change replaces one entry rather
+than rebuilding a flat list. What it deliberately does NOT hold is the text --
+name ranges are converted to line/character AT INDEX TIME, because turning an
+offset into a UTF-16 column needs the bytes of that line and keeping a
+workspace's source in memory to answer later would cost tens of megabytes.
+References are the exception: they re-lex on demand, which is
+[phase6.md](phase6.md#references-are-re-lexed-not-stored)'s reasoning.
 
 ## Threading
 

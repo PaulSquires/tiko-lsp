@@ -10,7 +10,8 @@ rem    5. tests\test_analysis.bas  the lexer, the parser, and this project's
 rem                                 own source analysed for false positives
 rem    6. tests\test_symbols.bas   symbol extraction, scope resolution, hover
 rem    7. tests\test_completion.bas  context detection and candidates
-rem    8. the piped session         a real tiko-lsp.exe, driven over a pipe
+rem    8. tests\test_workspace.bas   discovery, the index, reference scanning
+rem    9. the piped session         a real tiko-lsp.exe, driven over a pipe
 rem ===========================================================================
 setlocal enabledelayedexpansion
 
@@ -26,28 +27,28 @@ set FAILED=0
 
 if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
 
-echo [1/9] building the server
+echo [1/10] building the server
 call "%~dp0_compile.bat" || exit /b 1
 
-echo [2/9] framing tests
+echo [2/10] framing tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_framing.bas" ^
     "%ROOT%\src\rpc\transport.bas" "%ROOT%\src\utils\logging.bas" ^
     -x "%ROOT%\bin\test_framing.exe" || exit /b 1
 "%ROOT%\bin\test_framing.exe" || set FAILED=1
 
-echo [3/9] json and json-rpc tests
+echo [3/10] json and json-rpc tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_json.bas" ^
     "%ROOT%\src\json\json.bas" "%ROOT%\src\rpc\jsonrpc.bas" "%ROOT%\src\utils\logging.bas" ^
     -x "%ROOT%\bin\test_json.exe" || exit /b 1
 "%ROOT%\bin\test_json.exe" || set FAILED=1
 
-echo [4/9] position tests
+echo [4/10] position tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_position.bas" ^
     "%ROOT%\src\utils\position.bas" ^
     -x "%ROOT%\bin\test_position.exe" || exit /b 1
 "%ROOT%\bin\test_position.exe" || set FAILED=1
 
-echo [5/9] uri and document tests
+echo [5/10] uri and document tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_document.bas" ^
     "%ROOT%\src\document\document.bas" "%ROOT%\src\document\document_manager.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
@@ -57,7 +58,7 @@ echo [5/9] uri and document tests
     -x "%ROOT%\bin\test_document.exe" || exit /b 1
 "%ROOT%\bin\test_document.exe" || set FAILED=1
 
-echo [6/9] lexer and parser tests
+echo [6/10] lexer and parser tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_analysis.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
     "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\completion.bas" ^
@@ -67,7 +68,7 @@ rem The project root is passed so the suite can analyse this project's OWN
 rem source and require zero diagnostics from it.
 "%ROOT%\bin\test_analysis.exe" "%ROOT%" || set FAILED=1
 
-echo [7/9] symbol tests
+echo [7/10] symbol tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_symbols.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
     "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\completion.bas" ^
@@ -75,7 +76,7 @@ echo [7/9] symbol tests
     -x "%ROOT%\bin\test_symbols.exe" || exit /b 1
 "%ROOT%\bin\test_symbols.exe" || set FAILED=1
 
-echo [8/9] completion tests
+echo [8/10] completion tests
 "%FBC%" -w all %INC% "%ROOT%\tests\test_completion.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
     "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\completion.bas" ^
@@ -83,13 +84,23 @@ echo [8/9] completion tests
     -x "%ROOT%\bin\test_completion.exe" || exit /b 1
 "%ROOT%\bin\test_completion.exe" || set FAILED=1
 
-echo [9/9] piped session against the real server
+echo [9/10] workspace tests
+"%FBC%" -w all %INC% "%ROOT%\tests\test_workspace.bas" ^
+    "%ROOT%\src\workspace\workspace.bas" "%ROOT%\src\workspace\symbol_index.bas" ^
+    "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
+    "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\diagnostics.bas" ^
+    "%ROOT%\src\utils\position.bas" "%ROOT%\src\utils\uri.bas" "%ROOT%\src\utils\logging.bas" ^
+    -x "%ROOT%\bin\test_workspace.exe" || exit /b 1
+"%ROOT%\bin\test_workspace.exe" "%ROOT%" || set FAILED=1
+
+echo [10/10] piped session against the real server
 "%FBC%" -w all %INC% "%ROOT%\tests\session_tool.bas" ^
     "%ROOT%\src\json\json.bas" "%ROOT%\src\rpc\transport.bas" "%ROOT%\src\rpc\jsonrpc.bas" ^
     "%ROOT%\src\lsp\protocol.bas" "%ROOT%\src\utils\logging.bas" ^
+    "%ROOT%\src\utils\uri.bas" ^
     -x "%ROOT%\bin\session_tool.exe" || exit /b 1
 
-"%ROOT%\bin\session_tool.exe" --write "%ROOT%\bin\session.bin" || exit /b 1
+"%ROOT%\bin\session_tool.exe" --write "%ROOT%\bin\session.bin" "%ROOT%\tests\fixtures\workspace" || exit /b 1
 
 rem stderr is discarded here only to keep the transcript readable; the server
 rem writes diagnostics there, never to stdout.

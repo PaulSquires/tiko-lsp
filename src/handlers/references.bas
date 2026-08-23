@@ -1,0 +1,170 @@
+'' ############################################################################
+''  handlers/references.bas -- textDocument/references
+''
+''  Answered by RE-LEXING, not from a stored occurrence list. A workspace's
+''  identifiers are tens of megabytes to hold and to keep current, and a "find
+''  all references" is a deliberate action a user waits a moment for -- unlike
+''  completion, which runs on every keystroke.
+''
+''  BY NAME, not by symbol identity. Every `Count` in the workspace matches,
+''  whichever type it belongs to. That is what a name-based index can honestly
+''  do; telling two members called `Count` apart needs the type system, and
+''  saying so is better than quietly returning half the answers.
+'' ############################################################################
+
+#include once "references.bi"
+#include once "../workspace/workspace.bi"
+#include once "../utils/logging.bi"
+#include once "../utils/uri.bi"
+
+'' A cap, so a search for a name like `i` cannot produce a response an editor
+'' has to render for a minute.
+const MAX_REFERENCES = 2000
+
+type OffsetArray_ as FB.Array( of long )
+
+'' Appends one Location per occurrence of `lowerName` in `text_`.
+private sub AddLocations( byref rb as JsonBuilder, byval list_ as JsonNode, _
+                          byref uri as string, byref text_ as string, _
+                          byref lowerName as string, _
+                          byref declarations as OffsetArray_, _
+                          byval includeDeclaration as boolean, byref total as long )
+
+    dim offsets as OffsetArray_
+    FindIdentifierOffsets( text_, lowerName, offsets )
+    if( offsets.Count( ) = 0 ) then exit sub
+
+    '' Only built when there is something to report -- for most files in a
+    '' workspace the search above found nothing and this never runs.
+    dim as LineIndex lines_
+    lines_.Rebuild( text_ )
+
+    for i as long = 0 to offsets.Count( ) - 1
+        if( total >= MAX_REFERENCES ) then exit for
+
+        '' A declaration IS a reference, unless the client asked otherwise.
+        if( includeDeclaration = false ) then
+            dim as boolean isDecl = false
+            for d as long = 0 to declarations.Count( ) - 1
+                if( declarations[d] = offsets[i] ) then
+                    isDecl = true
+                    exit for
+                end if
+            next
+            if( isDecl ) then continue for
+        end if
+
+        dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, offsets[i] )
+        dim as SourcePosition b = OffsetToSourcePosition( text_, lines_, offsets[i] + len(lowerName) )
+
+        dim as JsonNode start_ = rb.NewObject( )
+        rb.SetInt( start_, "line", a.Line )
+        rb.SetInt( start_, "character", a.Column )
+
+        dim as JsonNode end_ = rb.NewObject( )
+        rb.SetInt( end_, "line", b.Line )
+        rb.SetInt( end_, "character", b.Column )
+
+        dim as JsonNode range_ = rb.NewObject( )
+        rb.SetNode( range_, "start", start_ )
+        rb.SetNode( range_, "end", end_ )
+
+        dim as JsonNode locNode = rb.NewObject( )
+        rb.SetStr ( locNode, "uri", uri )
+        rb.SetNode( locNode, "range", range_ )
+
+        rb.PushNode( list_, locNode )
+        total += 1
+    next
+end sub
+
+private function OnReferences( byref srv as Server, _
+                               byref req as RpcMessage, _
+                               byref rb as JsonBuilder, _
+                               byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+    if( doc = 0 ) then return rb.NewArray( )
+
+    dim as JsonValue posVal = req.Params( ).Member( "position" )
+    dim as long lineNo = clng( posVal.Member( "line"      ).AsLongInt( 0 ) )
+    dim as long charNo = clng( posVal.Member( "character" ).AsLongInt( 0 ) )
+    dim as long offset = clng( doc->PositionToOffset( lineNo, charNo ) )
+
+    '' includeDeclaration defaults to TRUE when the client omits the context:
+    '' the reading that shows more rather than less.
+    dim as boolean includeDecl = true
+    dim as JsonValue ctx = req.Params( ).Member( "context" )
+    if( ctx.IsObject( ) ) then includeDecl = ctx.Member( "includeDeclaration" ).AsBoolean( true )
+
+    '' The name under the cursor. Anything that is not an identifier -- a
+    '' keyword, a number, whitespace -- has no references to find.
+    dim as long tokIdx = TokenIndexAt( doc->Tokens( ), offset )
+    if( tokIdx < 0 ) then return rb.NewArray( )
+    if( doc->Tokens( )[tokIdx].Kind <> TK_IDENT ) then return rb.NewArray( )
+
+    dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[tokIdx] ) )
+    dim as double started = timer( )
+
+    dim as JsonNode list_ = rb.NewArray( )
+    dim as long total = 0
+    dim as long searched = 0
+
+    '' -- every indexed file ---------------------------------------------------
+    for f as long = 0 to srv.Index.FileCount( ) - 1
+        if( total >= MAX_REFERENCES ) then exit for
+
+        dim as string fileUri = srv.Index.FileUri( f )
+
+        '' The buffer when the editor has this file open -- it is the truth,
+        '' and may be a save ahead of the disk.
+        dim as TextDocumentPtr openDoc = srv.Documents.Find( fileUri )
+        dim as string body
+
+        if( openDoc <> 0 ) then
+            body = openDoc->Text( )
+        elseif( ReadSourceFile( srv.Index.FilePath( f ), body ) = false ) then
+            continue for
+        end if
+
+        '' Which occurrences are declarations is already known: the index has
+        '' this file's symbol table.
+        dim declarations as OffsetArray_
+        for i as long = 0 to srv.Index.FileSymbolCount( f ) - 1
+            if( srv.Index.SymbolAt( f, i ).LowerName = lowerName ) then
+                declarations.Push( srv.Index.SymbolAt( f, i ).NameStart )
+            end if
+        next
+
+        AddLocations( rb, list_, fileUri, body, lowerName, declarations, includeDecl, total )
+        searched += 1
+    next
+
+    '' -- and the open document, when the index has never seen it ---------------
+    ''
+    '' No workspace folder, or a file outside every folder: the document the
+    '' request came from must still be searched, or "find references" answers
+    '' nothing for the file the user is looking at.
+    if( srv.Index.IndexOfUri( uriText ) < 0 ) then
+        dim as string body = doc->Text( )
+
+        dim declarations as OffsetArray_
+        for i as long = 0 to doc->Symbols( ).Count( ) - 1
+            if( doc->Symbols( ).Items[i].LowerName = lowerName ) then
+                declarations.Push( doc->Symbols( ).Items[i].NameStart )
+            end if
+        next
+
+        AddLocations( rb, list_, uriText, body, lowerName, declarations, includeDecl, total )
+        searched += 1
+    end if
+
+    LogDebug( "references for '" & lowerName & "': " & total & " in " & searched & _
+              " file(s), " & int( (timer( ) - started) * 1000 ) & " ms" )
+    return list_
+end function
+
+sub RegisterReferencesHandlers( )
+    RegisterHandler( LSP_REFERENCES, @OnReferences )
+end sub

@@ -22,6 +22,7 @@
 #include once "../rpc/jsonrpc.bi"
 #include once "../rpc/transport.bi"
 #include once "../document/document_manager.bi"
+#include once "../workspace/symbol_index.bi"
 #include once "protocol.bi"
 
 '' A container held as a FIELD must be a named instantiation: fbc cannot
@@ -68,6 +69,13 @@ type Server
         '' Every handler that needs source text goes through here, never
         '' through the filesystem: the editor's buffer is authoritative.
         Documents        as DocumentManager
+
+        '' -- the workspace ---------------------------------------------------
+        ''
+        '' Every source file under the workspace folders, indexed by name. Built
+        '' on `initialized`, updated from the buffer as documents change, and
+        '' the reason a definition can be in another file at all.
+        Index            as SymbolIndex
 
         declare constructor( )
 

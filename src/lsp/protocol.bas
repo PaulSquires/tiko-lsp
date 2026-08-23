@@ -15,8 +15,9 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     ''      phase 3   (diagnostics are pushed, not advertised, before 3.17)
     ''      phase 4   documentSymbolProvider, hoverProvider,
     ''                definitionProvider
-    ''      phase 5   completionProvider                       <- here now
-    ''      phase 6   workspaceSymbolProvider, referencesProvider
+    ''      phase 5   completionProvider
+    ''      phase 6   workspaceSymbolProvider, referencesProvider,
+    ''                workspace.workspaceFolders               <- here now
     ''      phase 7   renameProvider, signatureHelpProvider, semanticTokens...
     '' ------------------------------------------------------------------------
 
@@ -62,6 +63,22 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     rb.SetNode( completion, "triggerCharacters", triggers )
 
     rb.SetNode( caps, "completionProvider", completion )
+
+    '' Phase 6. Both are answered from the workspace index, which is built once
+    '' the client says `initialized` and kept current from the open buffers.
+    rb.SetBool( caps, "workspaceSymbolProvider", true )
+    rb.SetBool( caps, "referencesProvider",      true )
+
+    '' Saying the server understands multi-root workspaces AND wants to be told
+    '' when the set changes. Without changeNotifications the index would go
+    '' stale the first time a folder is added, silently.
+    dim as JsonNode folders = rb.NewObject( )
+    rb.SetBool( folders, "supported", true )
+    rb.SetBool( folders, "changeNotifications", true )
+
+    dim as JsonNode wsCaps = rb.NewObject( )
+    rb.SetNode( wsCaps, "workspaceFolders", folders )
+    rb.SetNode( caps, "workspace", wsCaps )
 
     return caps
 end function

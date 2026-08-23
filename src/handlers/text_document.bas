@@ -4,6 +4,7 @@
 
 #include once "text_document.bi"
 #include once "../lsp/publish.bi"
+#include once "../workspace/workspace.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
 
@@ -53,6 +54,12 @@ private function OnDidOpen( byref srv as Server, _
     LogInfo( "opened " & DescribeDoc( doc ) & " [" & langId & "], " & _
              srv.Documents.Count( ) & " open" )
     srv.SendTrace( "didOpen " & UriFileName( uriText ), DescribeDoc( doc ) )
+
+    '' The index switches to the BUFFER for this file. From here until didClose
+    '' the editor's copy is what the workspace knows, so a symbol typed but not
+    '' saved is still found from another file.
+    srv.Index.IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
+
     PublishDocumentDiagnostics( srv, doc )
     return JsonNode( )
 end function
@@ -124,6 +131,10 @@ private function OnDidChange( byref srv as Server, _
     srv.SendTrace( "didChange " & UriFileName( uriText ) & " (" & applied & " edit(s))", _
                    DescribeDoc( doc ) )
 
+    '' The workspace index follows the buffer, so a rename typed in one file
+    '' is visible from another before it is saved.
+    srv.Index.IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
+
     '' Re-analysed on every change, synchronously. Measured on win64/gas64:
     '' 0.3 ms for a 700-line file, 10 ms for the 8,645-line ir-gas64.bas, which
     '' is the largest source in fbc's own compiler. That is comfortably inside
@@ -182,6 +193,16 @@ private function OnDidClose( byref srv as Server, _
     if( srv.Documents.Close( uriText ) = false ) then
         LogWarn( "didClose for a document that is not open: " & uriText )
         return JsonNode( )
+    end if
+
+    '' The buffer is gone, so the index goes back to what is on disk. If the
+    '' file is not there -- an untitled document, or one that was deleted --
+    '' it leaves the index entirely.
+    if( srv.Index.IndexOfUri( uriText ) >= 0 ) then
+        dim as string path_ = UriToPath( uriText )
+        dim as boolean reread = false
+        if( len(path_) > 0 ) then reread = srv.Index.IndexPath( path_ )
+        if( reread = false ) then srv.Index.Remove( uriText )
     end if
 
     LogInfo( "closed " & UriFileName( uriText ) & ", " & srv.Documents.Count( ) & " still open" )

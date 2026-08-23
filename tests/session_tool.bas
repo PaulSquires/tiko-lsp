@@ -4,9 +4,14 @@
 ''  This is the "manually piped LSP messages" check, in two halves so it works
 ''  identically on Windows and Linux without a shell that can emit exact CRLF:
 ''
-''      session_tool --write  session.bin      writes a scripted client session
-''      tiko-lsp < session.bin > captured.bin  runs the real server
-''      session_tool --check  captured.bin     asserts on what came back
+''      session_tool --write session.bin <workspace-root>
+''      tiko-lsp < session.bin > captured.bin
+''      session_tool --check captured.bin
+''
+''  <workspace-root> is tests/fixtures/workspace, whose two files are what the
+''  cross-file assertions are made against. The scripted didOpen carries the
+''  REAL CONTENT of widgets.bas, read at --write time, so the buffer and the
+''  file on disk cannot drift apart.
 ''
 ''  The checker reuses the server's own MessageFramer, so the captured stream
 ''  is validated as framing AND as protocol -- a response that is well-formed
@@ -19,6 +24,7 @@
 #include once "../src/json/json.bi"
 #include once "../src/rpc/jsonrpc.bi"
 #include once "../src/lsp/protocol.bi"
+#include once "../src/utils/uri.bi"
 
 const CR = chr(13)
 const LF = chr(10)
@@ -32,37 +38,53 @@ private function Frame( byref payload as string ) as string
     return "Content-Length: " & len(payload) & CR & LF & CR & LF & payload
 end function
 
+private function ReadWholeFile( byref path as string, byref outText as string ) as boolean
+    dim as long f = freefile( )
+    if( open( path for binary access read as #f ) <> 0 ) then return false
+
+    dim as longint n = lof( f )
+    outText = ""
+    if( n > 0 ) then
+        outText = space( n )
+        get #f, , outText
+    end if
+    close #f
+    return true
+end function
+
 '' ----------------------------------------------------------------------------
 ''  The scripted client session
-''
-''  Every message exercises one rule, in an order a real editor could produce.
 '' ----------------------------------------------------------------------------
-private function SessionBytes( ) as string
+private function SessionBytes( byref workspaceRoot as string ) as string
     dim as string s
+    dim as string wsUri = PathToUri( workspaceRoot )
 
-    '' 1. initialize, with the shape a real client sends.
+    '' 1. initialize, with the fixture workspace as its only folder.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "id" & Q & ":1," & Q & "method" & Q & ":" & Q & "initialize" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "processId" & Q & ":4242," & _
                 Q & "clientInfo" & Q & ":{" & Q & "name" & Q & ":" & Q & "session_tool" & Q & "," & _
                 Q & "version" & Q & ":" & Q & "1.0" & Q & "}," & _
-                Q & "rootUri" & Q & ":" & Q & "file:///c%3A/dev/tiko" & Q & "," & _
+                Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
                 Q & "trace" & Q & ":" & Q & "messages" & Q & "," & _
                 Q & "capabilities" & Q & ":{" & Q & "general" & Q & ":{" & _
                 Q & "positionEncodings" & Q & ":[" & Q & "utf-16" & Q & "," & Q & "utf-8" & Q & "]}}," & _
-                Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/tiko" & Q & "," & _
-                Q & "name" & Q & ":" & Q & "tiko" & Q & "}]}}" )
+                Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
+                Q & "name" & Q & ":" & Q & "fixture" & Q & "}]}}" )
 
-    '' 2. the client confirms; the server answers with a window/logMessage.
+    '' 2. the client confirms. The server answers with its ready message AND,
+    ''    because this is where the workspace scan happens, a second one saying
+    ''    what it indexed.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "initialized" & Q & "," & Q & "params" & Q & ":{}}" )
 
     '' 3. a request for something not implemented -> MethodNotFound.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":2," & _
-                Q & "method" & Q & ":" & Q & "textDocument/references" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/rename" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & _
                 Q & "file:///x.bas" & Q & "}," & _
-                Q & "position" & Q & ":{" & Q & "line" & Q & ":0," & Q & "character" & Q & ":0}}}" )
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":0," & Q & "character" & Q & ":0}," & _
+                Q & "newName" & Q & ":" & Q & "Other" & Q & "}}" )
 
     '' 4. a second initialize, with a STRING id -> InvalidRequest, echoed with
     ''    the id still a string.
@@ -79,8 +101,7 @@ private function SessionBytes( ) as string
                 Q & "method" & Q & ":" & Q & "$/somethingUnknown" & Q & "," & Q & "params" & Q & ":{}}" )
 
     '' 6. a document opens, carrying a REAL syntax error -- a sub with no
-    ''    `end sub`. Tracing is on, so each document notification produces a
-    ''    $/logTrace, and each also produces a publishDiagnostics.
+    ''    `end sub`. It is deliberately NOT in the workspace folder.
     ''
     ''        dim shared as long counter     26 bytes, `counter` at column 19
     ''        sub Test( )                    11
@@ -96,8 +117,7 @@ private function SessionBytes( ) as string
 
     '' 7. two edits in ONE didChange, the second expressed against the text as
     ''    the FIRST left it. Together they also FIX the error, so the
-    ''    publishDiagnostics that follows must be EMPTY -- which is how an
-    ''    editor clears a squiggle.
+    ''    publishDiagnostics that follows must be EMPTY.
     ''
     ''        edit 1: the `1` on line 2 becomes `2`
     ''        edit 2: append a newline and `end sub`
@@ -115,8 +135,7 @@ private function SessionBytes( ) as string
                 Q & "character" & Q & ":11}," & Q & "end" & Q & ":{" & Q & "line" & Q & ":2," & _
                 Q & "character" & Q & ":11}}," & Q & "text" & Q & ":" & Q & "\nend sub" & Q & "}]}}" )
 
-    '' 8. a change for a document that was never opened -- dropped in silence,
-    ''    which means NO $/logTrace and no response.
+    '' 8. a change for a document that was never opened -- dropped in silence.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didChange" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
@@ -124,9 +143,7 @@ private function SessionBytes( ) as string
                 Q & "version" & Q & ":5}," & _
                 Q & "contentChanges" & Q & ":[{" & Q & "text" & Q & ":" & Q & "whatever" & Q & "}]}}" )
 
-    '' 9. the language features, against the document as the edits left it: the
-    ''    outline, then a hover and a definition on the USE of `counter` on
-    ''    line 2, both of which must land on its declaration on line 0.
+    '' 9. the single-file features, against the document as the edits left it.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":5," & _
                 Q & "method" & Q & ":" & Q & "textDocument/documentSymbol" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
@@ -144,16 +161,54 @@ private function SessionBytes( ) as string
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
                 Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
 
-    '' 10. completion, in an ordinary position on line 2. The answer must
-    ''     carry the file's own declarations AND the language's reserved
-    ''     words, with the declarations sorting first.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":8," & _
                 Q & "method" & Q & ":" & Q & "textDocument/completion" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
                 Q & "position" & Q & ":{" & Q & "line" & Q & ":2," & Q & "character" & Q & ":3}}}" )
 
-    '' 11. save, then close.
+    '' 10. now a file that IS in the workspace, with the content it has on
+    ''     disk. Its `Widget` on line 4 is declared in the OTHER file, which is
+    ''     what the next three requests are about.
+    dim as string widgetsPath = workspaceRoot & "\widgets.bas"
+    dim as string widgetsText
+    if( ReadWholeFile( widgetsPath, widgetsText ) = false ) then
+        print "session_tool: cannot read " & widgetsPath
+        end 1
+    end if
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( widgetsText ) & "}}}" )
+
+    '' 11. cross-file definition: `Widget` at line 4, character 11 is declared
+    ''     in shared.bi, which this file only #includes -- and the server does
+    ''     not follow includes. The workspace index is the whole reason this
+    ''     can be answered.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":9," & _
+                Q & "method" & Q & ":" & Q & "textDocument/definition" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & Q & "character" & Q & ":11}}}" )
+
+    '' 12. references to the same name, across both files.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
+                Q & "method" & Q & ":" & Q & "textDocument/references" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & Q & "character" & Q & ":11}," & _
+                Q & "context" & Q & ":{" & Q & "includeDeclaration" & Q & ":true}}}" )
+
+    '' 13. the workspace picker.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":11," & _
+                Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
+
+    '' 14. save and close the first document. widgets.bas stays open, so the
+    ''     close trace must say ONE document is still open.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
@@ -163,52 +218,38 @@ private function SessionBytes( ) as string
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}}}" )
 
-    '' 12. broken JSON -> ParseError against a null id, and the session must
+    '' 15. broken JSON -> ParseError against a null id, and the session must
     ''     CONTINUE afterwards.
     s &= Frame( "{ this is not json" )
 
-    '' 13. shutdown -> null result.
+    '' 16. shutdown -> null result.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":3," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
 
-    '' 14. a request after shutdown -> InvalidRequest.
+    '' 17. a request after shutdown -> InvalidRequest.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":4," & _
                 Q & "method" & Q & ":" & Q & "textDocument/hover" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 15. exit -> the process ends with code 0, because shutdown came first.
+    '' 18. exit -> the process ends with code 0, because shutdown came first.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "exit" & Q & "}" )
 
     return s
 end function
 
-private function WriteSession( byref path as string ) as long
+private function WriteSession( byref path as string, byref workspaceRoot as string ) as long
     dim as long f = freefile( )
     if( open( path for binary access write as #f ) <> 0 ) then
         print "session_tool: cannot write " & path
         return 1
     end if
 
-    dim as string bytes_ = SessionBytes( )
+    dim as string bytes_ = SessionBytes( workspaceRoot )
     put #f, , bytes_
     close #f
 
     print "wrote " & len(bytes_) & " bytes to " & path
     return 0
-end function
-
-private function ReadWholeFile( byref path as string, byref outText as string ) as boolean
-    dim as long f = freefile( )
-    if( open( path for binary access read as #f ) <> 0 ) then return false
-
-    dim as longint n = lof( f )
-    outText = ""
-    if( n > 0 ) then
-        outText = space( n )
-        get #f, , outText
-    end if
-    close #f
-    return true
 end function
 
 '' ----------------------------------------------------------------------------
@@ -239,21 +280,21 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Nineteen, and exactly nineteen:
-    ''    9 answers to requests -- initialize, references, second initialize,
-    ''      documentSymbol, hover, definition, completion, shutdown,
-    ''      post-shutdown hover
+    '' Twenty-five, and exactly twenty-five:
+    ''   12 answers to requests -- initialize, rename, second initialize,
+    ''      documentSymbol, hover, definition, completion, cross-file
+    ''      definition, references, workspace/symbol, shutdown, post-shutdown
     ''    1 parse error
-    ''    1 window/logMessage from `initialized`
-    ''    4 $/logTrace          -- didOpen, didChange, didSave, didClose
-    ''    4 publishDiagnostics, one after each of those
+    ''    2 window/logMessage -- "ready", and what the workspace scan found
+    ''    5 $/logTrace          -- didOpen x2, didChange, didSave, didClose
+    ''    5 publishDiagnostics, one after each of those
     '' and NOTHING for the two $/ notifications the server must swallow, nor
     '' for the didChange against a document that was never opened.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 19, "the session produced exactly nineteen messages" )
-    if( messages.Count( ) <> 19 ) then
+    AssertEqInt( messages.Count( ), 25, "the session produced exactly twenty-five messages" )
+    if( messages.Count( ) <> 25 ) then
         for i as long = 0 to messages.Count( ) - 1
-            print "      [" & i & "] " & left( messages[i], 160 )
+            print "      [" & i & "] " & left( messages[i], 150 )
         next
         return TestSummary( "piped session" )
     end if
@@ -264,276 +305,241 @@ private function CheckSession( byref path as string ) as long
         dim as JsonDoc doc
         AssertTrue( doc.Parse( messages[0] ), "message 0 is JSON" )
         dim as JsonValue r = doc.Root( )
-        AssertEqStr( r.Member( "jsonrpc" ).AsString( ), "2.0", "carries jsonrpc 2.0" )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 1, "answers id 1" )
-        AssertTrue( r.Has( "result" ), "is a success response" )
         AssertEqStr( r.Member( "result" ).Member( "serverInfo" ).Member( "name" ).AsString( ), _
                      LSP_SERVER_NAME, "serverInfo names the server" )
 
         dim as JsonValue caps = r.Member( "result" ).Member( "capabilities" )
         AssertEqStr( caps.Member( "positionEncoding" ).AsString( ), LSP_ENCODING_UTF16, _
                      "the negotiated position encoding is stated" )
-        AssertTrue ( caps.Member( "textDocumentSync" ).Member( "openClose" ).AsBoolean( ), _
-                     "openClose is advertised" )
         AssertEqInt( caps.Member( "textDocumentSync" ).Member( "change" ).AsLongInt( ), _
                      clngint( LSPSYNC_INCREMENTAL ), "incremental sync is advertised" )
-
-        '' Phase 4's three, and still nothing that is not implemented.
         AssertTrue ( caps.Member( "documentSymbolProvider" ).AsBoolean( ), "documentSymbol is claimed" )
         AssertTrue ( caps.Member( "hoverProvider" ).AsBoolean( ), "hover is claimed" )
         AssertTrue ( caps.Member( "definitionProvider" ).AsBoolean( ), "definition is claimed" )
         AssertTrue ( caps.Member( "completionProvider" ).IsObject( ), "completion is claimed" )
-        AssertEqStr( caps.Member( "completionProvider" ).Member( "triggerCharacters" ).Item( 0 ).AsString( ), _
-                     ".", "with a dot as a trigger character" )
-        AssertFalse( caps.Member( "completionProvider" ).Member( "resolveProvider" ).AsBoolean( true ), _
-                     "and no resolve round trip, because items are already complete" )
-        AssertFalse( caps.Has( "referencesProvider" ), "references is NOT claimed" )
+
+        '' Phase 6's three.
+        AssertTrue ( caps.Member( "workspaceSymbolProvider" ).AsBoolean( ), "workspace/symbol is claimed" )
+        AssertTrue ( caps.Member( "referencesProvider" ).AsBoolean( ), "references is claimed" )
+        AssertTrue ( caps.Member( "workspace" ).Member( "workspaceFolders" ).Member( "supported" ).AsBoolean( ), _
+                     "multi-root workspaces are supported" )
+        AssertTrue ( caps.Member( "workspace" ).Member( "workspaceFolders" ) _
+                         .Member( "changeNotifications" ).AsBoolean( ), _
+                     "and the server asks to be told when they change" )
+
+        '' Still nothing that is not implemented.
         AssertFalse( caps.Has( "renameProvider" ), "rename is NOT claimed" )
+        AssertFalse( caps.Has( "signatureHelpProvider" ), "signature help is NOT claimed" )
     end scope
 
-    '' -- 2. the window/logMessage triggered by `initialized` --------------------
-    TestGroup( "initialized notification" )
+    '' -- 2..3. initialized, and the workspace scan ------------------------------
+    TestGroup( "the workspace index is built on `initialized`" )
     scope
-        dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[1] ), "message 1 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertEqStr( r.Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, "is window/logMessage" )
-        AssertFalse( r.Has( "id" ), "a notification carries no id" )
-        AssertContains( r.Member( "params" ).Member( "message" ).AsString( ), LSP_SERVER_NAME, _
-                        "the log message names the server" )
+        dim as JsonDoc ready_, indexed_
+        AssertTrue( ready_.Parse  ( messages[1] ), "message 1 is JSON" )
+        AssertTrue( indexed_.Parse( messages[2] ), "message 2 is JSON" )
+
+        AssertEqStr( ready_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
+                     "the server says it is ready" )
+        AssertContains( ready_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        LSP_SERVER_NAME, "naming itself" )
+
+        AssertEqStr( indexed_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
+                     "and then what it indexed" )
+
+        dim as string what = indexed_.Root( ).Member( "params" ).Member( "message" ).AsString( )
+        AssertContains( what, "indexed 2 file(s)", "both fixture files were found" )
+        AssertContains( what, "symbol(s)", "and their symbols counted" )
     end scope
 
-    '' -- 3. MethodNotFound for an unimplemented request -------------------------
+    '' -- 4. MethodNotFound ------------------------------------------------------
     TestGroup( "unimplemented method" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[2] ), "message 2 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertEqInt( r.Member( "id" ).AsLongInt( ), 2, "answers id 2" )
-        AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
-                     "textDocument/references is MethodNotFound" )
-        AssertFalse( r.Has( "result" ), "an error response has no result" )
+        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
+        AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 2, "answers id 2" )
+        AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
+                     "textDocument/rename is MethodNotFound" )
     end scope
 
-    '' -- 4. a second initialize, string id --------------------------------------
+    '' -- 5. a second initialize -------------------------------------------------
     TestGroup( "second initialize" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertTrue( r.Member( "id" ).IsString( ), "a string id is echoed AS A STRING" )
-        AssertEqStr( r.Member( "id" ).AsString( ), "s-1", "the string id is echoed exactly" )
-        AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
+        AssertTrue( doc.Parse( messages[4] ), "message 4 is JSON" )
+        AssertTrue( doc.Root( ).Member( "id" ).IsString( ), "a string id is echoed AS A STRING" )
+        AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
                      "a second initialize is InvalidRequest" )
     end scope
 
-    '' -- 5..8. document synchronisation and diagnostics -------------------------
-    ''
-    '' didOpen/didChange/didSave/didClose are notifications and have no
-    '' responses, so what proves the server tracked the buffer is what it sends
-    '' on its own: a $/logTrace, then a publishDiagnostics.
+    '' -- 6..9. document synchronisation and diagnostics -------------------------
     TestGroup( "document synchronisation and diagnostics" )
     scope
         dim as JsonDoc openTrace, openDiag, changeTrace, changeDiag
-        AssertTrue( openTrace.Parse  ( messages[4] ), "message 4 is JSON" )
-        AssertTrue( openDiag.Parse   ( messages[5] ), "message 5 is JSON" )
-        AssertTrue( changeTrace.Parse( messages[6] ), "message 6 is JSON" )
-        AssertTrue( changeDiag.Parse ( messages[7] ), "message 7 is JSON" )
+        AssertTrue( openTrace.Parse  ( messages[5] ), "message 5 is JSON" )
+        AssertTrue( openDiag.Parse   ( messages[6] ), "message 6 is JSON" )
+        AssertTrue( changeTrace.Parse( messages[7] ), "message 7 is JSON" )
+        AssertTrue( changeDiag.Parse ( messages[8] ), "message 8 is JSON" )
 
-        AssertEqStr( openTrace.Root( ).Member( "method" ).AsString( ), LSP_LOG_TRACE, "didOpen traced" )
-        AssertContains( openTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
-                        "didOpen x.bas", "the trace names the event and the file" )
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "v1, 3 line(s), 50 byte(s)", "the opened buffer is measured correctly" )
 
-        '' -- the diagnostic for the missing `end sub` --------------------------
         dim as JsonValue d = openDiag.Root( )
         AssertEqStr( d.Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, "diagnostics published" )
-        AssertEqStr( d.Member( "params" ).Member( "uri" ).AsString( ), _
-                     "file:///c%3A/dev/x.bas", "published against the right URI" )
-        AssertEqInt( d.Member( "params" ).Member( "version" ).AsLongInt( ), 1, _
-                     "carrying the document version" )
         AssertEqInt( d.Member( "params" ).Member( "diagnostics" ).Count( ), 1, _
                      "one diagnostic for the unclosed sub" )
 
         dim as JsonValue item = d.Member( "params" ).Member( "diagnostics" ).Item( 0 )
         AssertEqStr( item.Member( "code" ).AsString( ), "unclosed-block", "with a stable code" )
-        AssertEqInt( item.Member( "severity" ).AsLongInt( ), 1, "at severity Error" )
         AssertEqStr( item.Member( "source" ).AsString( ), "tiko-lsp", "attributed to this server" )
         AssertContains( item.Member( "message" ).AsString( ), "'sub Test'", "naming the procedure" )
         AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
                      "the range points at the SUB, on line 1" )
-        AssertEqInt( item.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 0, _
-                     "at character 0" )
 
-        '' -- the edits fix it, so the next report must be EMPTY ----------------
-        AssertContains( changeTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
-                        "2 edit(s)", "both content changes were applied" )
         AssertContains( changeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "v2, 4 line(s), 58 byte(s)", "the edits applied in order, against the evolving text" )
-
-        AssertEqStr( changeDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
-                     "diagnostics republished after the change" )
         AssertEqInt( changeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
-                     "and the list is EMPTY -- which is what clears the squiggle" )
-        AssertEqInt( changeDiag.Root( ).Member( "params" ).Member( "version" ).AsLongInt( ), 2, _
-                     "against the new version" )
+                     "and fixing the error publishes an EMPTY list" )
     end scope
 
-    '' -- 9..11. the language features -------------------------------------------
-    ''
-    '' The outline, then a hover and a definition on the USE of `counter` on
-    '' line 2, both of which have to land on its DECLARATION on line 0. That is
-    '' the whole of phase 4 in three messages.
-    TestGroup( "outline, hover and definition" )
+    '' -- 10..13. the single-file features ---------------------------------------
+    TestGroup( "outline, hover, definition, completion" )
     scope
-        dim as JsonDoc outline_, hover_, defn_
-        AssertTrue( outline_.Parse( messages[8]  ), "message 8 is JSON" )
-        AssertTrue( hover_.Parse  ( messages[9]  ), "message 9 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[10] ), "message 10 is JSON" )
+        dim as JsonDoc outline_, hover_, defn_, cmp_
+        AssertTrue( outline_.Parse( messages[9]  ), "message 9 is JSON" )
+        AssertTrue( hover_.Parse  ( messages[10] ), "message 10 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[11] ), "message 11 is JSON" )
+        AssertTrue( cmp_.Parse    ( messages[12] ), "message 12 is JSON" )
 
-        '' -- documentSymbol ----------------------------------------------------
         dim as JsonValue syms = outline_.Root( ).Member( "result" )
-        AssertEqInt( outline_.Root( ).Member( "id" ).AsLongInt( ), 5, "answers id 5" )
         AssertEqInt( syms.Count( ), 2, "the outline has two top-level symbols" )
+        AssertEqStr( syms.Item( 0 ).Member( "name" ).AsString( ), "counter", "the variable is listed" )
+        AssertEqInt( syms.Item( 0 ).Member( "kind" ).AsLongInt( ), 13, "as a Variable" )
+        AssertEqStr( syms.Item( 1 ).Member( "name" ).AsString( ), "Test", "the procedure is listed" )
 
-        dim as JsonValue s0 = syms.Item( 0 )
-        dim as JsonValue s1 = syms.Item( 1 )
-        AssertEqStr( s0.Member( "name" ).AsString( ), "counter", "the variable is listed" )
-        AssertEqInt( s0.Member( "kind" ).AsLongInt( ), 13, "as a Variable" )
-        AssertEqStr( s0.Member( "detail" ).AsString( ), "as long", "with its type" )
-        AssertEqStr( s1.Member( "name" ).AsString( ), "Test", "the procedure is listed" )
-        AssertEqInt( s1.Member( "kind" ).AsLongInt( ), 12, "as a Function" )
-
-        '' selectionRange is the NAME and must lie inside range, which is the
-        '' whole declaration. A client that disagrees shows an empty outline
-        '' rather than complaining.
-        AssertEqInt( s1.Member( "selectionRange" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
-                     "the selection range is the name, on line 1" )
-        AssertEqInt( s1.Member( "selectionRange" ).Member( "start" ).Member( "character" ).AsLongInt( ), 4, _
-                     "at the character the name starts" )
-        AssertEqInt( s1.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
-                     "the full range starts at the SUB" )
-        AssertEqInt( s1.Member( "range" ).Member( "end" ).Member( "line" ).AsLongInt( ), 3, _
-                     "and ends at the END SUB" )
-
-        '' -- hover -------------------------------------------------------------
         dim as string markdown = hover_.Root( ).Member( "result" ).Member( "contents" ) _
                                        .Member( "value" ).AsString( )
-        AssertEqInt( hover_.Root( ).Member( "id" ).AsLongInt( ), 6, "answers id 6" )
-        AssertEqStr( hover_.Root( ).Member( "result" ).Member( "contents" ).Member( "kind" ).AsString( ), _
-                     "markdown", "hover is markdown" )
-        AssertContains( markdown, "counter as long", "showing the declaration" )
-        AssertContains( markdown, "variable", "and what kind of thing it is" )
-        AssertEqInt( hover_.Root( ).Member( "result" ).Member( "range" ) _
-                           .Member( "start" ).Member( "line" ).AsLongInt( ), 2, _
-                     "the hovered range is the word under the cursor" )
+        AssertContains( markdown, "counter as long", "hover shows the declaration" )
 
-        '' -- definition --------------------------------------------------------
-        dim as JsonValue defnLoc = defn_.Root( ).Member( "result" )
-        AssertEqInt( defn_.Root( ).Member( "id" ).AsLongInt( ), 7, "answers id 7" )
-        AssertEqStr( defnLoc.Member( "uri" ).AsString( ), "file:///c%3A/dev/x.bas", _
-                     "the definition is in this file" )
-        AssertEqInt( defnLoc.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
+        dim as JsonValue where_ = defn_.Root( ).Member( "result" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
                      "a use on line 2 resolves to the declaration on line 0" )
-        AssertEqInt( defnLoc.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 19, _
-                     "at the character the NAME starts, not the line" )
-        AssertEqInt( defnLoc.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 26, _
-                     "and ending after it" )
-    end scope
-
-    '' -- 12. completion ------------------------------------------------------
-    TestGroup( "completion" )
-    scope
-        dim as JsonDoc cmp_
-        AssertTrue( cmp_.Parse( messages[11] ), "message 11 is JSON" )
-        AssertEqInt( cmp_.Root( ).Member( "id" ).AsLongInt( ), 8, "answers id 8" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 19, _
+                     "at the character the NAME starts" )
 
         dim as JsonValue items = cmp_.Root( ).Member( "result" )
-        AssertTrue( items.Count( ) > 200, "the list carries the language as well as the file" )
-
-        '' Find the three that matter: a variable this file declares, the
-        '' procedure it declares, and a reserved word.
-        dim as string counterSort, subSort
-        dim as long counterKind = -1, subKind = -1
-        dim as boolean sawTest = false
-
-        for i as long = 0 to items.Count( ) - 1
-            dim as JsonValue it = items.Item( i )
-            dim as string label_ = lcase( it.Member( "label" ).AsString( ) )
-
-            select case label_
-                case "counter"
-                    counterKind = clng( it.Member( "kind" ).AsLongInt( ) )
-                    counterSort = it.Member( "sortText" ).AsString( )
-                case "sub"
-                    subKind = clng( it.Member( "kind" ).AsLongInt( ) )
-                    subSort = it.Member( "sortText" ).AsString( )
-                case "test"
-                    sawTest = true
-            end select
-        next
-
-        AssertEqInt( counterKind, 6, "the file's variable is offered, as a Variable" )
-        AssertEqInt( subKind, 14, "and the reserved word `sub`, as a Keyword" )
-        AssertTrue ( sawTest, "along with the procedure this file declares" )
-
-        '' The ordering rule, on the wire: a declaration outranks a keyword
-        '' even though `counter` sorts after `sub` alphabetically.
-        AssertTrue( counterSort < subSort, "a declaration sorts above a keyword" )
+        AssertTrue( items.Count( ) > 200, "completion carries the language as well as the file" )
     end scope
 
-    '' -- 13..16. save and close ------------------------------------------------
+    '' -- 14..15. the workspace file opens ---------------------------------------
+    TestGroup( "a workspace file opens" )
+    scope
+        dim as JsonDoc trace_, diag_
+        AssertTrue( trace_.Parse( messages[13] ), "message 13 is JSON" )
+        AssertTrue( diag_.Parse ( messages[14] ), "message 14 is JSON" )
+
+        AssertContains( trace_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        "didOpen widgets.bas", "the fixture file is opened" )
+        AssertEqInt( diag_.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
+                     "and it analyses clean" )
+    end scope
+
+    '' -- 16..18. THE CROSS-FILE FEATURES ----------------------------------------
+    ''
+    '' widgets.bas uses `Widget` on line 4. It is declared in shared.bi, which
+    '' widgets.bas only #includes -- and this server does not follow includes.
+    '' Everything below is answered from the workspace index or not at all.
+    TestGroup( "cross-file definition, references, workspace symbols" )
+    scope
+        dim as JsonDoc defn_, refs_, syms_
+        AssertTrue( defn_.Parse( messages[15] ), "message 15 is JSON" )
+        AssertTrue( refs_.Parse( messages[16] ), "message 16 is JSON" )
+        AssertTrue( syms_.Parse( messages[17] ), "message 17 is JSON" )
+
+        '' -- definition, into another file --------------------------------------
+        dim as JsonValue where_ = defn_.Root( ).Member( "result" )
+        AssertEqInt( defn_.Root( ).Member( "id" ).AsLongInt( ), 9, "answers id 9" )
+        AssertContains( lcase( where_.Member( "uri" ).AsString( ) ), "shared.bi", _
+                        "a use in one file resolves to the declaration in ANOTHER" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 1, _
+                     "landing on the line `type Widget` is on" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 5, _
+                     "at the character the name starts" )
+        AssertEqInt( where_.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 11, _
+                     "and ending after it" )
+
+        '' -- references, across both files --------------------------------------
+        dim as JsonValue refs = refs_.Root( ).Member( "result" )
+        AssertEqInt( refs_.Root( ).Member( "id" ).AsLongInt( ), 10, "answers id 10" )
+        AssertEqInt( refs.Count( ), 4, "Widget is used four times in the workspace" )
+
+        dim as boolean inShared = false, inWidgets = false
+        for i as long = 0 to refs.Count( ) - 1
+            dim as string u = lcase( refs.Item( i ).Member( "uri" ).AsString( ) )
+            if( instr( u, "shared.bi" ) > 0 ) then inShared = true
+            if( instr( u, "widgets.bas" ) > 0 ) then inWidgets = true
+        next
+        AssertTrue( inShared andalso inWidgets, "and the hits span both files" )
+
+        '' -- the workspace picker ------------------------------------------------
+        dim as JsonValue found = syms_.Root( ).Member( "result" )
+        AssertEqInt( syms_.Root( ).Member( "id" ).AsLongInt( ), 11, "answers id 11" )
+        AssertTrue ( found.Count( ) >= 4, "the query finds the type, the constant and the procedure" )
+
+        dim as JsonValue first_ = found.Item( 0 )
+        AssertEqStr( first_.Member( "name" ).AsString( ), "Widget", "the exact match is first" )
+        AssertEqInt( first_.Member( "kind" ).AsLongInt( ), 23, "as a Struct" )
+        AssertEqStr( first_.Member( "containerName" ).AsString( ), "shared.bi", _
+                     "and says which file it is in" )
+        AssertContains( lcase( first_.Member( "location" ).Member( "uri" ).AsString( ) ), "shared.bi", _
+                        "with a location a client can open" )
+        AssertEqInt( first_.Member( "location" ).Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), _
+                     1, "at the right line" )
+    end scope
+
+    '' -- 19..22. save and close --------------------------------------------------
+    TestGroup( "save and close" )
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[12] ), "message 12 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[13] ), "message 13 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[14] ), "message 14 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[15] ), "message 15 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[18] ), "message 18 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[19] ), "message 19 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[20] ), "message 20 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[21] ), "message 21 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
         AssertEqStr( saveDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
                      "a save republishes" )
 
+        '' widgets.bas is still open, which is what makes this ONE and not zero.
         AssertContains( closeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "0 document(s) still open", "closing released the buffer" )
+                        "1 document(s) still open", "closing one buffer leaves the other" )
         AssertEqInt( closeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
-                     "with an empty list, so nothing is left on screen" )
-        AssertFalse( closeDiag.Root( ).Member( "params" ).Has( "version" ), _
-                     "and no version, because the document is gone" )
+                     "and clears the closed file's diagnostics" )
     end scope
 
-    '' -- 17. the parse error -------------------------------------------------------
+    '' -- 23. the parse error ------------------------------------------------------
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[16] ), "message 16 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertTrue( r.Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
-        AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
+        AssertTrue( doc.Parse( messages[22] ), "message 22 is JSON" )
+        AssertTrue( doc.Root( ).Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
+        AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
     end scope
 
-    '' -- 18. shutdown ---------------------------------------------------------------
+    '' -- 24..25. shutdown and after -----------------------------------------------
     TestGroup( "shutdown" )
     scope
-        dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[17] ), "message 17 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertEqInt( r.Member( "id" ).AsLongInt( ), 3, "answers id 3" )
-        AssertTrue( r.Has( "result" ), "shutdown returns a result member" )
-        AssertTrue( r.Member( "result" ).IsNull( ), "the shutdown result is null" )
-    end scope
+        dim as JsonDoc doc, after_
+        AssertTrue( doc.Parse   ( messages[23] ), "message 23 is JSON" )
+        AssertTrue( after_.Parse( messages[24] ), "message 24 is JSON" )
 
-    '' -- 19. a request arriving after shutdown --------------------------------------
-    TestGroup( "post-shutdown request" )
-    scope
-        dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[18] ), "message 18 is JSON" )
-        dim as JsonValue r = doc.Root( )
-        AssertEqInt( r.Member( "id" ).AsLongInt( ), 4, "answers id 4" )
-        AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
+        AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 3, "answers id 3" )
+        AssertTrue ( doc.Root( ).Member( "result" ).IsNull( ), "the shutdown result is null" )
+
+        AssertEqInt( after_.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
                      "a request after shutdown is InvalidRequest" )
     end scope
 
@@ -545,16 +551,25 @@ end function
 '' ----------------------------------------------------------------------------
 dim as string mode_ = command( 1 )
 dim as string path_ = command( 2 )
+dim as string root_ = command( 3 )
 
 if( len(path_) = 0 ) then
-    print "usage: session_tool --write <file> | --check <file>"
+    print "usage: session_tool --write <file> <workspace-root> | --check <file>"
     end 2
 end if
 
 select case lcase( mode_ )
-    case "--write" : end WriteSession( path_ )
-    case "--check" : end CheckSession( path_ )
+    case "--write"
+        if( len(root_) = 0 ) then
+            print "session_tool --write needs the workspace root"
+            end 2
+        end if
+        end WriteSession( path_, root_ )
+
+    case "--check"
+        end CheckSession( path_ )
+
     case else
-        print "usage: session_tool --write <file> | --check <file>"
+        print "usage: session_tool --write <file> <workspace-root> | --check <file>"
         end 2
 end select

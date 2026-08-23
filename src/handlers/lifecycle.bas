@@ -3,6 +3,7 @@
 '' ############################################################################
 
 #include once "lifecycle.bi"
+#include once "workspace_symbols.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -99,6 +100,12 @@ private function OnInitialized( byref srv as Server, _
                                 byref err_ as RpcError ) as JsonNode
     LogInfo( "client reports initialized" )
     srv.SendLogMessage( LSPMSG_LOG, LSP_SERVER_NAME & " " & LSP_SERVER_VERSION & " ready" )
+
+    '' The workspace scan happens HERE, not during `initialize`: the client is
+    '' blocked waiting for that response, and a scan of a large tree would show
+    '' up as a slow start. By now the editor is running and merely gets its
+    '' cross-file answers a moment later.
+    BuildWorkspaceIndex( srv )
     return JsonNode( )
 end function
 
@@ -116,6 +123,7 @@ private function OnShutdown( byref srv as Server, _
     LogInfo( "shutdown requested" )
     srv.SetState( SRV_SHUTDOWN )
     srv.WorkspaceFolders.Clear( )
+    srv.Index.Clear( )
     return rb.NewNull( )
 end function
 
