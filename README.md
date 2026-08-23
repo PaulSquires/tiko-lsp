@@ -4,6 +4,8 @@ A Language Server Protocol server for **fbc-modern**, written in fbc-modern.
 
 It speaks LSP 3.17 over stdin/stdout and is a plain standalone executable, so any
 LSP-capable editor — Zed, VS Code, Neovim, Helix, Sublime Text — can launch it.
+A **Zed extension** lives in [editors/zed](editors/zed); everything else needs
+only a few lines of client configuration.
 
 The server is designed to end up sharing the compiler's own lexer, parser, AST,
 symbol table and semantic analyser rather than shelling out to `fbc.exe`. Nothing
@@ -120,6 +122,7 @@ tiko-lsp/
                                       assertions are made against
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
   docs/         architecture.md, phase1.md .. phase10.md
+  editors/zed/  a Zed extension: the language, and where to find the server
 ```
 
 Every directory in the sketch now has something real in it.

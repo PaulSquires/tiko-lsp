@@ -257,6 +257,23 @@ scope
 end scope
 
 
+scope
+    '' A FILE as the workspace root. An editor that opens a single file -- `zed
+    '' widgets.bas` -- sends that file as the workspace folder, and walking a
+    '' file finds nothing at all.
+    dim as WorkspaceScan one_
+    ScanFolder( g_Fixture & "\widgets.bas", one_ )
+    AssertEqInt( one_.Files.Count( ), 1, "a file root scans to itself" )
+
+    dim as WorkspaceScan none_
+    ScanFolder( g_Fixture & "\notes.txt", none_ )
+    AssertEqInt( none_.Files.Count( ), 0, "and a file that is not FreeBASIC scans to nothing" )
+
+    dim as WorkspaceScan gone_
+    ScanFolder( g_Fixture & "\nothing-here.bas", gone_ )
+    AssertEqInt( gone_.Files.Count( ), 0, "a path that does not exist is not a file either" )
+end scope
+
 '' ############################################################################
 ''  The include graph
 ''

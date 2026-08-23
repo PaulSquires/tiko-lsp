@@ -63,6 +63,16 @@ sub ScanFolder( byref rootPath as string, byref scan as WorkspaceScan )
     '' against its own.
     dim as string root = NormalizePath( rootPath )
 
+    '' A FILE, not a folder. Zed sends the file itself as the workspace folder
+    '' when a single file is opened (`zed widgets.bas`), and walking a file
+    '' finds nothing -- so the file IS the workspace. Walking its directory
+    '' instead would be worse: opening one file out of C:\dev would index
+    '' every project on the disk.
+    if( FB.IsFile( root ) ) then
+        if( IsSourceFileName( root ) ) then scan.Files.Push( root )
+        exit sub
+    end if
+
     '' WalkDir is reentrant and does not follow directory symlinks, so the
     '' traversal is a tree by construction -- no visited set, no cycles. FB's
     '' own DIR/DIRNEXT is a per-thread global and cannot be nested at all.
