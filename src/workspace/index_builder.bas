@@ -30,6 +30,11 @@ dim shared as PathArray      g_idxRoots
 dim shared as SymbolIndex ptr g_idxResult
 dim shared as string         g_idxSummary
 
+'' Which of the two jobs is in flight: a whole-workspace scan, or a refresh of
+'' named files. The difference matters only at the end -- one result is
+'' ADOPTED, the other is MERGED.
+dim shared as boolean        g_idxRefresh
+
 '' Before main( ), so no two callers can create it at once -- the same rule as
 '' the file mutex next door in workspace.bas.
 private sub InitIndexMutex constructor
@@ -115,6 +120,40 @@ private sub IndexBuildWorker( byval param as any ptr )
     g_idxSummary = summary
 end sub
 
+'' Re-indexes the named files and nothing else. Same thread, same handover,
+'' same rules -- only the work is smaller.
+private sub IndexRefreshWorker( byval param as any ptr )
+    dim as double started = timer( )
+
+    dim as SymbolIndex ptr idx = new SymbolIndex
+    dim as long indexed = 0
+    dim as long failed  = 0
+
+    for i as long = 0 to g_idxRoots.Count( ) - 1
+        if( CancelRequested( ) ) then
+            delete idx
+            g_idxResult  = 0
+            g_idxSummary = "refresh cancelled after " & indexed & " file(s)"
+            LogInfo( g_idxSummary )
+            exit sub
+        end if
+
+        if( idx->IndexPath( g_idxRoots[i] ) ) then
+            indexed += 1
+        else
+            '' Gone again, or unreadable. It is NOT merged as an empty entry:
+            '' a file that cannot be read keeps whatever the live index last
+            '' knew, which is a better answer than none.
+            failed += 1
+        end if
+    next
+
+    g_idxResult  = idx
+    g_idxSummary = "re-indexed " & indexed & " of " & g_idxRoots.Count( ) & " file(s) in " & _
+                   int( (timer( ) - started) * 1000 ) & " ms"
+    if( failed > 0 ) then g_idxSummary &= " (" & failed & " unreadable)"
+end sub
+
 '' ----------------------------------------------------------------------------
 ''  The interface the message loop uses
 '' ----------------------------------------------------------------------------
@@ -134,7 +173,8 @@ sub StartIndexBuild( byref roots as PathArray )
     g_idxSummary = ""
 
     SetCancel( false )
-    g_idxThread = threadcreate( @IndexBuildWorker, 0 )
+    g_idxRefresh = false
+    g_idxThread  = threadcreate( @IndexBuildWorker, 0 )
 
     if( g_idxThread = 0 ) then
         '' No thread available. Rather than leave the workspace unindexed, the
@@ -144,6 +184,34 @@ sub StartIndexBuild( byref roots as PathArray )
         IndexBuildWorker( 0 )
     end if
 end sub
+
+sub StartIndexRefresh( byref paths as PathArray )
+    CancelIndexBuild( )
+
+    g_idxRoots.Clear( )
+    for i as long = 0 to paths.Count( ) - 1
+        g_idxRoots.Push( paths[i] )
+    next
+
+    if( g_idxResult <> 0 ) then
+        delete g_idxResult
+        g_idxResult = 0
+    end if
+    g_idxSummary = ""
+
+    SetCancel( false )
+    g_idxRefresh = true
+    g_idxThread  = threadcreate( @IndexRefreshWorker, 0 )
+
+    if( g_idxThread = 0 ) then
+        LogWarn( "could not start the index thread -- refreshing on the message loop" )
+        IndexRefreshWorker( 0 )
+    end if
+end sub
+
+function IndexBuildIsRefresh( ) as boolean
+    return g_idxRefresh
+end function
 
 function IndexBuildPending( ) as boolean
     return ( g_idxThread <> 0 ) orelse ( g_idxResult <> 0 )

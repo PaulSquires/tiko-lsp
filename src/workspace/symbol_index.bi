@@ -86,6 +86,11 @@ type SymbolIndex
 
         declare sub Remove( byref uri as string )
 
+        '' Takes every file `other` holds, replacing any entry for the same
+        '' file. Used to merge a batch the worker re-indexed back into the live
+        '' index -- the targeted counterpart of adopting a whole fresh index.
+        declare sub Absorb( byref other as SymbolIndex )
+
         '' A symbol, by file and entry. The reference dies with the index.
         declare function SymbolAt( byval fileIndex as long, byval symIndex as long ) byref as SymbolInfo
 

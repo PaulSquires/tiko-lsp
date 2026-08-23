@@ -80,11 +80,65 @@ anything applied to the live index in the meantime would be thrown away when the
 fresh one is adopted. That is not a shortcut, it is the only version that cannot
 go stale.
 
+## A burst goes to the worker
+
+A `git checkout` across a branch does not report three files; it reports
+hundreds or thousands. Applied one at a time on the message loop, at the 1–3 ms
+it costs to re-index one file into a large index, that is **a frozen editor for
+about a second per thousand files** — which is the very thing phase 8 was about.
+
+So a notification is now planned before it is acted on:
+
+1. **Filter**, as before: only `.bas`/`.bi`/`.inc`, nothing under `.git`, and
+   nothing the editor has open.
+2. **Collapse.** One checkout reports the same file more than once — deleted
+   then created, changed twice — and only the last word about it matters. Files
+   are keyed exactly as the index keys them, so one file counts once however the
+   client spelled its URI.
+3. **Count.** Up to **100 distinct files**, apply them here: that is a hiccup of
+   100–200 ms at worst, measured. Beyond that, the reading goes to the worker
+   and the deletions — which read nothing — are applied immediately.
+
+The worker re-indexes **only the named files** into a small index of its own,
+and the result is **merged** into the live one (`SymbolIndex.Absorb`) when the
+next request that needs the index takes delivery. That is the difference from a
+whole-workspace scan, and it is the difference between 0.7 s and 2.9 s for the
+next cross-file answer on a 2,000-file workspace — re-reading 1,800 files that
+nothing said anything about is work for its own sake.
+
+**A file that could not be read keeps what the index already knew.** A watcher
+that reports a file which is gone by the time the worker gets there must not
+delete that file's symbols; the refresh simply has no entry for it, and merging
+cannot remove one.
+
+Two rules follow from having two kinds of background job:
+
+- a **full scan** in flight still means the batch is dropped, because the scan
+  reads every file anyway;
+- a **refresh** in flight does not, because it covers only the files it was
+  given. The second burst waits for the first refresh to land before planning
+  its own — measured at about 200 ms for a 200-file refresh, and the only case
+  in which a burst blocks the loop at all.
+
+### Measured
+
+Time until a `hover` — which needs nothing but the open buffer — is answered
+after a burst arrives, over a live pipe. AfxNova, 2,093 indexed files.
+
+| Burst | hover before | hover now | next `workspace/symbol` before | now |
+| --- | --- | --- | --- | --- |
+| 200 files | 112 ms | **5 ms** | 191 ms | 209 ms |
+| 1,000 files | 724 ms | **26 ms** | 812 ms | 688 ms |
+
+On `C:\dev\tiko` (4,000 files), a 1,000-file burst answers a hover in 34 ms and
+the following `workspace/symbol` in 711 ms. Two 200-file bursts sent back to
+back answer in 218 ms, which is the second one waiting for the first.
+
 ## Verification
 
 `build\_run_tests.bat`, Windows 11, fbc-modern 1.20.0 (win64), gas64, `-w all`
-clean, everything linked `-mt`. **969 assertions**, all passing — twelve suites,
-of which the piped session grew to **174**.
+clean, everything linked `-mt`. **979 assertions**, all passing — twelve suites,
+of which the piped session grew to **184**.
 
 The session now runs the whole round trip against a real process:
 
@@ -98,7 +152,14 @@ The session now runs the whole round trip against a real process:
   `widgets.bas` — which is **open** — changed. The trace says `1 re-indexed,
   2 ignored`, and the picker offers `shared.bi` again.
 
-Forty-two messages, and exactly forty-two: the count is asserted, so a stray
+And then a **burst**: 120 invented files, plus `shared.bi`, plus the open
+`widgets.bas`. The trace says `121 change(s)` — the open file was filtered out
+before counting — and `121 re-indexed in the background`; the refresh reports
+`re-indexed 1 of 121 file(s) (120 unreadable)`; and `shared.bi` is still in the
+workspace picker afterwards, because a file that could not be read keeps what
+the index knew.
+
+Forty-five messages, and exactly forty-five: the count is asserted, so a stray
 notification or a reply to the client's response would fail the suite rather than
 pass unnoticed.
 
@@ -114,7 +175,12 @@ pass unnoticed.
   claimed.
 - **`unregisterCapability`.** The registration is made once and never withdrawn.
   Its id is fixed (`tiko-watched-files`) so it *could* be, but nothing does.
-- **Bursts.** A `git checkout` across a large branch can produce thousands of
-  events in one notification; each is re-indexed immediately, on the message
-  loop, at roughly a millisecond per file. A debounce, or handing the batch to
-  the worker, is the obvious next step and is not done.
+- **A queue for overlapping bursts.** A burst arriving while a refresh is still
+  running waits for it on the message loop — 200 ms for a 200-file refresh, the
+  one case where a burst blocks anything. Queuing the second batch instead is
+  the obvious next step and is not done.
+- **The merge cost is not separately measured.** `Absorb` copies one entry per
+  refreshed file into the live index, on the request that takes delivery; at
+  1,000 files it is inside the 688 ms above, but it has not been isolated.
+- **No debounce.** Ten notifications of ten files each are ten small batches,
+  not one of a hundred: nothing waits to see whether more is coming.

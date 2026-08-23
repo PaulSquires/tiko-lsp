@@ -147,6 +147,24 @@ function SymbolIndex.IndexPath( byref path_ as string ) as boolean
     return true
 end function
 
+sub SymbolIndex.Absorb( byref other as SymbolIndex )
+    for i as long = 0 to other.m_files.Count( ) - 1
+        dim as long existing = -1
+        for k as long = 0 to this.m_files.Count( ) - 1
+            if( this.m_files[k].Key_ = other.m_files[i].Key_ ) then
+                existing = k
+                exit for
+            end if
+        next
+
+        if( existing >= 0 ) then
+            this.m_files[existing] = other.m_files[i]
+        else
+            this.m_files.Push( other.m_files[i] )
+        end if
+    next
+end sub
+
 sub SymbolIndex.Remove( byref uri as string )
     dim as long i = this.IndexOfUri( uri )
     if( i < 0 ) then exit sub

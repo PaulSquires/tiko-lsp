@@ -8,11 +8,31 @@
 #include once "../workspace/index_builder.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
+#include once "fb/map.bi"
 
 '' FileChangeType, from the specification.
 const FILECHANGE_CREATED = 1
 const FILECHANGE_CHANGED = 2
 const FILECHANGE_DELETED = 3
+
+'' Above this many DISTINCT source files in one notification, the batch is not
+'' applied file by file -- the whole workspace is re-scanned on the worker
+'' instead. See OnDidChangeWatchedFiles for why that is the better answer and
+'' not merely the cheaper one to write.
+''
+'' The number comes from measurement: re-indexing one file into a 4,000-file
+'' index costs 1-3 ms, so a hundred is a hiccup of 100-200 ms and five hundred
+'' is well over a second of a frozen editor.
+const WATCHED_BURST_LIMIT = 100
+
+'' One change, after filtering: what the server would actually do about it.
+type WatchedChange
+    Uri   as string
+    Path_ as string
+    Kind_ as long
+end type
+
+type WatchedChangeArray as FB.Array( of WatchedChange )
 
 '' ----------------------------------------------------------------------------
 ''  Registering
@@ -69,15 +89,30 @@ private function OnDidChangeWatchedFiles( byref srv as Server, _
     '' find -- and anything applied to the live index now would be thrown away
     '' when the fresh one is adopted. Dropping them is not a shortcut; it is
     '' the only version that cannot go stale.
-    if( IndexBuildPending( ) ) then
+    if( IndexBuildPending( ) andalso IndexBuildIsRefresh( ) = false ) then
         LogDebug( "watched-file changes ignored: the workspace scan will read " & _
                   "them anyway" )
         return JsonNode( )
     end if
 
+    '' A REFRESH is a different matter: it covers only the files it was handed,
+    '' so this batch cannot be dropped on its account. Take delivery of the one
+    '' in flight -- sub-second, and only when bursts arrive back to back -- and
+    '' then deal with this one.
+    if( IndexBuildPending( ) ) then EnsureWorkspaceIndex( srv )
+
     dim as long indexed = 0
     dim as long removed = 0
     dim as long skipped = 0
+
+    '' -- what is actually worth doing, once each ------------------------------
+    ''
+    '' A single checkout reports the same file more than once -- deleted then
+    '' created, or changed twice -- and only the LAST word about it matters.
+    '' Collapsing here rather than acting twice is what makes the count below
+    '' mean something.
+    dim work_ as WatchedChangeArray
+    dim seen_ as FB.Map( of string, long )
 
     for each change in ArrayOf( req.Params( ).Member( "changes" ) )
         dim as string uriText = change.Member( "uri" ).AsString( "" )
@@ -108,23 +143,87 @@ private function OnDidChangeWatchedFiles( byref srv as Server, _
             continue for
         end if
 
-        select case kind
+        if( kind <> FILECHANGE_CREATED andalso kind <> FILECHANGE_CHANGED andalso _
+            kind <> FILECHANGE_DELETED ) then
+            skipped += 1
+            continue for
+        end if
+
+        '' The same key the index uses: one file has one identity however the
+        '' client spelled its URI.
+        dim as string key_ = lcase( NormalizePath( path_ ) )
+        dim as long at_ = 0
+
+        if( seen_.TryGet( key_, at_ ) ) then
+            work_[at_].Uri   = uriText
+            work_[at_].Path_ = path_
+            work_[at_].Kind_ = kind
+            continue for
+        end if
+
+        dim as WatchedChange w
+        w.Uri   = uriText
+        w.Path_ = path_
+        w.Kind_ = kind
+        seen_.Put( key_, work_.Count( ) )
+        work_.Push( w )
+    next
+
+    '' -- a burst is a workspace change, not a list of file changes ------------
+    ''
+    '' Past a hundred files this stops applying them one at a time and re-scans
+    '' the workspace on the worker instead. Three reasons, in order of weight:
+    ''
+    ''   - a thousand events applied here is a thousand milliseconds of an
+    ''     editor that does not respond, which is the whole thing phase 8 was
+    ''     about;
+    ''   - a burst this size IS a workspace change -- a branch switch, a pull,
+    ''     a generated tree -- and re-reading the workspace is the answer that
+    ''     matches what happened;
+    ''   - AND A WATCHER IS LEAST RELIABLE EXACTLY WHEN IT IS BUSIEST. Editors
+    ''     coalesce and drop file events under load, so the list that arrives
+    ''     after a big checkout is the one least worth trusting to be complete.
+    ''     A scan does not depend on it being complete.
+    if( work_.Count( ) > WATCHED_BURST_LIMIT ) then
+        '' Deletions are free -- no file is read for one -- so they are applied
+        '' here, and only the reading goes to the worker.
+        dim toRead as PathArray
+
+        for i as long = 0 to work_.Count( ) - 1
+            if( work_[i].Kind_ = FILECHANGE_DELETED ) then
+                srv.Index->Remove( work_[i].Uri )
+                removed += 1
+            else
+                toRead.Push( work_[i].Path_ )
+            end if
+        next
+
+        LogInfo( "watched files: " & work_.Count( ) & " changed at once -- " & _
+                 removed & " removed here, " & toRead.Count( ) & " re-indexed in " & _
+                 "the background" )
+        RefreshWorkspaceFiles( srv, toRead )
+
+        srv.SendTrace( "didChangeWatchedFiles (" & work_.Count( ) & " change(s))", _
+                       "burst -- " & removed & " removed, " & toRead.Count( ) & _
+                       " re-indexed in the background" )
+        return JsonNode( )
+    end if
+
+    for i as long = 0 to work_.Count( ) - 1
+        select case work_[i].Kind_
             case FILECHANGE_CREATED, FILECHANGE_CHANGED
-                if( srv.Index->IndexPath( path_ ) ) then
+                if( srv.Index->IndexPath( work_[i].Path_ ) ) then
                     indexed += 1
                 else
                     '' Created and already gone, or unreadable. Whatever the
                     '' index holds for it is now a guess, so it goes.
-                    srv.Index->Remove( uriText )
+                    srv.Index->Remove( work_[i].Uri )
                     removed += 1
                 end if
 
             case FILECHANGE_DELETED
-                srv.Index->Remove( uriText )
+                srv.Index->Remove( work_[i].Uri )
                 removed += 1
-
-            case else
-                skipped += 1
         end select
     next
 

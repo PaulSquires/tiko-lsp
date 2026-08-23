@@ -36,15 +36,30 @@ sub StartWorkspaceIndex( byref srv as Server )
     LogInfo( "workspace scan started in the background" )
 end sub
 
+sub RefreshWorkspaceFiles( byref srv as Server, byref paths as PathArray )
+    if( paths.IsEmpty( ) ) then exit sub
+    StartIndexRefresh( paths )
+    LogInfo( "re-indexing " & paths.Count( ) & " file(s) in the background" )
+end sub
+
 sub EnsureWorkspaceIndex( byref srv as Server )
     if( IndexBuildPending( ) = false ) then exit sub
 
     dim as double waited = timer( )
+    dim as boolean isRefresh = IndexBuildIsRefresh( )
     dim as string summary
     dim as SymbolIndex ptr fresh = TakeIndexBuild( summary )
     if( fresh = 0 ) then exit sub
 
-    srv.AdoptIndex( fresh )
+    if( isRefresh ) then
+        '' A REFRESH holds only the files that changed, so it is merged rather
+        '' than adopted -- adopting it would throw away the entire workspace to
+        '' keep the handful of files a `git checkout` touched.
+        srv.Index->Absorb( *fresh )
+        delete fresh
+    else
+        srv.AdoptIndex( fresh )
+    end if
 
     '' THE OPEN BUFFERS GO ON TOP, always. The worker indexed what is on disk,
     '' because it must not touch documents the message loop owns -- so a file

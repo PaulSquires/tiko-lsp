@@ -42,7 +42,7 @@ here launches a compiler process, and nothing ever will.
 | 6 | workspace index, workspace symbols, references | **done** |
 | 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | **done** |
 | 8 | the workspace scan off the message loop | **done** |
-| 9 | watched files: an index that notices `git checkout` | **done** |
+| 9 | watched files: an index that notices `git checkout`, bursts included | **done** |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
@@ -216,7 +216,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 969 assertions:
+(or `sh build/_run_tests.sh`). Twelve suites, 979 assertions:
 
 - **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -261,7 +261,7 @@ build\_run_tests.bat
   including everything it must leave alone: an already-tidy file (zero edits),
   broken structure (zero edits, and a reason), comment art inside a block
   comment, a `#macro` body, a `#if` body, and a wrapped line's alignment.
-- **piped session** — 174 assertions against a **real `tiko-lsp` process** driven
+- **piped session** — 184 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
   stream — including that two edits in one `didChange` applied in order against
@@ -281,7 +281,9 @@ build\_run_tests.bat
   `client/registerCapability`, asking the client to watch the workspace — and
   the file events that come back: a deleted file leaves the workspace picker,
   a created one returns to it, and a change reported for a file the editor has
-  open is ignored, because the buffer is the truth.
+  open is ignored, because the buffer is the truth. A **burst** of 121 changes
+  goes to the worker instead of the message loop, and the files it could not
+  read keep the symbols the index already had.
 
 ## Licence
 

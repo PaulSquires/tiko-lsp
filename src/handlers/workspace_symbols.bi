@@ -23,3 +23,8 @@ declare sub StartWorkspaceIndex( byref srv as Server )
 '' Cheap and idempotent after the first call: with no build pending it does
 '' nothing at all.
 declare sub EnsureWorkspaceIndex( byref srv as Server )
+
+'' Re-indexes named files on the worker, for a burst of watched-file changes
+'' too large to apply on the message loop. The result is MERGED into the live
+'' index when EnsureWorkspaceIndex next runs.
+declare sub RefreshWorkspaceFiles( byref srv as Server, byref paths as PathArray )

@@ -353,7 +353,40 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
 
-    '' 26. save and close the first document. widgets.bas stays open, so the
+    '' 26. A BURST. A hundred and twenty distinct files reported at once, which
+    ''     is what a branch switch looks like from a watcher. Applying those
+    ''     one at a time would be a fifth of a second of a frozen editor, so
+    ''     the server re-scans the workspace on the worker instead -- and the
+    ''     next request that needs the index waits for that scan, exactly as it
+    ''     does at start-up.
+    scope
+        dim as string changes_
+        for i as long = 1 to 120
+            if( i > 1 ) then changes_ &= ","
+            changes_ &= "{" & Q & "uri" & Q & ":" & Q & _
+                        PathToUri( workspaceRoot & "\burst" & i & ".bas" ) & Q & "," & _
+                        Q & "type" & Q & ":1}"
+        next
+
+        '' Two REAL files among the fiction: shared.bi, which is on disk and
+        '' not open, and widgets.bas, which the editor HAS open and which must
+        '' be left alone even here.
+        changes_ &= ",{" & Q & "uri" & Q & ":" & Q & _
+                    PathToUri( workspaceRoot & "\shared.bi" ) & Q & "," & _
+                    Q & "type" & Q & ":2}"
+        changes_ &= ",{" & Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "," & _
+                    Q & "type" & Q & ":2}"
+
+        s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                    Q & "method" & Q & ":" & Q & "workspace/didChangeWatchedFiles" & Q & "," & _
+                    Q & "params" & Q & ":{" & Q & "changes" & Q & ":[" & changes_ & "]}}" )
+    end scope
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":24," & _
+                Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
+
+    '' 27. save and close the first document. widgets.bas stays open, so the
     ''     close trace must say ONE document is still open.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
@@ -429,28 +462,30 @@ private function CheckSession( byref path as string ) as long
     '' Forty-two, and exactly forty-two:
     ''    1 request FROM the server -- client/registerCapability, asking the
     ''      client to watch the workspace for source files
-    ''   24 answers to requests -- initialize, typeDefinition, second
+    ''   25 answers to requests -- initialize, typeDefinition, second
     ''      initialize, documentSymbol, hover, definition, completion,
     ''      cross-file definition, references, workspace/symbol, two signature
     ''      helps, inlay hints, semantic tokens, code actions, prepareRename,
     ''      rename, a refused prepareRename, a refused rename, formatting,
-    ''      two more workspace/symbol queries around a watched-file change,
+    ''      three more workspace/symbol queries around watched-file changes,
     ''      shutdown, post-shutdown
     ''    1 parse error
-    ''    2 window/logMessage -- "ready", and what the workspace scan found
+    ''    3 window/logMessage -- "ready", and what each workspace scan found:
+    ''                           the one started at `initialized`, and the one
+    ''                           a burst of watched-file changes triggers
     ''                            WHEN IT IS TAKEN DELIVERY OF, which is not
     ''                            when it was started: the scan runs on its own
     ''                            thread and the first request that needs it is
     ''                            what waits for it
-    ''    8 $/logTrace          -- didOpen x3, didChange, didSave, didClose,
-    ''                            and two didChangeWatchedFiles
+    ''    9 $/logTrace          -- didOpen x3, didChange, didSave, didClose,
+    ''                            and three didChangeWatchedFiles
     ''    6 publishDiagnostics, one after each of the document ones
     '' and NOTHING for the two $/ notifications the server must swallow, for
     '' the didChange against a document that was never opened, or for the
     '' client's answer to the registration request.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 42, "the session produced exactly forty-two messages" )
-    if( messages.Count( ) <> 42 ) then
+    AssertEqInt( messages.Count( ), 45, "the session produced exactly forty-five messages" )
+    if( messages.Count( ) <> 45 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 150 )
         next
@@ -897,14 +932,56 @@ private function CheckSession( byref path as string ) as long
         AssertTrue( sawShared, "and its symbols are findable again" )
     end scope
 
-    '' -- 35..38. save and close --------------------------------------------------
+    '' -- 35..37. A BURST GOES TO THE WORKER ---------------------------------------
+    TestGroup( "a watched-file burst" )
+    scope
+        dim as JsonDoc burstTrace, rescanned, syms_
+        AssertTrue( burstTrace.Parse( messages[35] ), "message 35 is JSON" )
+        AssertTrue( rescanned.Parse ( messages[36] ), "message 36 is JSON" )
+        AssertTrue( syms_.Parse     ( messages[37] ), "message 37 is JSON" )
+
+        '' A hundred and twenty invented files plus shared.bi -- and NOT
+        '' widgets.bas, which the editor has open. The open file is filtered
+        '' out before the count is taken, exactly as in a small batch.
+        AssertContains( burstTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        "121 change(s)", "the open file is excluded from the batch" )
+        AssertContains( burstTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "121 re-indexed in the background", _
+                        "and none of them is read on the message loop" )
+
+        '' The proof that it really went to the worker: a report delivered the
+        '' same way the start-up scan's was -- at the next request that needed
+        '' the index.
+        AssertEqStr( rescanned.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
+                     "the refresh reports in when its result is taken" )
+
+        dim as string what2 = rescanned.Root( ).Member( "params" ).Member( "message" ).AsString( )
+        AssertContains( what2, "re-indexed 1 of 121 file(s)", _
+                        "one real file was re-read, and only one" )
+        AssertContains( what2, "120 unreadable", "the invented ones simply failed" )
+
+        '' And the index is intact. A file that could not be read keeps
+        '' whatever the index already knew about it -- merging an empty entry
+        '' for it would delete a file's symbols because a watcher was wrong.
+        dim as JsonValue found = syms_.Root( ).Member( "result" )
+        AssertEqInt( syms_.Root( ).Member( "id" ).AsLongInt( ), 24, "answers id 24" )
+
+        dim as boolean sawShared = false
+        for i as long = 0 to found.Count( ) - 1
+            if( instr( lcase( found.Item( i ).Member( "location" ).Member( "uri" ).AsString( ) ), _
+                       "shared.bi" ) > 0 ) then sawShared = true
+        next
+        AssertTrue( sawShared, "and the workspace is whole afterwards" )
+    end scope
+
+    '' -- 38..41. save and close --------------------------------------------------
     TestGroup( "save and close" )
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[35] ), "message 35 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[36] ), "message 36 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[37] ), "message 37 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[38] ), "message 38 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[38] ), "message 38 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[39] ), "message 39 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[40] ), "message 40 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[41] ), "message 41 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
@@ -922,7 +999,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[39] ), "message 39 is JSON" )
+        AssertTrue( doc.Parse( messages[42] ), "message 42 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
@@ -932,8 +1009,8 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc, after_
-        AssertTrue( doc.Parse   ( messages[40] ), "message 40 is JSON" )
-        AssertTrue( after_.Parse( messages[41] ), "message 41 is JSON" )
+        AssertTrue( doc.Parse   ( messages[43] ), "message 43 is JSON" )
+        AssertTrue( after_.Parse( messages[44] ), "message 44 is JSON" )
 
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue ( doc.Root( ).Member( "result" ).IsNull( ), "the shutdown result is null" )
