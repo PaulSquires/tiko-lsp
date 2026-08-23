@@ -15,28 +15,28 @@ FAILED=0
 
 mkdir -p "$ROOT/bin"
 
-echo "[1/10] building the server"
+echo "[1/13] building the server"
 sh "$ROOT/build/_compile.sh"
 
-echo "[2/10] framing tests"
+echo "[2/13] framing tests"
 "$FBC" -w all $INC "$ROOT/tests/test_framing.bas" \
     "$ROOT/src/rpc/transport.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_framing"
 "$ROOT/bin/test_framing" || FAILED=1
 
-echo "[3/10] json and json-rpc tests"
+echo "[3/13] json and json-rpc tests"
 "$FBC" -w all $INC "$ROOT/tests/test_json.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/jsonrpc.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_json"
 "$ROOT/bin/test_json" || FAILED=1
 
-echo "[4/10] position tests"
+echo "[4/13] position tests"
 "$FBC" -w all $INC "$ROOT/tests/test_position.bas" \
     "$ROOT/src/utils/position.bas" \
     -x "$ROOT/bin/test_position"
 "$ROOT/bin/test_position" || FAILED=1
 
-echo "[5/10] uri and document tests"
+echo "[5/13] uri and document tests"
 "$FBC" -w all $INC "$ROOT/tests/test_document.bas" \
     "$ROOT/src/document/document.bas" "$ROOT/src/document/document_manager.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
@@ -46,7 +46,7 @@ echo "[5/10] uri and document tests"
     -x "$ROOT/bin/test_document"
 "$ROOT/bin/test_document" || FAILED=1
 
-echo "[6/10] lexer and parser tests"
+echo "[6/13] lexer and parser tests"
 "$FBC" -w all $INC "$ROOT/tests/test_analysis.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
@@ -56,7 +56,7 @@ echo "[6/10] lexer and parser tests"
 # source and require zero diagnostics from it.
 "$ROOT/bin/test_analysis" "$ROOT" || FAILED=1
 
-echo "[7/10] symbol tests"
+echo "[7/13] symbol tests"
 "$FBC" -w all $INC "$ROOT/tests/test_symbols.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
@@ -64,7 +64,7 @@ echo "[7/10] symbol tests"
     -x "$ROOT/bin/test_symbols"
 "$ROOT/bin/test_symbols" || FAILED=1
 
-echo "[8/10] completion tests"
+echo "[8/13] completion tests"
 "$FBC" -w all $INC "$ROOT/tests/test_completion.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
@@ -72,7 +72,7 @@ echo "[8/10] completion tests"
     -x "$ROOT/bin/test_completion"
 "$ROOT/bin/test_completion" || FAILED=1
 
-echo "[9/10] workspace tests"
+echo "[9/13] workspace tests"
 "$FBC" -w all $INC "$ROOT/tests/test_workspace.bas" \
     "$ROOT/src/workspace/workspace.bas" "$ROOT/src/workspace/symbol_index.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
@@ -81,10 +81,37 @@ echo "[9/10] workspace tests"
     -x "$ROOT/bin/test_workspace"
 "$ROOT/bin/test_workspace" "$ROOT" || FAILED=1
 
-echo "[10/10] piped session against the real server"
+echo "[10/13] signature tests"
+"$FBC" -w all $INC "$ROOT/tests/test_signature.bas" \
+    "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/signature.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
+    -x "$ROOT/bin/test_signature"
+"$ROOT/bin/test_signature" || FAILED=1
+
+echo "[11/13] semantic token tests"
+"$FBC" -w all $INC "$ROOT/tests/test_semantic.bas" \
+    "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/semantic.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
+    -x "$ROOT/bin/test_semantic"
+"$ROOT/bin/test_semantic" || FAILED=1
+
+echo "[12/13] formatting tests"
+"$FBC" -w all $INC "$ROOT/tests/test_format.bas" \
+    "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/format.bas" \
+    "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
+    -x "$ROOT/bin/test_format"
+"$ROOT/bin/test_format" || FAILED=1
+
+echo "[13/13] piped session against the real server"
 "$FBC" -w all $INC "$ROOT/tests/session_tool.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/transport.bas" "$ROOT/src/rpc/jsonrpc.bas" \
-    "$ROOT/src/lsp/protocol.bas" "$ROOT/src/utils/logging.bas" \
+    "$ROOT/src/lsp/protocol.bas" "$ROOT/src/analysis/semantic.bas" \
+    "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
+    "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/diagnostics.bas" \
+    "$ROOT/src/utils/position.bas" "$ROOT/src/utils/logging.bas" \
     "$ROOT/src/utils/uri.bas" \
     -x "$ROOT/bin/session_tool"
 

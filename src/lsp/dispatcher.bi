@@ -64,6 +64,12 @@ type Server
         ClientProcessId  as longint
         WorkspaceFolders as WorkspaceFolderArray
 
+        '' Whether the client understands the VERSIONED form of a
+        '' WorkspaceEdit. Phase 7's rename sends `documentChanges` when it
+        '' does -- so an edit computed against version 12 is refused if the
+        '' user typed since -- and plain `changes` when it does not.
+        SupportsDocumentChanges as boolean
+
         '' -- open buffers ----------------------------------------------------
         ''
         '' Every handler that needs source text goes through here, never

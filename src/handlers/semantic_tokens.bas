@@ -1,0 +1,49 @@
+'' ############################################################################
+''  handlers/semantic_tokens.bas -- textDocument/semanticTokens/full
+''
+''  The whole file, every time. No deltas, no range variant -- see semantic.bi
+''  for why the encoding is the delicate part and protocol.bas for why only
+''  `full` is advertised.
+'' ############################################################################
+
+#include once "semantic_tokens.bi"
+#include once "../analysis/semantic.bi"
+#include once "../utils/logging.bi"
+
+private function OnSemanticTokensFull( byref srv as Server, _
+                                       byref req as RpcMessage, _
+                                       byref rb as JsonBuilder, _
+                                       byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+
+    '' A null result and an empty `data` array mean different things: null is
+    '' "no answer", an empty array is "this file has no tokens" and CLEARS
+    '' whatever the client was showing. For a document we do not have, null.
+    if( doc = 0 ) then return rb.NewNull( )
+
+    dim as double started = timer( )
+
+    dim toks as SemTokenArray
+    ComputeSemanticTokens( doc->Text( ), doc->Index( ), doc->Tokens( ), doc->Symbols( ), toks )
+
+    dim data_ as FB.Array( of long )
+    EncodeSemanticTokens( toks, data_ )
+
+    dim as JsonNode arr = rb.NewArray( )
+    for i as long = 0 to data_.Count( ) - 1
+        rb.PushInt( arr, data_[i] )
+    next
+
+    dim as JsonNode result_ = rb.NewObject( )
+    rb.SetNode( result_, "data", arr )
+
+    LogDebug( "semantic tokens: " & toks.Count( ) & " token(s), " & _
+              data_.Count( ) & " integers, " & int( (timer( ) - started) * 1000 ) & " ms" )
+    return result_
+end function
+
+sub RegisterSemanticTokensHandlers( )
+    RegisterHandler( LSP_SEMANTIC_FULL, @OnSemanticTokensFull )
+end sub

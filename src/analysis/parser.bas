@@ -13,6 +13,13 @@ type BlockFrame
     StartOffset as long        '' the opening keyword
     EndOffset   as long
     SymbolIndex as long        '' the symbol this block declares, or -1
+
+    '' One extra indent level this frame contributes, for the formatter only.
+    '' A SELECT gets it when its first CASE is seen: the arm of a CASE is a
+    '' level the BLOCK STACK does not have, because a clause opens no frame,
+    '' and without it every block opened inside a CASE arm would be marked one
+    '' level too shallow.
+    Bias        as long
 end type
 
 type BlockStack as FB.Array( of BlockFrame )
@@ -130,6 +137,7 @@ type ParseState
     '' Symbol collection. NULL when the caller only wants diagnostics, which
     '' is what keeps phase 3's callers working unchanged.
     Symbols_ as SymbolTable ptr
+    Indents_ as IndentTrace ptr
 
     '' The '' comment block sitting immediately above the statement being read,
     '' which becomes the next symbol's documentation.
@@ -174,6 +182,34 @@ private function InMacroBody( byref st as ParseState ) as boolean
     return false
 end function
 
+'' The indent level of the first `nframes` open blocks, clause bias included.
+private function IndentDepthUpTo( byref st as ParseState, byval nframes as long ) as long
+    dim as long d = nframes
+    for i as long = 0 to nframes - 1
+        d += st.Stack_[i].Bias
+    next
+    return d
+end function
+
+private function IndentDepth( byref st as ParseState ) as long
+    return IndentDepthUpTo( st, st.Stack_.Count( ) )
+end function
+
+'' Records what the block stack just did, for the formatter. A no-op unless
+'' a trace was asked for, so parsing for diagnostics costs nothing.
+private sub Mark( byref st as ParseState, byval offset as long, _
+                  byval selfDepth as long, byval nextDepth as long )
+    if( st.Indents_ = 0 ) then exit sub
+    if( selfDepth < 0 ) then selfDepth = 0
+    if( nextDepth < 0 ) then nextDepth = 0
+
+    dim as IndentMark m
+    m.Offset    = offset
+    m.SelfDepth = selfDepth
+    m.NextDepth = nextDepth
+    st.Indents_->Push( m )
+end sub
+
 private sub PushBlock( byref st as ParseState, byval kw as FbKeyword, _
                        byref name_ as string, byref tok as Token, _
                        byval symbolIndex as long = -1 )
@@ -183,6 +219,9 @@ private sub PushBlock( byref st as ParseState, byval kw as FbKeyword, _
     frame.StartOffset = tok.Start_
     frame.EndOffset   = tok.Start_ + tok.Length_
     frame.SymbolIndex = symbolIndex
+
+    '' The opener sits at the OUTER depth; everything after it is one deeper.
+    Mark( st, tok.Start_, IndentDepth( st ), IndentDepth( st ) + 1 )
     st.Stack_.Push( frame )
 end sub
 
@@ -271,6 +310,11 @@ private sub CloseBlock( byref st as ParseState, byref diags as DiagnosticArray, 
     next
 
     CloseSymbolRange( st, st.Stack_[found].SymbolIndex, tok.Start_ + tok.Length_ )
+
+    '' A closer belongs at its opener's depth -- the depth of the frames below
+    '' it, whatever bias those carry.
+    dim as long closerDepth = IndentDepthUpTo( st, found )
+    Mark( st, tok.Start_, closerDepth, closerDepth )
     st.Stack_.Pop( )
 end sub
 
@@ -702,6 +746,7 @@ private sub AddParameters( byref st as ParseState, byref text_ as string, _
                 sym.NameStart  = p.Start_
                 sym.NameEnd    = p.Start_ + p.Length_
                 sym.IsLocal    = true
+                sym.IsParameter = true
                 st.Symbols_->Add( sym )
 
                 st.PendingDoc = savedDoc
@@ -901,10 +946,13 @@ end function
 ''  The statement walker
 '' ----------------------------------------------------------------------------
 sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
-                 byref diags as DiagnosticArray, byval symbols as SymbolTable ptr )
+                 byref diags as DiagnosticArray, byval symbols as SymbolTable ptr, _
+                 byval indents as IndentTrace ptr )
     dim as ParseState st
     st.Symbols_ = symbols
+    st.Indents_ = indents
     if( symbols <> 0 ) then symbols->Clear( )
+    if( indents <> 0 ) then indents->Clear( )
 
     dim as long total = tokens.Count( )
     dim as long i = 0
@@ -1057,6 +1105,38 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
         wend
 
         if( first_ >= stmt.Count( ) ) then
+            '' Nothing but modifiers: an ACCESS SPECIFIER on a line of its own,
+            ''
+            ''     type Widget
+            ''         private:
+            ''             m_count as long
+            ''         public:
+            ''             declare function Count( ) as long
+            ''     end type
+            ''
+            '' It opens no block and declares nothing, so the parser has never
+            '' had to notice it -- but it does add an indent level, exactly as
+            '' a CASE does, and the formatter has to be told. Every `public:`
+            '' in this project's own headers was being pulled out a level
+            '' without it.
+            if( stmt.Count( ) > 0 andalso st.Indents_ <> 0 ) then
+                dim as Token spec = tokens[ stmt[0] ]
+                dim as boolean isAccess = false
+                select case spec.Kw
+                    case KW_PRIVATE, KW_PUBLIC, KW_PROTECTED : isAccess = true
+                end select
+
+                if( isAccess andalso st.Stack_.Count( ) > 0 ) then
+                    dim as long top = st.Stack_.Count( ) - 1
+                    select case st.Stack_[top].Kind_
+                        case KW_TYPE, KW_UNION
+                            dim as long base_ = IndentDepth( st ) - st.Stack_[top].Bias
+                            Mark( st, spec.Start_, base_, base_ + 1 )
+                            st.Stack_[top].Bias = 1
+                    end select
+                end if
+            end if
+
             if( i >= total ) then exit while
             continue while
         end if
@@ -1089,6 +1169,10 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                         '' Whatever the branch just left behind opened, it is
                         '' not this branch's business.
                         DropBlocksTo( st, st.PpStack_[ppTop].DepthAtOpen )
+
+                        '' The drop is invisible to the block stack's own
+                        '' bookkeeping, so the formatter is told directly.
+                        Mark( st, head.Start_, IndentDepth( st ), IndentDepth( st ) )
                     end if
 
                 case KW_PP_ENDIF
@@ -1139,6 +1223,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     else
                         '' A macro body is text, and half of one is legal.
                         DropBlocksTo( st, st.PpStack_[ppTop].DepthAtOpen )
+                        Mark( st, head.Start_, IndentDepth( st ), IndentDepth( st ) )
                         st.PpStack_.Pop( )
                     end if
             end select
@@ -1274,10 +1359,25 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
             '' -- clauses that must be inside something ---------------------------
             case KW_ELSE
                 RequireInside( st, diags, KW_IF, head, "else" )
+                '' A clause opens nothing, so the stack is unchanged: ELSE goes
+                '' back out to its IF, and what follows returns to the body.
+                Mark( st, head.Start_, IndentDepth( st ) - 1, IndentDepth( st ) )
             case KW_ELSEIF
                 RequireInside( st, diags, KW_IF, head, "elseif" )
+                Mark( st, head.Start_, IndentDepth( st ) - 1, IndentDepth( st ) )
             case KW_CASE
                 RequireInside( st, diags, KW_SELECT, head, "case" )
+
+                '' CASE is indented INSIDE its SELECT -- the house style of
+                '' every file in this repository -- and its arm one further.
+                '' The arm's level is recorded on the SELECT frame, so a block
+                '' opened inside the arm is marked relative to it.
+                if( st.Stack_.Count( ) > 0 ) then
+                    dim as long top = st.Stack_.Count( ) - 1
+                    dim as long base_ = IndentDepth( st ) - st.Stack_[top].Bias
+                    Mark( st, head.Start_, base_, base_ + 1 )
+                    st.Stack_[top].Bias = 1
+                end if
 
             '' -- procedure bodies -------------------------------------------------
             case KW_SUB, KW_FUNCTION, KW_PROPERTY, KW_CONSTRUCTOR, KW_DESTRUCTOR, KW_OPERATOR

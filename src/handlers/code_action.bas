@@ -1,0 +1,174 @@
+'' ############################################################################
+''  handlers/code_action.bas -- textDocument/codeAction
+''
+''  THREE QUICK FIXES, and the list is short on purpose. A quick fix is applied
+''  with one keystroke and usually without reading it, so the only defensible
+''  ones are those with a SINGLE unambiguous edit -- where there is exactly one
+''  thing the user can have meant.
+''
+''  Offered:
+''      unterminated-string    insert the closing quote at the end of the line
+''      unterminated-comment   close the block comment at the end of the file
+''      unexpected-character   delete the byte that begins nothing
+''
+''  Deliberately NOT offered, and each for a reason:
+''
+''      unclosed-block     `end sub` has to go SOMEWHERE, and the server cannot
+''                         know where the body was meant to stop. Inserting it
+''                         at the end of the file would swallow every procedure
+''                         written after the broken one.
+''      mismatched-end     the same problem seen from the other side: either
+''                         the opener or the closer is wrong, and choosing
+''                         costs the user the half of the code that was right.
+''      unbalanced-paren   a ')' can belong to any of several open calls.
+''
+''  A server that offers a fix for those looks more capable and is wrong often
+''  enough to be worse than silence.
+'' ############################################################################
+
+#include once "code_action.bi"
+#include once "../lsp/publish.bi"
+#include once "../utils/logging.bi"
+
+'' The diagnostics whose range overlaps [fromOffset, toOffset).
+private function Overlaps( byref d as Diagnostic, byval fromOffset as long, byval toOffset as long ) as boolean
+    if( d.EndOffset   <= fromOffset ) then return false
+    if( d.StartOffset >= toOffset   ) then return false
+    return true
+end function
+
+'' The Diagnostic object that goes inside a CodeAction, so a client can match
+'' the fix to the squiggle it came from. The same shape publish.bas sends.
+private function BuildDiagnosticNode( byref rb as JsonBuilder, byref text_ as string, _
+                                      byref idx as LineIndex, byref d as Diagnostic ) as JsonNode
+    dim as JsonNode item = rb.NewObject( )
+    rb.SetNode( item, "range", BuildLspRange( rb, text_, idx, d.StartOffset, d.EndOffset ) )
+    rb.SetInt ( item, "severity", clngint( d.Severity ) )
+    rb.SetStr ( item, "code",     d.Code_ )
+    rb.SetStr ( item, "source",   DIAG_SOURCE )
+    rb.SetStr ( item, "message",  d.Message_ )
+    return item
+end function
+
+'' One CodeAction with one TextEdit, wrapped in the WorkspaceEdit the protocol
+'' requires. `replaceStart`..`replaceEnd` is what the edit covers -- equal
+'' offsets make it an insertion.
+private function BuildFix( byref rb as JsonBuilder, byref srv as Server, _
+                           byval doc as TextDocumentPtr, byref d as Diagnostic, _
+                           byref title as string, _
+                           byval replaceStart as long, byval replaceEnd as long, _
+                           byref newText as string ) as JsonNode
+
+    dim as string body = doc->Text( )
+
+    dim as JsonNode edit_ = rb.NewObject( )
+    rb.SetNode( edit_, "range", BuildLspRange( rb, body, doc->Index( ), replaceStart, replaceEnd ) )
+    rb.SetStr ( edit_, "newText", newText )
+
+    dim as JsonNode editList = rb.NewArray( )
+    rb.PushNode( editList, edit_ )
+
+    dim as JsonNode wsEdit = rb.NewObject( )
+    if( srv.SupportsDocumentChanges ) then
+        dim as JsonNode ident = rb.NewObject( )
+        rb.SetStr( ident, "uri", doc->Uri( ) )
+        rb.SetInt( ident, "version", doc->Version( ) )
+
+        dim as JsonNode entry = rb.NewObject( )
+        rb.SetNode( entry, "textDocument", ident )
+        rb.SetNode( entry, "edits", editList )
+
+        dim as JsonNode entries = rb.NewArray( )
+        rb.PushNode( entries, entry )
+        rb.SetNode( wsEdit, "documentChanges", entries )
+    else
+        dim as JsonNode changes = rb.NewObject( )
+        rb.SetNode( changes, doc->Uri( ), editList )
+        rb.SetNode( wsEdit, "changes", changes )
+    end if
+
+    dim as JsonNode diagList = rb.NewArray( )
+    rb.PushNode( diagList, BuildDiagnosticNode( rb, body, doc->Index( ), d ) )
+
+    dim as JsonNode action = rb.NewObject( )
+    rb.SetStr ( action, "title", title )
+    rb.SetStr ( action, "kind",  "quickfix" )
+    rb.SetNode( action, "diagnostics", diagList )
+    rb.SetNode( action, "edit", wsEdit )
+
+    '' There is only ever one fix for these, so it is the preferred one and a
+    '' client may apply it with "fix all"/auto-fix.
+    rb.SetBool( action, "isPreferred", true )
+    return action
+end function
+
+private function OnCodeAction( byref srv as Server, _
+                               byref req as RpcMessage, _
+                               byref rb as JsonBuilder, _
+                               byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+    if( doc = 0 ) then return rb.NewArray( )
+
+    '' `only` is the client saying which kinds it will use -- during an
+    '' organise-imports or a source-action pass, for instance. Answering with
+    '' quick fixes it did not ask for puts them in the wrong menu.
+    dim as JsonValue only_ = req.Params( ).Member( "context" ).Member( "only" )
+    if( only_.IsArray( ) ) then
+        dim as boolean wanted = false
+        for each kindVal in ArrayOf( only_ )
+            dim as string k = kindVal.AsString( "" )
+            if( k = "quickfix" orelse left( k, 9 ) = "quickfix." ) then wanted = true
+        next
+        if( wanted = false ) then return rb.NewArray( )
+    end if
+
+    dim as JsonValue rangeVal = req.Params( ).Member( "range" )
+    dim as long fromOffset = clng( doc->PositionToOffset( _
+            clng( rangeVal.Member( "start" ).Member( "line"      ).AsLongInt( 0 ) ), _
+            clng( rangeVal.Member( "start" ).Member( "character" ).AsLongInt( 0 ) ) ) )
+    dim as long toOffset = clng( doc->PositionToOffset( _
+            clng( rangeVal.Member( "end" ).Member( "line"      ).AsLongInt( 0 ) ), _
+            clng( rangeVal.Member( "end" ).Member( "character" ).AsLongInt( 0 ) ) ) )
+
+    '' An empty selection -- just a caret -- still has to find the diagnostic
+    '' it sits on, which a zero-width overlap test never would.
+    if( toOffset <= fromOffset ) then toOffset = fromOffset + 1
+
+    dim as string body = doc->Text( )
+    dim as JsonNode actions = rb.NewArray( )
+
+    for i as long = 0 to doc->Diagnostics( ).Count( ) - 1
+        dim as Diagnostic d = doc->Diagnostics( )[i]
+        if( Overlaps( d, fromOffset, toOffset ) = false ) then continue for
+
+        select case d.Code_
+            case DIAGCODE_UNTERMINATED_STRING
+                '' The literal runs to the end of the line, and that is where
+                '' the quote belongs.
+                rb.PushNode( actions, BuildFix( rb, srv, doc, d, _
+                             "Insert the closing quote", _
+                             d.EndOffset, d.EndOffset, """" ) )
+
+            case DIAGCODE_UNTERMINATED_COMMENT
+                '' A /' comment swallows the rest of the file, so the closer
+                '' goes at the end of it.
+                dim as long eof_ = clng( doc->TextLength( ) )
+                rb.PushNode( actions, BuildFix( rb, srv, doc, d, _
+                             "Close the block comment", _
+                             eof_, eof_, "'/" ) )
+
+            case DIAGCODE_UNEXPECTED_CHAR
+                rb.PushNode( actions, BuildFix( rb, srv, doc, d, _
+                             "Remove the stray character", _
+                             d.StartOffset, d.EndOffset, "" ) )
+        end select
+    next
+
+    return actions
+end function
+
+sub RegisterCodeActionHandlers( )
+    RegisterHandler( LSP_CODE_ACTION, @OnCodeAction )
+end sub

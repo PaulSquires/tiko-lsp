@@ -72,6 +72,12 @@ type SymbolInfo
 
     IsLocal       as boolean      '' a local or a parameter: NOT in the outline
     IsDeclaration as boolean      '' a DECLARE prototype, not a body
+
+    '' A parameter, rather than a local declared in the body. Both are locals
+    '' and neither belongs in the outline, but only a parameter has a place in
+    '' a signature -- which is what inlay hints and semantic tokens need to
+    '' tell them apart, and what nothing before phase 7 had to ask.
+    IsParameter   as boolean
 end type
 
 type SymbolArray as FB.Array( of SymbolInfo )

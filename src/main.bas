@@ -28,6 +28,12 @@
 #include once "handlers/completion.bi"
 #include once "handlers/workspace_symbols.bi"
 #include once "handlers/references.bi"
+#include once "handlers/rename.bi"
+#include once "handlers/signature_help.bi"
+#include once "handlers/semantic_tokens.bi"
+#include once "handlers/inlay_hints.bi"
+#include once "handlers/formatting.bi"
+#include once "handlers/code_action.bi"
 
 using FB
 
@@ -128,6 +134,12 @@ private function RunServer( ) as long
     RegisterCompletionHandlers( )
     RegisterWorkspaceHandlers( )
     RegisterReferencesHandlers( )
+    RegisterRenameHandlers( )
+    RegisterSignatureHelpHandlers( )
+    RegisterSemanticTokensHandlers( )
+    RegisterInlayHintHandlers( )
+    RegisterFormattingHandlers( )
+    RegisterCodeActionHandlers( )
     LogDebug( RegisteredCount( ) & " methods registered" )
 
     dim as string payload

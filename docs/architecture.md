@@ -15,6 +15,7 @@ handlers/*          one function per method; build a result, or set an error
   |                        +--> analysis/*   lexer, parser, symbols,
   |                        |                 completion, diagnostics
   |                        +--> workspace/*  discovery, the symbol index
+  |                        +--> format/semantic/signature (phase 7)
   |                        +--> utils/*      positions, URIs, logging
 rpc/jsonrpc         jsonrpc / id / method / params / result / error
   |                 knows JSON-RPC, does not know LSP
@@ -124,6 +125,15 @@ offset into a UTF-16 column needs the bytes of that line and keeping a
 workspace's source in memory to answer later would cost tens of megabytes.
 References are the exception: they re-lex on demand, which is
 [phase6.md](phase6.md#references-are-re-lexed-not-stored)'s reasoning.
+
+Phase 7 added three modules beside those and NO new source of truth. Signature
+help splits the signature text the parser already recorded; semantic tokens
+classify the tokens the document already holds; and the formatter asks the
+PARSER for its block depths -- `ParseTokens` takes an optional `IndentTrace` --
+rather than deciding for itself which lines open a block. That last one is the
+important one: two answers to "does this line open a block" would drift apart,
+and the first symptom would be a formatter that indents the whole file after a
+single-line `IF`. See [phase7.md](phase7.md#formatting).
 
 ## Threading
 

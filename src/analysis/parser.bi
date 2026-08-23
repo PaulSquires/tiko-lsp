@@ -32,11 +32,35 @@
 '' the rest of the list tells the user nothing. The cap is per analysis.
 const MAX_DIAGNOSTICS = 200
 
+'' ----------------------------------------------------------------------------
+''  The indent trace
+''
+''  Phase 7's formatter needs to know how deep each line is nested, and there
+''  is exactly one place in this server that already knows: the block stack
+''  kept here. Re-deriving it in the formatter was the alternative, and it
+''  would have meant two answers to "does this line open a block" that drift
+''  apart -- a formatter that indents a single-line IF as a block, say, while
+''  the diagnostics correctly do not.
+''
+''  So the parser can be asked to record what it did. A mark carries ABSOLUTE
+''  depths rather than deltas, because a preprocessor branch can abandon
+''  blocks wholesale (#else drops whatever the previous branch opened) and a
+''  delta stream has no way to say that.
+'' ----------------------------------------------------------------------------
+type IndentMark
+    Offset    as long    '' of the keyword that caused it
+    SelfDepth as long    '' the indent the line holding it should have
+    NextDepth as long    '' the indent of the lines after it
+end type
+
+type IndentTrace as FB.Array( of IndentMark )
+
 '' Tokens in, diagnostics out, and symbols too when a table is supplied.
 '' `text_` is needed for identifier names.
 declare sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                          byref diags as DiagnosticArray, _
-                         byval symbols as SymbolTable ptr = 0 )
+                         byval symbols as SymbolTable ptr = 0, _
+                         byval indents as IndentTrace ptr = 0 )
 
 '' Lex and parse in one call, for a caller that only wants problems.
 declare sub AnalyzeSource( byref text_ as string, byref diags as DiagnosticArray )

@@ -34,6 +34,9 @@ const LF = chr(10)
 '' as JSON rather than as a hedge maze.
 const Q = chr(34)
 
+'' And a backslash, for a JSON string escape written inside one.
+const BS = chr(92)
+
 private function Frame( byref payload as string ) as string
     return "Content-Length: " & len(payload) & CR & LF & CR & LF & payload
 end function
@@ -68,7 +71,9 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
                 Q & "trace" & Q & ":" & Q & "messages" & Q & "," & _
                 Q & "capabilities" & Q & ":{" & Q & "general" & Q & ":{" & _
-                Q & "positionEncodings" & Q & ":[" & Q & "utf-16" & Q & "," & Q & "utf-8" & Q & "]}}," & _
+                Q & "positionEncodings" & Q & ":[" & Q & "utf-16" & Q & "," & Q & "utf-8" & Q & "]}," & _
+                Q & "workspace" & Q & ":{" & Q & "workspaceEdit" & Q & ":{" & _
+                Q & "documentChanges" & Q & ":true}}}," & _
                 Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
                 Q & "name" & Q & ":" & Q & "fixture" & Q & "}]}}" )
 
@@ -78,13 +83,15 @@ private function SessionBytes( byref workspaceRoot as string ) as string
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "initialized" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 3. a request for something not implemented -> MethodNotFound.
+    '' 3. a request for something not implemented -> MethodNotFound. It used
+    ''    to be textDocument/rename, which phase 7 implements; typeDefinition
+    ''    needs the type system this server does not have, so it is the honest
+    ''    stand-in.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":2," & _
-                Q & "method" & Q & ":" & Q & "textDocument/rename" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/typeDefinition" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & _
                 Q & "file:///x.bas" & Q & "}," & _
-                Q & "position" & Q & ":{" & Q & "line" & Q & ":0," & Q & "character" & Q & ":0}," & _
-                Q & "newName" & Q & ":" & Q & "Other" & Q & "}}" )
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":0," & Q & "character" & Q & ":0}}}" )
 
     '' 4. a second initialize, with a STRING id -> InvalidRequest, echoed with
     ''    the id still a string.
@@ -207,7 +214,107 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
 
-    '' 14. save and close the first document. widgets.bas stays open, so the
+    '' 14. a third document, for the editing features. Lines, 0-based:
+    ''
+    ''        0  sub Move_( byval x as long, byval y as long )
+    ''        1  end sub
+    ''        2  sub Go_( )
+    ''        3  Move_( 10, 3 )
+    ''        4  print "oops              <- deliberately unterminated
+    ''        5  end sub
+    ''
+    ''    Line 3 is a call whose signature is known; line 4 is the one lexical
+    ''    error there is an unambiguous quick fix_ for.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & Q & "sub Move_( byval x as long, byval y as long )\n" & _
+                "end sub\nsub Go_( )\nMove_( 10, 3 )\nprint " & BS & Q & "oops\nend sub" & Q & "}}}" )
+
+    '' 15. signature help, twice: on the first argument and on the second.
+    ''     Line 3 is `Move_( 10, 3 )` -- character 7 is inside `10`, and
+    ''     character 11 is inside `3`.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":12," & _
+                Q & "method" & Q & ":" & Q & "textDocument/signatureHelp" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":3," & Q & "character" & Q & ":7}}}" )
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":13," & _
+                Q & "method" & Q & ":" & Q & "textDocument/signatureHelp" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":3," & Q & "character" & Q & ":11}}}" )
+
+    '' 16. inlay hints over the whole file.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":14," & _
+                Q & "method" & Q & ":" & Q & "textDocument/inlayHint" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "}," & _
+                Q & "range" & Q & ":{" & Q & "start" & Q & ":{" & Q & "line" & Q & ":0," & _
+                Q & "character" & Q & ":0}," & Q & "end" & Q & ":{" & Q & "line" & Q & ":5," & _
+                Q & "character" & Q & ":0}}}}" )
+
+    '' 17. semantic tokens for the same file.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":15," & _
+                Q & "method" & Q & ":" & Q & "textDocument/semanticTokens/full" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "}}}" )
+
+    '' 18. a code action where the caret sits in the unterminated string.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":16," & _
+                Q & "method" & Q & ":" & Q & "textDocument/codeAction" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "}," & _
+                Q & "range" & Q & ":{" & Q & "start" & Q & ":{" & Q & "line" & Q & ":4," & _
+                Q & "character" & Q & ":8}," & Q & "end" & Q & ":{" & Q & "line" & Q & ":4," & _
+                Q & "character" & Q & ":8}}," & _
+                Q & "context" & Q & ":{" & Q & "diagnostics" & Q & ":[]}}}" )
+
+    '' 19. prepareRename on the local `w` of widgets.bas -- line 4 is
+    ''     `    dim as Widget w`, and character 18 is the `w`.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":17," & _
+                Q & "method" & Q & ":" & Q & "textDocument/prepareRename" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & Q & "character" & Q & ":18}}}" )
+
+    '' 20. and the rename itself: a local, so this file and this procedure.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":18," & _
+                Q & "method" & Q & ":" & Q & "textDocument/rename" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & Q & "character" & Q & ":18}," & _
+                Q & "newName" & Q & ":" & Q & "widget_" & Q & "}}" )
+
+    '' 21. the refusal that matters: `Label_` on line 5 is a FIELD, but
+    ''     `label_` is also the parameter of this very function. A name-based
+    ''     rename would rewrite both.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":19," & _
+                Q & "method" & Q & ":" & Q & "textDocument/prepareRename" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":5," & Q & "character" & Q & ":7}}}" )
+
+    '' 22. a rename to a reserved word -> InvalidParams.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":20," & _
+                Q & "method" & Q & ":" & Q & "textDocument/rename" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & Q & "character" & Q & ":18}," & _
+                Q & "newName" & Q & ":" & Q & "end" & Q & "}}" )
+
+    '' 23. formatting x.bas, whose body has never been indented.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":21," & _
+                Q & "method" & Q & ":" & Q & "textDocument/formatting" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "}," & _
+                Q & "options" & Q & ":{" & Q & "tabSize" & Q & ":4," & _
+                Q & "insertSpaces" & Q & ":true}}}" )
+
+    '' 24. save and close the first document. widgets.bas stays open, so the
     ''     close trace must say ONE document is still open.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
@@ -280,19 +387,22 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Twenty-five, and exactly twenty-five:
-    ''   12 answers to requests -- initialize, rename, second initialize,
-    ''      documentSymbol, hover, definition, completion, cross-file
-    ''      definition, references, workspace/symbol, shutdown, post-shutdown
+    '' Thirty-seven, and exactly thirty-seven:
+    ''   22 answers to requests -- initialize, typeDefinition, second
+    ''      initialize, documentSymbol, hover, definition, completion,
+    ''      cross-file definition, references, workspace/symbol, two signature
+    ''      helps, inlay hints, semantic tokens, code actions, prepareRename,
+    ''      rename, a refused prepareRename, a refused rename, formatting,
+    ''      shutdown, post-shutdown
     ''    1 parse error
     ''    2 window/logMessage -- "ready", and what the workspace scan found
-    ''    5 $/logTrace          -- didOpen x2, didChange, didSave, didClose
-    ''    5 publishDiagnostics, one after each of those
+    ''    6 $/logTrace          -- didOpen x3, didChange, didSave, didClose
+    ''    6 publishDiagnostics, one after each of those
     '' and NOTHING for the two $/ notifications the server must swallow, nor
     '' for the didChange against a document that was never opened.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 25, "the session produced exactly twenty-five messages" )
-    if( messages.Count( ) <> 25 ) then
+    AssertEqInt( messages.Count( ), 37, "the session produced exactly thirty-seven messages" )
+    if( messages.Count( ) <> 37 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 150 )
         next
@@ -328,9 +438,27 @@ private function CheckSession( byref path as string ) as long
                          .Member( "changeNotifications" ).AsBoolean( ), _
                      "and the server asks to be told when they change" )
 
+        '' Phase 7's seven.
+        AssertTrue ( caps.Member( "renameProvider" ).Member( "prepareProvider" ).AsBoolean( ), _
+                     "rename is claimed, WITH prepare" )
+        AssertTrue ( caps.Member( "signatureHelpProvider" ).IsObject( ), "signature help is claimed" )
+        AssertTrue ( caps.Member( "semanticTokensProvider" ).Member( "full" ).AsBoolean( ), _
+                     "semantic tokens are claimed, full only" )
+        AssertFalse( caps.Member( "semanticTokensProvider" ).Has( "range" ), _
+                     "and NOT the range variant, which is not implemented" )
+        AssertEqInt( caps.Member( "semanticTokensProvider" ).Member( "legend" ) _
+                         .Member( "tokenTypes" ).Count( ), SEMTYPE_COUNT, _
+                     "the legend is sent in full" )
+        AssertTrue ( caps.Member( "inlayHintProvider" ).AsBoolean( ), "inlay hints are claimed" )
+        AssertTrue ( caps.Member( "documentFormattingProvider" ).AsBoolean( ), "formatting is claimed" )
+        AssertTrue ( caps.Member( "documentRangeFormattingProvider" ).AsBoolean( ), _
+                     "and range formatting" )
+        AssertEqStr( caps.Member( "codeActionProvider" ).Member( "codeActionKinds" ) _
+                         .Item( 0 ).AsString( ), "quickfix", "code actions, quickfix only" )
+
         '' Still nothing that is not implemented.
-        AssertFalse( caps.Has( "renameProvider" ), "rename is NOT claimed" )
-        AssertFalse( caps.Has( "signatureHelpProvider" ), "signature help is NOT claimed" )
+        AssertFalse( caps.Has( "typeDefinitionProvider" ), "typeDefinition is NOT claimed" )
+        AssertFalse( caps.Has( "documentHighlightProvider" ), "documentHighlight is NOT claimed" )
     end scope
 
     '' -- 2..3. initialized, and the workspace scan ------------------------------
@@ -360,7 +488,7 @@ private function CheckSession( byref path as string ) as long
         AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 2, "answers id 2" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
-                     "textDocument/rename is MethodNotFound" )
+                     "textDocument/typeDefinition is MethodNotFound" )
     end scope
 
     '' -- 5. a second initialize -------------------------------------------------
@@ -498,43 +626,172 @@ private function CheckSession( byref path as string ) as long
                      1, "at the right line" )
     end scope
 
-    '' -- 19..22. save and close --------------------------------------------------
+    '' -- 19..30. THE EDITING FEATURES ------------------------------------------
+    TestGroup( "signature help, inlay hints, semantic tokens, code actions" )
+    scope
+        dim as JsonDoc yTrace, yDiag, sig1, sig2, hints_, sem_, actions_
+        AssertTrue( yTrace.Parse  ( messages[18] ), "message 18 is JSON" )
+        AssertTrue( yDiag.Parse   ( messages[19] ), "message 19 is JSON" )
+        AssertTrue( sig1.Parse    ( messages[20] ), "message 20 is JSON" )
+        AssertTrue( sig2.Parse    ( messages[21] ), "message 21 is JSON" )
+        AssertTrue( hints_.Parse  ( messages[22] ), "message 22 is JSON" )
+        AssertTrue( sem_.Parse    ( messages[23] ), "message 23 is JSON" )
+        AssertTrue( actions_.Parse( messages[24] ), "message 24 is JSON" )
+
+        AssertContains( yTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        "didOpen y.bas", "the third document opens" )
+        AssertEqInt( yDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 1, _
+                     "with the one lexical error it was written to have" )
+
+        '' -- signature help ----------------------------------------------------
+        dim as JsonValue sig = sig1.Root( ).Member( "result" ).Member( "signatures" ).Item( 0 )
+        AssertEqStr( sig.Member( "label" ).AsString( ), _
+                     "Move_(byval x as long, byval y as long)", _
+                     "the signature is shown as declared" )
+        AssertEqInt( sig.Member( "parameters" ).Count( ), 2, "with two parameters" )
+        AssertEqInt( sig1.Root( ).Member( "result" ).Member( "activeParameter" ).AsLongInt( ), 0, _
+                     "the caret in the first argument highlights the first parameter" )
+
+        '' The [start, end) span, which is what the client highlights.
+        dim as JsonValue span = sig.Member( "parameters" ).Item( 1 ).Member( "label" )
+        AssertTrue( span.IsArray( ), "a parameter's label is an offset pair, not a substring" )
+        AssertEqInt( span.Item( 0 ).AsLongInt( ), 23, "starting where `byval y` starts" )
+
+        AssertEqInt( sig2.Root( ).Member( "result" ).Member( "activeParameter" ).AsLongInt( ), 1, _
+                     "and after the comma, the second" )
+
+        '' -- inlay hints -------------------------------------------------------
+        dim as JsonValue hints = hints_.Root( ).Member( "result" )
+        AssertEqInt( hints.Count( ), 2, "both literal arguments are annotated" )
+        AssertEqStr( hints.Item( 0 ).Member( "label" ).AsString( ), "x:", "with the parameter's name" )
+        AssertEqInt( hints.Item( 0 ).Member( "kind" ).AsLongInt( ), 2, "as a Parameter hint" )
+        AssertEqInt( hints.Item( 0 ).Member( "position" ).Member( "line" ).AsLongInt( ), 3, _
+                     "on the line the call is on" )
+        AssertEqInt( hints.Item( 0 ).Member( "position" ).Member( "character" ).AsLongInt( ), 7, _
+                     "immediately before the argument" )
+        AssertEqStr( hints.Item( 1 ).Member( "label" ).AsString( ), "y:", "and the second is the second" )
+
+        '' -- semantic tokens ---------------------------------------------------
+        dim as JsonValue data_ = sem_.Root( ).Member( "result" ).Member( "data" )
+        AssertTrue ( data_.Count( ) > 20, "the file produces semantic tokens" )
+        AssertEqInt( data_.Count( ) mod 5, 0, "five integers per token" )
+        AssertEqInt( data_.Item( 0 ).AsLongInt( ), 0, "the first token is on line 0" )
+        AssertEqInt( data_.Item( 1 ).AsLongInt( ), 0, "at character 0" )
+        AssertEqInt( data_.Item( 3 ).AsLongInt( ), 13, "and is a keyword -- legend index 13" )
+
+        '' -- code actions ------------------------------------------------------
+        dim as JsonValue actions = actions_.Root( ).Member( "result" )
+        AssertEqInt( actions.Count( ), 1, "one quick fix_ for the unterminated string" )
+
+        dim as JsonValue fix_ = actions.Item( 0 )
+        AssertEqStr( fix_.Member( "title" ).AsString( ), "Insert the closing quote", "titled plainly" )
+        AssertEqStr( fix_.Member( "kind"  ).AsString( ), "quickfix", "as a quickfix" )
+        AssertEqStr( fix_.Member( "diagnostics" ).Item( 0 ).Member( "code" ).AsString( ), _
+                     "unterminated-string", "carrying the diagnostic it fixes" )
+
+        '' The client said it understands documentChanges, so the edit is the
+        '' VERSIONED form.
+        dim as JsonValue entry = fix_.Member( "edit" ).Member( "documentChanges" ).Item( 0 )
+        AssertEqInt( entry.Member( "textDocument" ).Member( "version" ).AsLongInt( ), 1, _
+                     "against the version it was computed from" )
+        AssertEqStr( entry.Member( "edits" ).Item( 0 ).Member( "newText" ).AsString( ), Q, _
+                     "and the edit inserts one quote" )
+        AssertEqInt( entry.Member( "edits" ).Item( 0 ).Member( "range" ).Member( "start" ) _
+                          .Member( "character" ).AsLongInt( ), 11, _
+                     "at the end of the line, where the quote belongs" )
+    end scope
+
+    TestGroup( "rename" )
+    scope
+        dim as JsonDoc prep_, ren_, refused_, badName_, fmt_
+        AssertTrue( prep_.Parse   ( messages[25] ), "message 25 is JSON" )
+        AssertTrue( ren_.Parse    ( messages[26] ), "message 26 is JSON" )
+        AssertTrue( refused_.Parse( messages[27] ), "message 27 is JSON" )
+        AssertTrue( badName_.Parse( messages[28] ), "message 28 is JSON" )
+        AssertTrue( fmt_.Parse    ( messages[29] ), "message 29 is JSON" )
+
+        '' -- prepareRename ------------------------------------------------------
+        dim as JsonValue prep = prep_.Root( ).Member( "result" )
+        AssertEqStr( prep.Member( "placeholder" ).AsString( ), "w", _
+                     "prepareRename offers the name as written" )
+        AssertEqInt( prep.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 18, _
+                     "over exactly the identifier" )
+        AssertEqInt( prep.Member( "range" ).Member( "end" ).Member( "character" ).AsLongInt( ), 19, _
+                     "and no further" )
+
+        '' -- the rename ---------------------------------------------------------
+        ''
+        '' `w` is a LOCAL, so the edit is confined to its own procedure in its
+        '' own file: three occurrences, and nothing in shared.bi.
+        dim as JsonValue changes = ren_.Root( ).Member( "result" ).Member( "documentChanges" )
+        AssertEqInt( changes.Count( ), 1, "a local rename touches ONE file" )
+        AssertContains( lcase( changes.Item( 0 ).Member( "textDocument" ).Member( "uri" ).AsString( ) ), _
+                        "widgets.bas", "the file the local is in" )
+        AssertEqInt( changes.Item( 0 ).Member( "textDocument" ).Member( "version" ).AsLongInt( ), 1, _
+                     "at the version it was computed against" )
+        AssertEqInt( changes.Item( 0 ).Member( "edits" ).Count( ), 3, _
+                     "and rewrites its three occurrences" )
+        AssertEqStr( changes.Item( 0 ).Member( "edits" ).Item( 0 ).Member( "newText" ).AsString( ), _
+                     "widget_", "with the new name" )
+
+        '' -- the refusal ---------------------------------------------------------
+        AssertTrue( refused_.Root( ).Has( "error" ), "renaming a name a local shares is REFUSED" )
+        AssertContains( refused_.Root( ).Member( "error" ).Member( "message" ).AsString( ), _
+                        "is also a local", "and the message says why" )
+
+        AssertTrue( badName_.Root( ).Has( "error" ), "renaming to a reserved word is refused" )
+        AssertEqInt( badName_.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_PARAMS, _
+                     "as InvalidParams" )
+
+        '' -- formatting -----------------------------------------------------------
+        ''
+        '' x.bas is `dim shared as long counter / sub Test( ) / counter = 2 /
+        '' end sub`, so exactly one line is in the wrong column.
+        dim as JsonValue edits = fmt_.Root( ).Member( "result" )
+        AssertEqInt( edits.Count( ), 1, "formatting the file produces one edit" )
+        AssertEqInt( edits.Item( 0 ).Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 2, _
+                     "on the body line" )
+        AssertEqStr( edits.Item( 0 ).Member( "newText" ).AsString( ), "    ", _
+                     "inserting one level of indentation" )
+    end scope
+
+    '' -- 31..34. save and close --------------------------------------------------
     TestGroup( "save and close" )
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[18] ), "message 18 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[19] ), "message 19 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[20] ), "message 20 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[21] ), "message 21 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[30] ), "message 30 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[31] ), "message 31 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[32] ), "message 32 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[33] ), "message 33 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
         AssertEqStr( saveDiag.Root( ).Member( "method" ).AsString( ), LSP_PUBLISH_DIAGNOSTICS, _
                      "a save republishes" )
 
-        '' widgets.bas is still open, which is what makes this ONE and not zero.
+        '' widgets.bas and y.bas are still open, which is what makes this TWO.
         AssertContains( closeTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
-                        "1 document(s) still open", "closing one buffer leaves the other" )
+                        "2 document(s) still open", "closing one buffer leaves the others" )
         AssertEqInt( closeDiag.Root( ).Member( "params" ).Member( "diagnostics" ).Count( ), 0, _
                      "and clears the closed file's diagnostics" )
     end scope
 
-    '' -- 23. the parse error ------------------------------------------------------
+    '' -- 35. the parse error ------------------------------------------------------
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[22] ), "message 22 is JSON" )
+        AssertTrue( doc.Parse( messages[34] ), "message 34 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
     end scope
 
-    '' -- 24..25. shutdown and after -----------------------------------------------
+    '' -- 36..37. shutdown and after -----------------------------------------------
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc, after_
-        AssertTrue( doc.Parse   ( messages[23] ), "message 23 is JSON" )
-        AssertTrue( after_.Parse( messages[24] ), "message 24 is JSON" )
+        AssertTrue( doc.Parse   ( messages[35] ), "message 35 is JSON" )
+        AssertTrue( after_.Parse( messages[36] ), "message 36 is JSON" )
 
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue ( doc.Root( ).Member( "result" ).IsNull( ), "the shutdown result is null" )

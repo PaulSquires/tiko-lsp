@@ -57,6 +57,16 @@ private function OnInitialize( byref srv as Server, _
         srv.WorkspaceFolders.Push( wf )
     end if
 
+    '' -- what the client can accept back ------------------------------------
+    ''
+    '' Only two client capabilities change what this server SENDS, and both are
+    '' read here rather than at the point of use, because InitializeParams is
+    '' the only place they are ever offered.
+    srv.SupportsDocumentChanges = params.Member( "capabilities" ) _
+                                        .Member( "workspace" ) _
+                                        .Member( "workspaceEdit" ) _
+                                        .Member( "documentChanges" ).AsBoolean( false )
+
     '' -- position encoding ---------------------------------------------------
     ''
     '' The client offers a list; the server picks one and echoes it in its

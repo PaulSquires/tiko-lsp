@@ -1,0 +1,22 @@
+'' ############################################################################
+''  handlers/rename.bi -- textDocument/prepareRename and textDocument/rename
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.bi"
+
+declare sub RegisterRenameHandlers( )
+
+'' Why a rename cannot be done here, or "" when it can.
+''
+'' Exposed for the tests, and because prepareRename and rename must give the
+'' SAME answer: a prepare that says yes followed by a rename that says no is
+'' the worst outcome for a user, who has already typed the new name.
+declare function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
+                                byval offset as long, byref lowerName as string, _
+                                byref localScopeStart as long, byref localScopeEnd as long ) as string
+
+'' True when `name_` is something fbc would accept as an identifier and is not
+'' a reserved word.
+declare function IsRenameableIdentifier( byref name_ as string ) as boolean

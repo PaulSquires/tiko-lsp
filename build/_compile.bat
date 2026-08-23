@@ -44,12 +44,21 @@ set SOURCES=^
  "%ROOT%\src\handlers\completion.bas"^
  "%ROOT%\src\handlers\workspace_symbols.bas"^
  "%ROOT%\src\handlers\references.bas"^
+ "%ROOT%\src\handlers\rename.bas"^
+ "%ROOT%\src\handlers\signature_help.bas"^
+ "%ROOT%\src\handlers\semantic_tokens.bas"^
+ "%ROOT%\src\handlers\inlay_hints.bas"^
+ "%ROOT%\src\handlers\formatting.bas"^
+ "%ROOT%\src\handlers\code_action.bas"^
  "%ROOT%\src\document\document.bas"^
  "%ROOT%\src\document\document_manager.bas"^
  "%ROOT%\src\analysis\lexer.bas"^
  "%ROOT%\src\analysis\parser.bas"^
  "%ROOT%\src\analysis\symbols.bas"^
  "%ROOT%\src\analysis\completion.bas"^
+ "%ROOT%\src\analysis\signature.bas"^
+ "%ROOT%\src\analysis\semantic.bas"^
+ "%ROOT%\src\analysis\format.bas"^
  "%ROOT%\src\workspace\workspace.bas"^
  "%ROOT%\src\workspace\symbol_index.bas"^
  "%ROOT%\src\analysis\diagnostics.bas"^

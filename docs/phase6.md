@@ -152,4 +152,5 @@ Measured on win64/gas64: scan, then index, then twenty queries.
 
 Rename — which is references plus a `WorkspaceEdit`, and which needs
 `prepareRename` to refuse the places a rename would be wrong. Then signature
-help, semantic tokens, inlay hints, code actions and formatting.
+help, semantic tokens, inlay hints, code actions and formatting. All of it
+landed: see [phase7.md](phase7.md).

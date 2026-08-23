@@ -18,7 +18,10 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     ''      phase 5   completionProvider
     ''      phase 6   workspaceSymbolProvider, referencesProvider,
     ''                workspace.workspaceFolders               <- here now
-    ''      phase 7   renameProvider, signatureHelpProvider, semanticTokens...
+    ''      phase 7   renameProvider, signatureHelpProvider,
+    ''                semanticTokensProvider, inlayHintProvider,
+    ''                documentFormattingProvider,
+    ''                documentRangeFormattingProvider, codeActionProvider
     '' ------------------------------------------------------------------------
 
     '' Stated explicitly even though utf-16 is the protocol default, because a
@@ -79,6 +82,73 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     dim as JsonNode wsCaps = rb.NewObject( )
     rb.SetNode( wsCaps, "workspaceFolders", folders )
     rb.SetNode( caps, "workspace", wsCaps )
+
+    '' ------------------------------------------------------------------------
+    ''  Phase 7
+    '' ------------------------------------------------------------------------
+
+    '' prepareProvider is TRUE, and it is not a formality: this server refuses
+    '' renames it cannot do safely, and prepareRename is the only way to say so
+    '' BEFORE the user has typed a new name into the editor's box.
+    dim as JsonNode renameOpts = rb.NewObject( )
+    rb.SetBool( renameOpts, "prepareProvider", true )
+    rb.SetNode( caps, "renameProvider", renameOpts )
+
+    '' '(' opens a call and ',' moves to the next argument -- the two moments
+    '' a signature should appear without being asked for. ',' retriggers so an
+    '' already-open popup follows the caret instead of closing.
+    dim as JsonNode sigOpts = rb.NewObject( )
+    dim as JsonNode sigTrig = rb.NewArray( )
+    rb.PushStr( sigTrig, "(" )
+    rb.PushStr( sigTrig, "," )
+    rb.SetNode( sigOpts, "triggerCharacters", sigTrig )
+
+    dim as JsonNode sigRetrig = rb.NewArray( )
+    rb.PushStr( sigRetrig, "," )
+    rb.SetNode( sigOpts, "retriggerCharacters", sigRetrig )
+    rb.SetNode( caps, "signatureHelpProvider", sigOpts )
+
+    '' The semantic-token legend. The client caches this and then receives
+    '' nothing but numbers, so the order here is the wire format.
+    ''
+    '' `full` only: no range, and no delta. A delta needs the previous result
+    '' kept per document and a result id to match it, and claiming it while
+    '' returning a full set every time is the kind of half-support that makes
+    '' a client show stale colours.
+    dim as JsonNode legend = rb.NewObject( )
+
+    dim as JsonNode typeNames = rb.NewArray( )
+    dim names_ as FB.Array( of string ) = SemanticTypeNames( )
+    for i as long = 0 to names_.Count( ) - 1
+        rb.PushStr( typeNames, names_[i] )
+    next
+    rb.SetNode( legend, "tokenTypes", typeNames )
+
+    dim as JsonNode modNames = rb.NewArray( )
+    dim mods_ as FB.Array( of string ) = SemanticModifierNames( )
+    for i as long = 0 to mods_.Count( ) - 1
+        rb.PushStr( modNames, mods_[i] )
+    next
+    rb.SetNode( legend, "tokenModifiers", modNames )
+
+    dim as JsonNode semOpts = rb.NewObject( )
+    rb.SetNode( semOpts, "legend", legend )
+    rb.SetBool( semOpts, "full", true )
+    rb.SetNode( caps, "semanticTokensProvider", semOpts )
+
+    '' resolveProvider is absent: a hint is complete when it is sent.
+    rb.SetBool( caps, "inlayHintProvider", true )
+
+    rb.SetBool( caps, "documentFormattingProvider",      true )
+    rb.SetBool( caps, "documentRangeFormattingProvider", true )
+
+    '' Only quickfix. Announcing `refactor` or `source` and returning nothing
+    '' for them puts empty entries in the editor's lightbulb menu.
+    dim as JsonNode caOpts  = rb.NewObject( )
+    dim as JsonNode caKinds = rb.NewArray( )
+    rb.PushStr( caKinds, "quickfix" )
+    rb.SetNode( caOpts, "codeActionKinds", caKinds )
+    rb.SetNode( caps, "codeActionProvider", caOpts )
 
     return caps
 end function

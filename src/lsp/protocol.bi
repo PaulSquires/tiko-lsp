@@ -9,6 +9,7 @@
 #pragma once
 
 #include once "../json/json.bi"
+#include once "../analysis/semantic.bi"
 
 const LSP_SERVER_NAME    = "tiko-lsp"
 const LSP_SERVER_VERSION = "0.1.0"
@@ -46,6 +47,16 @@ const LSP_COMPLETION      = "textDocument/completion"
 const LSP_REFERENCES        = "textDocument/references"
 const LSP_WORKSPACE_SYMBOL  = "workspace/symbol"
 const LSP_DID_CHANGE_FOLDERS = "workspace/didChangeWorkspaceFolders"
+
+'' Editing features (phase 7).
+const LSP_PREPARE_RENAME     = "textDocument/prepareRename"
+const LSP_RENAME             = "textDocument/rename"
+const LSP_SIGNATURE_HELP     = "textDocument/signatureHelp"
+const LSP_SEMANTIC_FULL      = "textDocument/semanticTokens/full"
+const LSP_INLAY_HINT         = "textDocument/inlayHint"
+const LSP_FORMATTING         = "textDocument/formatting"
+const LSP_RANGE_FORMATTING   = "textDocument/rangeFormatting"
+const LSP_CODE_ACTION        = "textDocument/codeAction"
 
 '' Diagnostics are PUSHED (phase 3). There is no capability to advertise for
 '' this: a server may publish whenever it likes, and the pull-based
