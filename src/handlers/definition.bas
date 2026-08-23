@@ -13,6 +13,7 @@
 
 #include once "definition.bi"
 #include once "workspace_symbols.bi"
+#include once "../analysis/includes.bi"
 #include once "hover.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"
@@ -32,6 +33,53 @@ private function OnDefinition( byref srv as Server, _
     dim as long charNo   = clng( posVal.Member( "character" ).AsLongInt( 0 ) )
     dim as long offset   = clng( doc->PositionToOffset( lineNo, charNo ) )
 
+    '' -- an #include line is a definition too ---------------------------------
+    ''
+    '' Ctrl-clicking `#include once "shared.bi"` should open shared.bi. Nothing
+    '' else in LSP expresses "go to this file", and every editor already binds
+    '' the gesture to this request.
+    ''
+    '' The CHEAP HALF of the question is asked first, from this document's own
+    '' tokens: is the caret on an include path at all? Only then is the index
+    '' needed -- otherwise every go-to-definition in an open file would start
+    '' by waiting for a workspace scan it does not need.
+    dim includeRefs as IncludeRefArray
+    FindIncludes( doc->Text( ), doc->Tokens( ), includeRefs )
+
+    if( IncludeAtOffset( includeRefs, offset ) >= 0 ) then
+        EnsureWorkspaceIndex( srv )
+        dim as long here = srv.Index->IndexOfUri( uriText )
+
+        for i as long = 0 to srv.Index->IncludeCount( here ) - 1
+            dim as IncludeEdge e = srv.Index->IncludeAt( here, i )
+            if( e.Line <> lineNo ) then continue for
+            if( charNo < e.StartChar orelse charNo > e.EndChar ) then continue for
+
+            '' A path this server could not place -- a compiler header, or a
+            '' file no workspace folder covers. There is nothing to open, and
+            '' saying so beats opening the wrong thing.
+            if( e.ToFile < 0 ) then
+                LogDebug( "include '" & e.Target & "' is not a file in the workspace" )
+                return rb.NewNull( )
+            end if
+
+            dim as JsonNode start_ = rb.NewObject( )
+            rb.SetInt( start_, "line", 0 )
+            rb.SetInt( start_, "character", 0 )
+
+            dim as JsonNode range_ = rb.NewObject( )
+            rb.SetNode( range_, "start", start_ )
+            rb.SetNode( range_, "end", start_ )
+
+            dim as JsonNode locNode = rb.NewObject( )
+            rb.SetStr ( locNode, "uri", srv.Index->FileUri( e.ToFile ) )
+            rb.SetNode( locNode, "range", range_ )
+
+            LogDebug( "include '" & e.Target & "' -> " & UriFileName( srv.Index->FileUri( e.ToFile ) ) )
+            return locNode
+        next
+    end if
+
     dim as long wordStart, wordEnd
     dim as long symIndex = ResolveAtOffset( doc, offset, wordStart, wordEnd )
 
@@ -49,8 +97,14 @@ private function OnDefinition( byref srv as Server, _
         '' and it is the only path in this handler that needs the workspace.
         EnsureWorkspaceIndex( srv )
 
+        '' ASKED FROM SOMEWHERE. The include graph decides which of several
+        '' declarations of one name this file can actually see; without it the
+        '' answer was "whichever the index liked best", which is right whenever
+        '' a name is unique and a coin toss when it is not.
         dim as IndexHit hit
-        if( srv.Index->FindDefinition( lowerName, hit ) = false ) then return rb.NewNull( )
+        if( srv.Index->FindDefinitionFrom( srv.Index->IndexOfUri( uriText ), lowerName, hit ) = false ) then
+            return rb.NewNull( )
+        end if
 
         '' The index stores its ranges already converted, so nothing has to be
         '' read from disk to answer this.

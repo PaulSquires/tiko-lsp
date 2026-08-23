@@ -27,6 +27,11 @@ dim shared as any ptr        g_idxThread
 dim shared as any ptr        g_idxMutex
 dim shared as boolean        g_idxCancel
 dim shared as PathArray      g_idxRoots
+
+'' The workspace folders, kept separately from the work list: a REFRESH's work
+'' list is files, and the include graph still has to be resolved against the
+'' folders.
+dim shared as PathArray      g_idxSearch
 dim shared as SymbolIndex ptr g_idxResult
 dim shared as string         g_idxSummary
 
@@ -34,6 +39,13 @@ dim shared as string         g_idxSummary
 '' named files. The difference matters only at the end -- one result is
 '' ADOPTED, the other is MERGED.
 dim shared as boolean        g_idxRefresh
+
+'' Set by the worker as its last act, read by the loop without a lock. A
+'' boolean written once and read repeatedly is the one shape where that is
+'' safe: the reader either sees the old value and waits, or the new one and
+'' collects. Neither is wrong, and the wrong answer costs a keystroke's worth
+'' of completion items rather than correctness.
+dim shared as boolean        g_idxDone
 
 '' Before main( ), so no two callers can create it at once -- the same rule as
 '' the file mutex next door in workspace.bas.
@@ -68,6 +80,8 @@ private sub IndexBuildWorker( byval param as any ptr )
     dim as double started = timer( )
 
     dim as SymbolIndex ptr idx = new SymbolIndex
+    idx->SetSearchPaths( g_idxSearch )
+
     dim as WorkspaceScan scan
 
     for i as long = 0 to g_idxRoots.Count( ) - 1
@@ -116,8 +130,14 @@ private sub IndexBuildWorker( byval param as any ptr )
         summary &= " -- STOPPED at the " & WS_MAX_FILES & " file limit"
     end if
 
+    '' The include graph is pointed at real files once, here, rather than as
+    '' each file is read: an include can name a file that has not been scanned
+    '' yet, and resolving it early would only have to be undone.
+    idx->ResolveIncludes( )
+
     g_idxResult  = idx
     g_idxSummary = summary
+    g_idxDone    = true
 end sub
 
 '' Re-indexes the named files and nothing else. Same thread, same handover,
@@ -126,6 +146,8 @@ private sub IndexRefreshWorker( byval param as any ptr )
     dim as double started = timer( )
 
     dim as SymbolIndex ptr idx = new SymbolIndex
+    idx->SetSearchPaths( g_idxSearch )
+
     dim as long indexed = 0
     dim as long failed  = 0
 
@@ -152,6 +174,7 @@ private sub IndexRefreshWorker( byval param as any ptr )
     g_idxSummary = "re-indexed " & indexed & " of " & g_idxRoots.Count( ) & " file(s) in " & _
                    int( (timer( ) - started) * 1000 ) & " ms"
     if( failed > 0 ) then g_idxSummary &= " (" & failed & " unreadable)"
+    g_idxDone    = true
 end sub
 
 '' ----------------------------------------------------------------------------
@@ -162,8 +185,10 @@ sub StartIndexBuild( byref roots as PathArray )
 
     '' Written before the thread exists, so the worker cannot be reading them.
     g_idxRoots.Clear( )
+    g_idxSearch.Clear( )
     for i as long = 0 to roots.Count( ) - 1
         g_idxRoots.Push( roots[i] )
+        g_idxSearch.Push( roots[i] )
     next
 
     if( g_idxResult <> 0 ) then
@@ -174,6 +199,7 @@ sub StartIndexBuild( byref roots as PathArray )
 
     SetCancel( false )
     g_idxRefresh = false
+    g_idxDone    = false
     g_idxThread  = threadcreate( @IndexBuildWorker, 0 )
 
     if( g_idxThread = 0 ) then
@@ -185,12 +211,17 @@ sub StartIndexBuild( byref roots as PathArray )
     end if
 end sub
 
-sub StartIndexRefresh( byref paths as PathArray )
+sub StartIndexRefresh( byref paths as PathArray, byref roots as PathArray )
     CancelIndexBuild( )
 
     g_idxRoots.Clear( )
     for i as long = 0 to paths.Count( ) - 1
         g_idxRoots.Push( paths[i] )
+    next
+
+    g_idxSearch.Clear( )
+    for i as long = 0 to roots.Count( ) - 1
+        g_idxSearch.Push( roots[i] )
     next
 
     if( g_idxResult <> 0 ) then
@@ -201,6 +232,7 @@ sub StartIndexRefresh( byref paths as PathArray )
 
     SetCancel( false )
     g_idxRefresh = true
+    g_idxDone    = false
     g_idxThread  = threadcreate( @IndexRefreshWorker, 0 )
 
     if( g_idxThread = 0 ) then
@@ -215,6 +247,11 @@ end function
 
 function IndexBuildPending( ) as boolean
     return ( g_idxThread <> 0 ) orelse ( g_idxResult <> 0 )
+end function
+
+function IndexBuildReady( ) as boolean
+    if( IndexBuildPending( ) = false ) then return false
+    return ( g_idxThread = 0 ) orelse g_idxDone
 end function
 
 function TakeIndexBuild( byref summary as string ) as SymbolIndex ptr

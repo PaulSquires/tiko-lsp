@@ -36,6 +36,7 @@
 #include once "../workspace/workspace.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
+#include once "fb/map.bi"
 
 '' A rename that touches more than this is not something to verify by eye, and
 '' a truncated rename is CORRUPTION -- so the limit refuses rather than trims.
@@ -78,6 +79,58 @@ private function EnclosingProcedure( byref symbols as SymbolTable, byval symInde
     return -1
 end function
 
+'' WHICH FILES A RENAME MAY TOUCH.
+''
+'' Everything that can SEE the declaration, which is what the include graph is
+'' for. Before it, a rename by name reached the whole workspace, and any local
+'' anywhere that happened to share the name made it refuse -- so renaming a
+'' field called `Count` was impossible in any project that also had a loop
+'' variable called `count` somewhere.
+''
+'' TWO THINGS ARE ADDED TO THE VISIBLE SET, and both are there so that
+'' narrowing can never lose an edit:
+''
+''   - the file the request came from, always;
+''   - EVERY FILE WITH AN INCLUDE THIS SERVER COULD NOT RESOLVE. Such a file
+''     might reach the declaration by a path we cannot see -- a compiler header
+''     that includes it, an -i directory we were never told about -- so it is
+''     treated as "maybe" and edited. Unknown visibility is not invisibility.
+''
+'' Returns false when the graph cannot say anything useful, and the caller then
+'' does what it always did: the whole workspace, by name.
+private function BuildRenameScope( byref srv as Server, byval doc as TextDocumentPtr, _
+                                   byref lowerName as string, _
+                                   byref scopeFiles as FB.Array( of long ) ) as boolean
+    scopeFiles.Clear( )
+
+    dim as long docFile = srv.Index->IndexOfUri( doc->Uri( ) )
+
+    dim as IndexHit hit
+    if( srv.Index->FindDefinitionFrom( docFile, lowerName, hit ) = false ) then return false
+
+    srv.Index->IncludedBy( hit.FileIndex, scopeFiles )
+    if( scopeFiles.IsEmpty( ) ) then return false
+
+    dim seen_ as FB.Map( of long, boolean )
+    for i as long = 0 to scopeFiles.Count( ) - 1
+        seen_.Put( scopeFiles[i], true )
+    next
+
+    if( docFile >= 0 andalso seen_.Contains( docFile ) = false ) then
+        scopeFiles.Push( docFile )
+        seen_.Put( docFile, true )
+    end if
+
+    for f as long = 0 to srv.Index->FileCount( ) - 1
+        if( seen_.Contains( f ) ) then continue for
+        if( srv.Index->HasUnresolvedIncludes( f ) = false ) then continue for
+        scopeFiles.Push( f )
+        seen_.Put( f, true )
+    next
+
+    return true
+end function
+
 function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
                         byval offset as long, byref lowerName as string, _
                         byref localScopeStart as long, byref localScopeEnd as long ) as string
@@ -117,13 +170,19 @@ function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
         end if
     end if
 
-    '' -- everything else: by name, across the workspace ----------------------
+    '' -- everything else: by name, within what can see it --------------------
     ''
-    '' The guard below reads the whole index, so the scan has to have finished.
-    '' A rename that silently skipped half the workspace because it was asked
+    '' The guard below reads the index, so the scan has to have finished. A
+    '' rename that silently skipped half the workspace because it was asked
     '' early would be the worst bug this server could have.
     EnsureWorkspaceIndex( srv )
-    for f as long = 0 to srv.Index->FileCount( ) - 1
+
+    dim scopeFiles as FB.Array( of long )
+    dim as boolean scoped = BuildRenameScope( srv, doc, lowerName, scopeFiles )
+
+    for k as long = 0 to iif( scoped, scopeFiles.Count( ), srv.Index->FileCount( ) ) - 1
+        dim as long f = iif( scoped, scopeFiles[k], k )
+
         for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
             if( srv.Index->SymbolAt( f, i ).LowerName <> lowerName ) then continue for
             if( srv.Index->SymbolAt( f, i ).IsLocal = false ) then continue for
@@ -316,10 +375,19 @@ private function OnRename( byref srv as Server, _
         LogDebug( "rename local '" & lowerName & "' -> '" & newName & "': " & _
                   total & " edit(s) in one procedure" )
     else
-        '' -- everything else: every file that mentions the name -------------
+        '' -- everything else: by name, every file that CAN SEE it --------------
         dim as long files_ = 0
 
-        for f as long = 0 to srv.Index->FileCount( ) - 1
+        dim scopeFiles as FB.Array( of long )
+        dim as boolean scoped = BuildRenameScope( srv, doc, lowerName, scopeFiles )
+
+        if( scoped ) then
+            LogDebug( "rename '" & lowerName & "': " & scopeFiles.Count( ) & " of " & _
+                      srv.Index->FileCount( ) & " file(s) can see the declaration" )
+        end if
+
+        for k as long = 0 to iif( scoped, scopeFiles.Count( ), srv.Index->FileCount( ) ) - 1
+            dim as long f = iif( scoped, scopeFiles[k], k )
             dim as string fileUri = srv.Index->FileUri( f )
 
             '' The open buffer, when there is one: it is the truth, and its

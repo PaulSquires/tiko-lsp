@@ -349,4 +349,76 @@ scope
     AssertEqStr( e.Message_( ), "Invalid params", "an empty message falls back to the standard text" )
 end scope
 
+'' ############################################################################
+''  Invalid UTF-8 on the way out
+''
+''  yyjson refuses to serialise a document containing invalid UTF-8, and
+''  refuses ALL of it -- so one stray byte in one symbol's documentation lost
+''  the entire response, with nothing on the wire and one line in the log.
+''
+''  This was not hypothetical: 155 of AfxNova's 179 source files carry a
+''  Latin-1 `é` in their copyright line, and a completion list drawn through an
+''  #include of any of them was silently unanswerable.
+'' ############################################################################
+TestGroup( "invalid UTF-8 is replaced, not fatal" )
+
+scope
+    '' A lone 0xE9 -- `é` in Latin-1, and the start of a three-byte sequence
+    '' that never arrives in UTF-8.
+    dim as string latin1 = "Copyright " & chr(&hE9) & " somebody"
+
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "message", latin1 )
+    rb.SetRoot( root )
+
+    dim as string text_ = rb.Serialize( )
+    AssertTrue( len(text_) > 0, "a document with a Latin-1 byte still serialises" )
+
+    '' And it comes back as text, with the offending byte replaced rather than
+    '' dropped -- the string keeps its shape.
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( text_ ), "and the result is valid JSON" )
+
+    dim as string back_ = doc.Root( ).Member( "message" ).AsString( )
+    AssertContains( back_, "Copyright ", "the text before it survives" )
+    AssertContains( back_, " somebody", "and the text after it" )
+    AssertContains( back_, chr(&hEF) & chr(&hBF) & chr(&hBD), _
+                    "with U+FFFD where the byte could not be read" )
+end scope
+
+scope
+    '' Valid UTF-8 must pass through untouched, including the two cases the
+    '' position code cares about: a three-byte CJK character and a four-byte
+    '' emoji.
+    dim as string cjk   = chr(228,184,173)
+    dim as string emoji = chr(240,159,152,128)
+
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "a", cjk )
+    rb.SetStr( root, "b", emoji )
+    rb.SetStr( root, "c", "plain ascii" )
+    rb.SetRoot( root )
+
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( rb.Serialize( ) ), "valid UTF-8 serialises and parses" )
+    AssertEqStr( doc.Root( ).Member( "a" ).AsString( ), cjk, "a CJK character is unchanged" )
+    AssertEqStr( doc.Root( ).Member( "b" ).AsString( ), emoji, "an emoji is unchanged" )
+    AssertEqStr( doc.Root( ).Member( "c" ).AsString( ), "plain ascii", "and ASCII is ASCII" )
+end scope
+
+scope
+    '' A truncated sequence at the very end -- the other way a real file goes
+    '' wrong, when it is cut mid-character.
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "t", "ok" & chr(&hE4) & chr(&hB8) )      '' two of three bytes
+    rb.SetRoot( root )
+
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( rb.Serialize( ) ), "a truncated sequence does not sink the document" )
+    AssertContains( doc.Root( ).Member( "t" ).AsString( ), "ok", "and what came before it is kept" )
+end scope
+
 end TestSummary( "json + jsonrpc" )

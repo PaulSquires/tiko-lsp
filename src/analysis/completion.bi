@@ -58,7 +58,8 @@ enum CompletionGroup
     CMPGROUP_LOCAL   = 1   '' locals and parameters of this procedure
     CMPGROUP_TYPE    = 2   '' members of the enclosing type
     CMPGROUP_FILE    = 3   '' everything else this file declares
-    CMPGROUP_KEYWORD = 4   '' the language itself
+    CMPGROUP_INCLUDE = 4   '' what the files this one #includes declare
+    CMPGROUP_KEYWORD = 5   '' the language itself
 end enum
 
 type CompletionItem

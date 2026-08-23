@@ -57,6 +57,7 @@ set SOURCES=^
  "%ROOT%\src\analysis\parser.bas"^
  "%ROOT%\src\analysis\symbols.bas"^
  "%ROOT%\src\analysis\completion.bas"^
+ "%ROOT%\src\analysis\includes.bas"^
  "%ROOT%\src\analysis\signature.bas"^
  "%ROOT%\src\analysis\semantic.bas"^
  "%ROOT%\src\analysis\format.bas"^

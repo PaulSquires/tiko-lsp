@@ -7,9 +7,158 @@
 '' ############################################################################
 
 #include once "completion.bi"
+#include once "workspace_symbols.bi"
+#include once "../workspace/index_builder.bi"
 #include once "../analysis/completion.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
+
+'' A file at the top of a big header tree can see fifty thousand symbols --
+'' measured, on C:\dev\tiko. Sending those on every keystroke is a megabyte of
+'' JSON the editor renders and then filters down to five, so the list is capped
+'' and the client is told it is INCOMPLETE, which is the protocol's way of
+'' saying "ask me again when you have typed more".
+const MAX_INCLUDED_ITEMS = 1000
+
+'' Everything the files this one includes put into scope.
+''
+''  WITHOUT THIS, completion was a lie of omission: a file that includes a
+''  header saw none of what the header declares, so the one list a user reads
+''  on every keystroke stopped exactly at the file boundary the language does
+''  not have.
+''
+''  Local symbols are left out -- another file's locals are not in scope
+''  anywhere -- and so are duplicates of what this file already offered, which
+''  is what a header and its implementation file look like together.
+private function AddIncludedSymbols( byref srv as Server, byval doc as TextDocumentPtr, _
+                                     byref prefix as string, _
+                                     byref items as CompletionItemArray ) as boolean
+
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then return false
+
+    dim visible as FB.Array( of long )
+    srv.Index->VisibleFrom( here, visible )
+    if( visible.Count( ) <= 1 ) then return false
+
+    '' The labels already offered, lower-cased once. The list is a few hundred
+    '' items and the visible set can be thousands of symbols, so this is the
+    '' difference between a millisecond and a hundred.
+    dim seen_ as FB.Map( of string, boolean )
+    for i as long = 0 to items.Count( ) - 1
+        seen_.Put( items[i].LowerLabel, true )
+    next
+
+    dim as long added = 0
+    dim as boolean truncated = false
+
+    '' The prefix the user has already typed does the filtering a client would
+    '' otherwise do for itself -- and it is what keeps the cap from biting: by
+    '' the second character the visible set is a handful of names.
+    dim as string want = lcase( prefix )
+
+    for v as long = 0 to visible.Count( ) - 1
+        dim as long f = visible[v]
+        if( f = here ) then continue for
+        if( added >= MAX_INCLUDED_ITEMS ) then
+            truncated = true
+            exit for
+        end if
+
+        for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            dim as SymbolInfo sym = srv.Index->SymbolAt( f, i )
+            if( sym.IsLocal ) then continue for
+            if( len(sym.Name_) = 0 ) then continue for
+            if( len(want) > 0 andalso left( sym.LowerName, len(want) ) <> want ) then continue for
+            if( seen_.Contains( sym.LowerName ) ) then continue for
+
+            if( added >= MAX_INCLUDED_ITEMS ) then
+                truncated = true
+                exit for
+            end if
+
+            seen_.Put( sym.LowerName, true )
+
+            dim as CompletionItem it
+            it.Label      = sym.Name_
+            it.LowerLabel = sym.LowerName
+            it.Kind_      = CompletionKindOf( sym.Kind_ )
+            it.Detail_    = sym.Detail_
+            it.Doc_       = sym.Doc_
+            it.SortGroup  = CMPGROUP_INCLUDE
+            items.Push( it )
+            added += 1
+        next
+    next
+
+    LogDebug( "completion: " & added & " item(s) from " & (visible.Count( ) - 1) & _
+              " included file(s)" & iif( truncated, " (capped)", "" ) )
+
+    '' Filtered by a prefix is ALSO incomplete: the client must not cache this
+    '' list and narrow it locally, because the names it would then never see
+    '' are the ones that were filtered out here.
+    return truncated orelse ( len(want) > 0 )
+end function
+
+'' The members of a type declared in an INCLUDED file.
+''
+'' `w.` where `w as Widget` and Widget lives in a header was the case that made
+'' member completion look broken: the type is in scope, its fields are in
+'' scope, and the server offered nothing at all.
+private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPtr, _
+                                byref typeName as string, byref items as CompletionItemArray )
+
+    if( len(typeName) = 0 ) then exit sub
+
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then exit sub
+
+    dim visible as FB.Array( of long )
+    srv.Index->VisibleFrom( here, visible )
+
+    dim as string want = lcase( typeName )
+    dim seen_ as FB.Map( of string, boolean )
+    for i as long = 0 to items.Count( ) - 1
+        seen_.Put( items[i].LowerLabel, true )
+    next
+
+    for v as long = 0 to visible.Count( ) - 1
+        dim as long f = visible[v]
+        if( f = here ) then continue for
+
+        '' Find the type, then everything whose parent it is. The table is
+        '' flat with parent INDICES, so its members are one pass away.
+        for t as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            dim as SymbolInfo owner = srv.Index->SymbolAt( f, t )
+            if( owner.LowerName <> want ) then continue for
+
+            select case owner.Kind_
+                case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_NAMESPACE, SYM_INTERFACE
+                case else
+                    continue for
+            end select
+
+            for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+                dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
+                if( m.Parent <> t ) then continue for
+                if( len(m.Name_) = 0 ) then continue for
+                if( seen_.Contains( m.LowerName ) ) then continue for
+
+                seen_.Put( m.LowerName, true )
+
+                dim as CompletionItem it
+                it.Label      = m.Name_
+                it.LowerLabel = m.LowerName
+                it.Kind_      = CompletionKindOf( m.Kind_ )
+                it.Detail_    = m.Detail_
+                it.Doc_       = m.Doc_
+                it.SortGroup  = CMPGROUP_MEMBER
+                items.Push( it )
+            next
+            exit for
+        next
+    next
+end sub
 
 private function OnCompletion( byref srv as Server, _
                                byref req as RpcMessage, _
@@ -30,6 +179,38 @@ private function OnCompletion( byref srv as Server, _
 
     dim as CompletionItemArray items
     CollectCompletions( doc->Text( ), doc->Tokens( ), doc->Symbols( ), offset, items )
+
+    '' -- and what the includes bring in ---------------------------------------
+    ''
+    '' The index is needed for this and only for this, so a file with no
+    '' includes -- and a server whose scan has not finished -- pays nothing.
+    dim as CompletionContext ctx = CompletionContextAt( doc->Text( ), doc->Tokens( ), offset )
+
+    '' COMPLETION NEVER WAITS. It runs on every keystroke, and a first
+    '' completion that blocked for the four seconds a large workspace takes to
+    '' scan would be worse than one that offers a shorter list. So the index is
+    '' used when it is THERE -- collected here if the worker has finished, and
+    '' silently skipped while it has not.
+    dim as boolean indexUsable = ( IndexBuildPending( ) = false ) orelse IndexBuildReady( )
+    dim as boolean incomplete_ = false
+
+    if( ctx.Kind_ = CMPCTX_SCOPE andalso indexUsable ) then
+        EnsureWorkspaceIndex( srv )
+        incomplete_ = AddIncludedSymbols( srv, doc, ctx.Prefix, items )
+
+    elseif( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable ) then
+        '' The base's type is read from ITS declaration, which is in this file
+        '' -- a variable is declared where it is used. Only the TYPE lives
+        '' somewhere else, and that is what the graph is asked about.
+        dim as long baseIdx = doc->Symbols( ).Resolve( ctx.BaseName, ctx.BaseOffset )
+        if( baseIdx >= 0 ) then
+            dim as string typeName = DeclaredTypeName( doc->Symbols( ).Items[baseIdx] )
+            if( len(typeName) > 0 ) then
+                EnsureWorkspaceIndex( srv )
+                AddIncludedMembers( srv, doc, typeName, items )
+            end if
+        end if
+    end if
 
     dim as JsonNode list_ = rb.NewArray( )
 
@@ -61,8 +242,17 @@ private function OnCompletion( byref srv as Server, _
     next
 
     LogDebug( "completion at " & UriFileName( uriText ) & " " & lineNo & ":" & charNo & _
-              " -> " & items.Count( ) & " item(s)" )
-    return list_
+              " -> " & items.Count( ) & " item(s)" & iif( incomplete_, " (incomplete)", "" ) )
+
+    '' A CompletionList rather than a bare array, so `isIncomplete` can be
+    '' said. It matters exactly when the list was filtered by what has been
+    '' typed so far or cut off at the cap: a client that believed a filtered
+    '' list was the whole truth would narrow it locally from then on, and the
+    '' names it never saw would never appear however much more the user typed.
+    dim as JsonNode result_ = rb.NewObject( )
+    rb.SetBool( result_, "isIncomplete", incomplete_ )
+    rb.SetNode( result_, "items", list_ )
+    return result_
 end function
 
 sub RegisterCompletionHandlers( )

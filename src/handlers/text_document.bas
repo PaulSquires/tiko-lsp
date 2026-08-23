@@ -60,6 +60,12 @@ private function OnDidOpen( byref srv as Server, _
     '' saved is still found from another file.
     srv.Index->IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
 
+    '' The buffer may have just gained or lost an #include, and the graph is
+    '' what completion and definition read to know what this file can see. One
+    '' hash probe per edge in the workspace -- a fraction of the analysis that
+    '' just ran.
+    srv.Index->ResolveIncludes( )
+
     PublishDocumentDiagnostics( srv, doc )
     return JsonNode( )
 end function
@@ -135,6 +141,12 @@ private function OnDidChange( byref srv as Server, _
     '' is visible from another before it is saved.
     srv.Index->IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
 
+    '' The buffer may have just gained or lost an #include, and the graph is
+    '' what completion and definition read to know what this file can see. One
+    '' hash probe per edge in the workspace -- a fraction of the analysis that
+    '' just ran.
+    srv.Index->ResolveIncludes( )
+
     '' Re-analysed on every change, synchronously. Measured on win64/gas64:
     '' 0.3 ms for a 700-line file, 10 ms for the 8,645-line ir-gas64.bas, which
     '' is the largest source in fbc's own compiler. That is comfortably inside
@@ -203,6 +215,7 @@ private function OnDidClose( byref srv as Server, _
         dim as boolean reread = false
         if( len(path_) > 0 ) then reread = srv.Index->IndexPath( path_ )
         if( reread = false ) then srv.Index->Remove( uriText )
+        srv.Index->ResolveIncludes( )
     end if
 
     LogInfo( "closed " & UriFileName( uriText ) & ", " & srv.Documents.Count( ) & " still open" )

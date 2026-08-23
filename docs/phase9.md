@@ -184,3 +184,7 @@ pass unnoticed.
   1,000 files it is inside the 688 ms above, but it has not been isolated.
 - **No debounce.** Ten notifications of ten files each are ten small batches,
   not one of a hundred: nothing waits to see whether more is coming.
+
+## Next
+
+What a file can actually see -- [phase10.md](phase10.md).

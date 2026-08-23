@@ -23,6 +23,101 @@ private function TextPtr( byref s as string ) as zstring ptr
     return strptr(s)
 end function
 
+'' ############################################################################
+''  Invalid UTF-8 on the way out
+''
+''  yyjson REFUSES to serialise a string that is not valid UTF-8, and it
+''  refuses the whole document: one stray byte anywhere and the entire response
+''  is lost. What the server did about that was log "failed to serialise" and
+''  answer nothing -- so the request simply never completed, in an editor that
+''  showed no error and waited.
+''
+''  This is not a hypothetical. 155 of AfxNova's 179 source files carry a
+''  Latin-1 `é` in their copyright line, and a completion list drawn from any
+''  of them was silently unanswerable. LSP says content is UTF-8; real files
+''  predate the machine that says so.
+''
+''  So every string that goes out is checked, and a byte that cannot be part of
+''  a valid sequence becomes U+FFFD. The user sees one replacement character in
+''  a copyright line instead of a feature that does not work.
+'' ############################################################################
+
+'' How long a UTF-8 sequence starting with this byte should be, or 0 when the
+'' byte cannot start one.
+private function Utf8Len( byval c as ubyte ) as long
+    if( c < &h80 ) then return 1
+    if( c >= &hC2 andalso c <= &hDF ) then return 2
+    if( c >= &hE0 andalso c <= &hEF ) then return 3
+    if( c >= &hF0 andalso c <= &hF4 ) then return 4
+    return 0
+end function
+
+private function IsContinuation( byval c as ubyte ) as boolean
+    return ( c >= &h80 andalso c <= &hBF )
+end function
+
+'' `s` with every byte that is not part of a well-formed sequence replaced. The
+'' common case -- text that is already valid -- copies nothing: the scan runs,
+'' finds nothing wrong, and the original is returned.
+private function SanitiseUtf8( byref s as string ) as string
+    dim as long n = len(s)
+    dim as long i = 0
+    dim as boolean clean_ = true
+
+    while( i < n )
+        dim as long need = Utf8Len( s[i] )
+        if( need = 0 ) then
+            clean_ = false
+            exit while
+        end if
+
+        if( i + need > n ) then
+            clean_ = false
+            exit while
+        end if
+
+        for k as long = 1 to need - 1
+            if( IsContinuation( s[i + k] ) = false ) then
+                clean_ = false
+                exit for
+            end if
+        next
+        if( clean_ = false ) then exit while
+
+        i += need
+    wend
+
+    if( clean_ ) then return s
+
+    '' Rebuild, keeping every valid sequence whole.
+    dim as string out_
+    i = 0
+
+    while( i < n )
+        dim as long need = Utf8Len( s[i] )
+        dim as boolean ok_ = ( need > 0 ) andalso ( i + need <= n )
+
+        if( ok_ ) then
+            for k as long = 1 to need - 1
+                if( IsContinuation( s[i + k] ) = false ) then
+                    ok_ = false
+                    exit for
+                end if
+            next
+        end if
+
+        if( ok_ ) then
+            out_ &= mid( s, i + 1, need )
+            i += need
+        else
+            out_ &= chr( &hEF, &hBF, &hBD )   '' U+FFFD REPLACEMENT CHARACTER
+            i += 1
+        end if
+    wend
+
+    return out_
+end function
+
 '' Builds a FreeBASIC string from a pointer/length pair. yyjson strings are
 '' counted, not NUL-terminated in the FB sense: an escaped u0000 unescapes to
 '' a real zero byte inside the text, and LEFT(*p, n) would stop early on it.
@@ -318,11 +413,15 @@ function JsonBuilder.NewArray( ) as JsonNode
     return JsonNode( yyjson_mut_arr( this.m_doc ) )
 end function
 
+'' EVERY string value on the wire passes through here, which is why the
+'' sanitising happens here and nowhere else.
 function JsonBuilder.NewString( byref v as string ) as JsonNode
     if( this.m_doc = NULL ) then return JsonNode( )
     '' strncpy, not str: the FB string may be a temporary that dies before the
-    '' document is serialised.
-    return JsonNode( yyjson_mut_strncpy( this.m_doc, TextPtr(v), len(v) ) )
+    '' document is serialised. And sanitised: yyjson refuses to write a
+    '' document containing invalid UTF-8, and refuses ALL of it.
+    dim as string clean_ = SanitiseUtf8( v )
+    return JsonNode( yyjson_mut_strncpy( this.m_doc, TextPtr(clean_), len(clean_) ) )
 end function
 
 function JsonBuilder.NewInt( byval v as longint ) as JsonNode

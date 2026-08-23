@@ -386,7 +386,33 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
 
-    '' 27. save and close the first document. widgets.bas stays open, so the
+    '' 27. THE INCLUDE GRAPH. widgets.bas line 1 is `#include once "shared.bi"`,
+    ''     and character 20 is inside the quoted path.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":25," & _
+                Q & "method" & Q & ":" & Q & "textDocument/definition" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":1," & Q & "character" & Q & ":20}}}" )
+
+    '' 28. completion inside the function body: line 6 is `    return w`, and
+    ''     character 4 is the start of it -- an ordinary scope position. What
+    ''     it must now contain is everything shared.bi declares.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":26," & _
+                Q & "method" & Q & ":" & Q & "textDocument/completion" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":6," & Q & "character" & Q & ":4}}}" )
+
+    '' 29. and member completion: line 5 is `    w.Label_ = label_`, character 6
+    ''     is immediately after the dot. `w` is a Widget, Widget is declared in
+    ''     the OTHER file, and its fields have to come from there.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":27," & _
+                Q & "method" & Q & ":" & Q & "textDocument/completion" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "}," & _
+                Q & "position" & Q & ":{" & Q & "line" & Q & ":5," & Q & "character" & Q & ":6}}}" )
+
+    '' 30. save and close the first document. widgets.bas stays open, so the
     ''     close trace must say ONE document is still open.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
@@ -462,21 +488,22 @@ private function CheckSession( byref path as string ) as long
     '' Forty-two, and exactly forty-two:
     ''    1 request FROM the server -- client/registerCapability, asking the
     ''      client to watch the workspace for source files
-    ''   25 answers to requests -- initialize, typeDefinition, second
+    ''   28 answers to requests -- initialize, typeDefinition, second
     ''      initialize, documentSymbol, hover, definition, completion,
     ''      cross-file definition, references, workspace/symbol, two signature
     ''      helps, inlay hints, semantic tokens, code actions, prepareRename,
     ''      rename, a refused prepareRename, a refused rename, formatting,
     ''      three more workspace/symbol queries around watched-file changes,
+    ''      a jump along an #include and two completions that read through one,
     ''      shutdown, post-shutdown
     ''    1 parse error
-    ''    3 window/logMessage -- "ready", and what each workspace scan found:
-    ''                           the one started at `initialized`, and the one
-    ''                           a burst of watched-file changes triggers
-    ''                            WHEN IT IS TAKEN DELIVERY OF, which is not
-    ''                            when it was started: the scan runs on its own
-    ''                            thread and the first request that needs it is
-    ''                            what waits for it
+    ''    3 window/logMessage -- "ready", and what each background scan found:
+    ''                           the one started at `initialized` and the one a
+    ''                           burst of watched-file changes triggers. WHERE
+    ''                           those two land in the stream is a matter of
+    ''                           thread scheduling, so they are checked by
+    ''                           content and taken out before anything else is
+    ''                           checked by position
     ''    9 $/logTrace          -- didOpen x3, didChange, didSave, didClose,
     ''                            and three didChangeWatchedFiles
     ''    6 publishDiagnostics, one after each of the document ones
@@ -484,19 +511,75 @@ private function CheckSession( byref path as string ) as long
     '' the didChange against a document that was never opened, or for the
     '' client's answer to the registration request.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 45, "the session produced exactly forty-five messages" )
-    if( messages.Count( ) <> 45 ) then
+    AssertEqInt( messages.Count( ), 48, "the session produced exactly forty-eight messages" )
+    if( messages.Count( ) <> 48 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 150 )
         next
         return TestSummary( "piped session" )
     end if
 
+    '' -- the two scan reports, which arrive WHEN A THREAD FINISHES --------------
+    ''
+    '' Everything else in this stream is ordered by the protocol: an answer
+    '' follows its request. These two do not belong to any request -- they are
+    '' the workspace scan and the watched-file refresh saying what they found,
+    '' at whichever message first collected them. That is a matter of thread
+    '' scheduling, so they are checked by CONTENT and then taken out of the
+    '' stream; the positional assertions below read what is left.
+    TestGroup( "the background scans report in" )
+
+    dim ordered as FB.Array( of string )
+    dim reports as FB.Array( of string )
+    dim as long firstReportAt = -1
+
+    scope
+        for i as long = 0 to messages.Count( ) - 1
+            dim as JsonDoc doc
+            dim as boolean isReport = false
+
+            if( doc.Parse( messages[i] ) ) then
+                if( doc.Root( ).Member( "method" ).AsString( ) = LSP_WINDOW_LOG_MESSAGE ) then
+                    dim as string text_ = doc.Root( ).Member( "params" ).Member( "message" ).AsString( )
+                    if( instr( text_, "indexed " ) > 0 orelse instr( text_, "re-indexed " ) > 0 ) then
+                        isReport = true
+                        if( firstReportAt < 0 ) then firstReportAt = i
+                    end if
+                end if
+            end if
+
+            if( isReport ) then reports.Push( messages[i] ) else ordered.Push( messages[i] )
+        next
+
+        AssertEqInt( reports.Count( ), 2, "two scans reported in: the start-up one and the refresh" )
+        if( reports.Count( ) = 2 ) then
+            dim as JsonDoc first_, second_
+            AssertTrue( first_.Parse ( reports[0] ), "the first report is JSON" )
+            AssertTrue( second_.Parse( reports[1] ), "the second report is JSON" )
+
+            dim as string a = first_.Root( ).Member( "params" ).Member( "message" ).AsString( )
+            AssertContains( a, "indexed 2 file(s)", "the start-up scan found both fixture files" )
+            AssertContains( a, "symbol(s)", "and counted their symbols" )
+            AssertFalse( instr( a, "0 symbol(s)" ) > 0, _
+                         "with symbols in them -- a keyword table raced into by two " & _
+                         "threads indexes every file to nothing, silently" )
+
+            dim as string b = second_.Root( ).Member( "params" ).Member( "message" ).AsString( )
+            AssertContains( b, "re-indexed 1 of 121 file(s)", _
+                            "the burst's refresh re-read one real file, and only one" )
+            AssertContains( b, "120 unreadable", "the invented ones simply failed" )
+        end if
+
+        '' It cannot arrive before there is anything to report on, and it must
+        '' arrive before the first answer that depends on it.
+        AssertTrue( firstReportAt > 2, "no scan reports before the client is even registered" )
+    end scope
+
     '' -- 1. the initialize response --------------------------------------------
     TestGroup( "initialize response" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[0] ), "message 0 is JSON" )
+        AssertTrue( doc.Parse( ordered[0] ), "message 0 is JSON" )
         dim as JsonValue r = doc.Root( )
         AssertEqInt( r.Member( "id" ).AsLongInt( ), 1, "answers id 1" )
         AssertEqStr( r.Member( "result" ).Member( "serverInfo" ).Member( "name" ).AsString( ), _
@@ -552,7 +635,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "the workspace scan starts on `initialized`" )
     scope
         dim as JsonDoc ready_
-        AssertTrue( ready_.Parse( messages[1] ), "message 1 is JSON" )
+        AssertTrue( ready_.Parse( ordered[1] ), "message 1 is JSON" )
 
         AssertEqStr( ready_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
                      "the server says it is ready" )
@@ -564,7 +647,7 @@ private function CheckSession( byref path as string ) as long
         '' there is no capability for file watching, so registering at run time
         '' is the only way to have it.
         dim as JsonDoc reg_
-        AssertTrue( reg_.Parse( messages[2] ), "message 2 is JSON" )
+        AssertTrue( reg_.Parse( ordered[2] ), "message 2 is JSON" )
         AssertEqStr( reg_.Root( ).Member( "method" ).AsString( ), LSP_REGISTER_CAPABILITY, _
                      "the server registers for file watching" )
         AssertTrue( reg_.Root( ).Member( "id" ).IsString( ), _
@@ -585,7 +668,7 @@ private function CheckSession( byref path as string ) as long
         '' And then it says nothing more until it is asked something: the scan
         '' it started reports in later, when its result is taken.
         dim as JsonDoc next_
-        AssertTrue( next_.Parse( messages[3] ), "message 3 is JSON" )
+        AssertTrue( next_.Parse( ordered[3] ), "message 3 is JSON" )
         AssertFalse( next_.Root( ).Member( "method" ).AsString( ) = LSP_WINDOW_LOG_MESSAGE, _
                      "and nothing else before the next answer" )
     end scope
@@ -594,7 +677,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "unimplemented method" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
+        AssertTrue( doc.Parse( ordered[3] ), "message 3 is JSON" )
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 2, "answers id 2" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
                      "textDocument/typeDefinition is MethodNotFound" )
@@ -604,7 +687,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "second initialize" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[4] ), "message 4 is JSON" )
+        AssertTrue( doc.Parse( ordered[4] ), "message 4 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsString( ), "a string id is echoed AS A STRING" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
                      "a second initialize is InvalidRequest" )
@@ -617,10 +700,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "document synchronisation and diagnostics" )
     scope
         dim as JsonDoc openTrace, openDiag, changeTrace, changeDiag
-        AssertTrue( openTrace.Parse  ( messages[5] ), "message 5 is JSON" )
-        AssertTrue( openDiag.Parse   ( messages[6] ), "message 6 is JSON" )
-        AssertTrue( changeTrace.Parse( messages[7] ), "message 7 is JSON" )
-        AssertTrue( changeDiag.Parse ( messages[8] ), "message 8 is JSON" )
+        AssertTrue( openTrace.Parse  ( ordered[5] ), "message 5 is JSON" )
+        AssertTrue( openDiag.Parse   ( ordered[6] ), "message 6 is JSON" )
+        AssertTrue( changeTrace.Parse( ordered[7] ), "message 7 is JSON" )
+        AssertTrue( changeDiag.Parse ( ordered[8] ), "message 8 is JSON" )
 
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "v1, 3 line(s), 50 byte(s)", "the opened buffer is measured correctly" )
@@ -647,10 +730,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "outline, hover, definition, completion" )
     scope
         dim as JsonDoc outline_, hover_, defn_, cmp_
-        AssertTrue( outline_.Parse( messages[9]  ), "message 9 is JSON" )
-        AssertTrue( hover_.Parse  ( messages[10]  ), "message 10 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[11] ), "message 11 is JSON" )
-        AssertTrue( cmp_.Parse    ( messages[12] ), "message 12 is JSON" )
+        AssertTrue( outline_.Parse( ordered[9]  ), "message 9 is JSON" )
+        AssertTrue( hover_.Parse  ( ordered[10]  ), "message 10 is JSON" )
+        AssertTrue( defn_.Parse   ( ordered[11] ), "message 11 is JSON" )
+        AssertTrue( cmp_.Parse    ( ordered[12] ), "message 12 is JSON" )
 
         dim as JsonValue syms = outline_.Root( ).Member( "result" )
         AssertEqInt( syms.Count( ), 2, "the outline has two top-level symbols" )
@@ -668,16 +751,21 @@ private function CheckSession( byref path as string ) as long
         AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 19, _
                      "at the character the NAME starts" )
 
-        dim as JsonValue items = cmp_.Root( ).Member( "result" )
-        AssertTrue( items.Count( ) > 200, "completion carries the language as well as the file" )
+        '' A CompletionList, not a bare array: the server has to be able to say
+        '' `isIncomplete`, and it does whenever it filtered by the typed prefix.
+        dim as JsonValue cmpResult = cmp_.Root( ).Member( "result" )
+        AssertTrue( cmpResult.Member( "items" ).Count( ) > 200, _
+                    "completion carries the language as well as the file" )
+        AssertFalse( cmpResult.Member( "isIncomplete" ).AsBoolean( true ), _
+                     "and with nothing typed yet it is the whole list" )
     end scope
 
     '' -- 13..14. the workspace file opens ---------------------------------------
     TestGroup( "a workspace file opens" )
     scope
         dim as JsonDoc trace_, diag_
-        AssertTrue( trace_.Parse( messages[13] ), "message 13 is JSON" )
-        AssertTrue( diag_.Parse ( messages[14] ), "message 14 is JSON" )
+        AssertTrue( trace_.Parse( ordered[13] ), "message 13 is JSON" )
+        AssertTrue( diag_.Parse ( ordered[14] ), "message 14 is JSON" )
 
         AssertContains( trace_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen widgets.bas", "the fixture file is opened" )
@@ -692,27 +780,10 @@ private function CheckSession( byref path as string ) as long
     '' Everything below is answered from the workspace index or not at all.
     TestGroup( "cross-file definition, references, workspace symbols" )
     scope
-        dim as JsonDoc indexed_, defn_, refs_, syms_
-        AssertTrue( indexed_.Parse( messages[15] ), "message 15 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[16] ), "message 16 is JSON" )
-        AssertTrue( refs_.Parse   ( messages[17] ), "message 17 is JSON" )
-        AssertTrue( syms_.Parse   ( messages[18] ), "message 18 is JSON" )
-
-        '' -- the scan is delivered HERE ------------------------------------------
-        ''
-        '' Thirteen messages after it was started, and immediately before the
-        '' first request that could not be answered without it. Everything in
-        '' between -- three documents opened, an edit, an outline, a hover, a
-        '' definition, a completion list -- was answered while it ran.
-        AssertEqStr( indexed_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
-                     "the scan reports in when its result is taken" )
-
-        dim as string what = indexed_.Root( ).Member( "params" ).Member( "message" ).AsString( )
-        AssertContains( what, "indexed 2 file(s)", "both fixture files were found" )
-        AssertContains( what, "symbol(s)", "and their symbols counted" )
-        AssertFalse( instr( what, "0 symbol(s)" ) > 0, _
-                     "with symbols in them -- a keyword table raced into by two " & _
-                     "threads indexes every file to nothing, silently" )
+        dim as JsonDoc defn_, refs_, syms_
+        AssertTrue( defn_.Parse( ordered[15] ), "message 15 is JSON" )
+        AssertTrue( refs_.Parse( ordered[16] ), "message 16 is JSON" )
+        AssertTrue( syms_.Parse( ordered[17] ), "message 17 is JSON" )
 
         '' -- definition, into another file --------------------------------------
         dim as JsonValue where_ = defn_.Root( ).Member( "result" )
@@ -759,13 +830,13 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "signature help, inlay hints, semantic tokens, code actions" )
     scope
         dim as JsonDoc yTrace, yDiag, sig1, sig2, hints_, sem_, actions_
-        AssertTrue( yTrace.Parse  ( messages[19] ), "message 19 is JSON" )
-        AssertTrue( yDiag.Parse   ( messages[20] ), "message 20 is JSON" )
-        AssertTrue( sig1.Parse    ( messages[21] ), "message 21 is JSON" )
-        AssertTrue( sig2.Parse    ( messages[22] ), "message 22 is JSON" )
-        AssertTrue( hints_.Parse  ( messages[23] ), "message 23 is JSON" )
-        AssertTrue( sem_.Parse    ( messages[24] ), "message 24 is JSON" )
-        AssertTrue( actions_.Parse( messages[25] ), "message 25 is JSON" )
+        AssertTrue( yTrace.Parse  ( ordered[18] ), "message 18 is JSON" )
+        AssertTrue( yDiag.Parse   ( ordered[19] ), "message 19 is JSON" )
+        AssertTrue( sig1.Parse    ( ordered[20] ), "message 20 is JSON" )
+        AssertTrue( sig2.Parse    ( ordered[21] ), "message 21 is JSON" )
+        AssertTrue( hints_.Parse  ( ordered[22] ), "message 22 is JSON" )
+        AssertTrue( sem_.Parse    ( ordered[23] ), "message 23 is JSON" )
+        AssertTrue( actions_.Parse( ordered[24] ), "message 24 is JSON" )
 
         AssertContains( yTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen y.bas", "the third document opens" )
@@ -833,11 +904,11 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "rename" )
     scope
         dim as JsonDoc prep_, ren_, refused_, badName_, fmt_
-        AssertTrue( prep_.Parse   ( messages[26] ), "message 26 is JSON" )
-        AssertTrue( ren_.Parse    ( messages[27] ), "message 27 is JSON" )
-        AssertTrue( refused_.Parse( messages[28] ), "message 28 is JSON" )
-        AssertTrue( badName_.Parse( messages[29] ), "message 29 is JSON" )
-        AssertTrue( fmt_.Parse    ( messages[30] ), "message 30 is JSON" )
+        AssertTrue( prep_.Parse   ( ordered[25] ), "message 25 is JSON" )
+        AssertTrue( ren_.Parse    ( ordered[26] ), "message 26 is JSON" )
+        AssertTrue( refused_.Parse( ordered[27] ), "message 27 is JSON" )
+        AssertTrue( badName_.Parse( ordered[28] ), "message 28 is JSON" )
+        AssertTrue( fmt_.Parse    ( ordered[29] ), "message 29 is JSON" )
 
         '' -- prepareRename ------------------------------------------------------
         dim as JsonValue prep = prep_.Root( ).Member( "result" )
@@ -892,10 +963,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "watched files" )
     scope
         dim as JsonDoc goneTrace, goneSyms, backTrace, backSyms
-        AssertTrue( goneTrace.Parse( messages[31] ), "message 31 is JSON" )
-        AssertTrue( goneSyms.Parse ( messages[32] ), "message 32 is JSON" )
-        AssertTrue( backTrace.Parse( messages[33] ), "message 33 is JSON" )
-        AssertTrue( backSyms.Parse ( messages[34] ), "message 34 is JSON" )
+        AssertTrue( goneTrace.Parse( ordered[30] ), "message 30 is JSON" )
+        AssertTrue( goneSyms.Parse ( ordered[31] ), "message 31 is JSON" )
+        AssertTrue( backTrace.Parse( ordered[32] ), "message 32 is JSON" )
+        AssertTrue( backSyms.Parse ( ordered[33] ), "message 33 is JSON" )
 
         '' -- deleted -------------------------------------------------------------
         AssertContains( goneTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
@@ -935,10 +1006,9 @@ private function CheckSession( byref path as string ) as long
     '' -- 35..37. A BURST GOES TO THE WORKER ---------------------------------------
     TestGroup( "a watched-file burst" )
     scope
-        dim as JsonDoc burstTrace, rescanned, syms_
-        AssertTrue( burstTrace.Parse( messages[35] ), "message 35 is JSON" )
-        AssertTrue( rescanned.Parse ( messages[36] ), "message 36 is JSON" )
-        AssertTrue( syms_.Parse     ( messages[37] ), "message 37 is JSON" )
+        dim as JsonDoc burstTrace, syms_
+        AssertTrue( burstTrace.Parse( ordered[34] ), "message 34 is JSON" )
+        AssertTrue( syms_.Parse     ( ordered[35] ), "message 35 is JSON" )
 
         '' A hundred and twenty invented files plus shared.bi -- and NOT
         '' widgets.bas, which the editor has open. The open file is filtered
@@ -949,17 +1019,10 @@ private function CheckSession( byref path as string ) as long
                         "121 re-indexed in the background", _
                         "and none of them is read on the message loop" )
 
-        '' The proof that it really went to the worker: a report delivered the
-        '' same way the start-up scan's was -- at the next request that needed
-        '' the index.
-        AssertEqStr( rescanned.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
-                     "the refresh reports in when its result is taken" )
-
-        dim as string what2 = rescanned.Root( ).Member( "params" ).Member( "message" ).AsString( )
-        AssertContains( what2, "re-indexed 1 of 121 file(s)", _
-                        "one real file was re-read, and only one" )
-        AssertContains( what2, "120 unreadable", "the invented ones simply failed" )
-
+        '' What the refresh actually did is checked with the other scan report,
+        '' at the top: it arrives when a thread finishes, not when a message is
+        '' answered.
+        ''
         '' And the index is intact. A file that could not be read keeps
         '' whatever the index already knew about it -- merging an empty entry
         '' for it would delete a file's symbols because a watcher was wrong.
@@ -974,14 +1037,77 @@ private function CheckSession( byref path as string ) as long
         AssertTrue( sawShared, "and the workspace is whole afterwards" )
     end scope
 
-    '' -- 38..41. save and close --------------------------------------------------
+    '' -- 36..38. THE INCLUDE GRAPH -----------------------------------------------
+    TestGroup( "the include graph" )
+    scope
+        dim as JsonDoc jump_, scope_, member_
+        AssertTrue( jump_.Parse  ( ordered[36] ), "message 36 is JSON" )
+        AssertTrue( scope_.Parse ( ordered[37] ), "message 37 is JSON" )
+        AssertTrue( member_.Parse( ordered[38] ), "message 38 is JSON" )
+
+        '' -- go to definition ON an #include line --------------------------------
+        dim as JsonValue where_ = jump_.Root( ).Member( "result" )
+        AssertEqInt( jump_.Root( ).Member( "id" ).AsLongInt( ), 25, "answers id 25" )
+        AssertContains( lcase( where_.Member( "uri" ).AsString( ) ), "shared.bi", _
+                        "a click on an include path opens that file" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "line" ).AsLongInt( ), 0, _
+                     "at its first line" )
+        AssertEqInt( where_.Member( "range" ).Member( "start" ).Member( "character" ).AsLongInt( ), 0, _
+                     "and its first character -- there is no name to land on" )
+
+        '' -- completion reads through the include --------------------------------
+        ''
+        '' Before the graph this list stopped at the file boundary, which the
+        '' language does not have: shared.bi's type, constant and prototype
+        '' were all in scope and none of them was offered.
+        dim as JsonValue items = scope_.Root( ).Member( "result" ).Member( "items" )
+        AssertTrue( items.Count( ) > 200, "the scope list still carries the language" )
+
+        dim as boolean sawType = false, sawConst = false, sawLocal = false
+        dim as string typeSort
+
+        for i as long = 0 to items.Count( ) - 1
+            dim as string label = items.Item( i ).Member( "label" ).AsString( )
+            if( label = "Widget" ) then
+                sawType  = true
+                typeSort = items.Item( i ).Member( "sortText" ).AsString( )
+            end if
+            if( label = "WIDGET_LIMIT" ) then sawConst = true
+            if( label = "w" ) then sawLocal = true
+        next
+
+        AssertTrue( sawType,  "the type declared in the included file is offered" )
+        AssertTrue( sawConst, "and its constant" )
+        AssertTrue( sawLocal, "without losing this file's own locals" )
+
+        '' Group 4: after this file's own declarations, before the keywords.
+        '' An included name is in scope, and it is still one step further away
+        '' than something declared here.
+        AssertEqStr( left( typeSort, 1 ), "4", "included names sort after local ones" )
+
+        '' -- member completion through the include -------------------------------
+        dim as JsonValue members = member_.Root( ).Member( "result" ).Member( "items" )
+        AssertEqInt( member_.Root( ).Member( "id" ).AsLongInt( ), 27, "answers id 27" )
+
+        dim as boolean sawField = false, sawKeyword = false
+        for i as long = 0 to members.Count( ) - 1
+            dim as string label = members.Item( i ).Member( "label" ).AsString( )
+            if( label = "Label_" orelse label = "Size_" ) then sawField = true
+            if( lcase( label ) = "sub" ) then sawKeyword = true
+        next
+
+        AssertTrue ( sawField, "`w.` offers the fields of a type declared in a header" )
+        AssertFalse( sawKeyword, "and a member context still contains no keywords" )
+    end scope
+
+    '' -- 39..42. save and close --------------------------------------------------
     TestGroup( "save and close" )
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[38] ), "message 38 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[39] ), "message 39 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[40] ), "message 40 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[41] ), "message 41 is JSON" )
+        AssertTrue( saveTrace.Parse ( ordered[39] ), "message 39 is JSON" )
+        AssertTrue( saveDiag.Parse  ( ordered[40] ), "message 40 is JSON" )
+        AssertTrue( closeTrace.Parse( ordered[41] ), "message 41 is JSON" )
+        AssertTrue( closeDiag.Parse ( ordered[42] ), "message 42 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
@@ -999,7 +1125,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[42] ), "message 42 is JSON" )
+        AssertTrue( doc.Parse( ordered[43] ), "message 43 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
@@ -1009,8 +1135,8 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc, after_
-        AssertTrue( doc.Parse   ( messages[43] ), "message 43 is JSON" )
-        AssertTrue( after_.Parse( messages[44] ), "message 44 is JSON" )
+        AssertTrue( doc.Parse   ( ordered[44] ), "message 44 is JSON" )
+        AssertTrue( after_.Parse( ordered[45] ), "message 45 is JSON" )
 
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue ( doc.Root( ).Member( "result" ).IsNull( ), "the shutdown result is null" )

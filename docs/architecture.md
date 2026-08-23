@@ -126,6 +126,14 @@ workspace's source in memory to answer later would cost tens of megabytes.
 References are the exception: they re-lex on demand, which is
 [phase6.md](phase6.md#references-are-re-lexed-not-stored)'s reasoning.
 
+WHAT A FILE CAN SEE is the include graph, held in the workspace index: one
+edge per `#include` that names a file the index knows about, resolved lexically
+against the includer's directory, the workspace folders, and -- when the name is
+unique -- the file name alone. A file with an edge the server could not place
+has UNKNOWN visibility, and every caller treats that as "maybe everything"
+rather than "nothing": definition falls back, completion adds without removing,
+rename widens its edit set. See [phase10.md](phase10.md).
+
 THE CLIENT WATCHES THE FILESYSTEM, not the server. File events arrive as
 `workspace/didChangeWatchedFiles` after the server registers for them at run
 time -- there is no capability for it -- and they are the only thing besides an

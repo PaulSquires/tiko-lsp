@@ -258,6 +258,186 @@ end scope
 
 
 '' ############################################################################
+''  The include graph
+''
+''  Built from synthetic files: IndexText takes the TEXT, and resolution is
+''  lexical, so a graph can be described here without writing anything to disk.
+''  The paths are real-looking because that is what resolution compares -- and
+''  the URI is derived from the path rather than invented, because the index
+''  keys on the RESOLVED PATH and a URI that does not agree with its path is a
+''  file the index cannot find again.
+'' ############################################################################
+TestGroup( "the include graph" )
+
+'' Indexes one made-up file under the fixture directory.
+private sub Fake( byref idx as SymbolIndex, byref name_ as string, byref text_ as string )
+    dim as string path_ = g_Fixture & "\" & name_
+    idx.IndexText( PathToUri( path_ ), path_, text_ )
+end sub
+
+private function FakeIndex( byref idx as SymbolIndex, byref name_ as string ) as long
+    return idx.IndexOfUri( PathToUri( g_Fixture & "\" & name_ ) )
+end function
+
+scope
+    '' a.bas -> b.bi -> c.bi, a chain three deep.
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( g_Fixture )
+    idx.SetSearchPaths( roots )
+
+    Fake( idx, "a.bas", "#include once ""b.bi""" & LF & "dim shared as long AAA" & LF )
+    Fake( idx, "b.bi",  "#include once ""c.bi""" & LF & "dim shared as long BBB" & LF )
+    Fake( idx, "c.bi",  "dim shared as long CCC" & LF )
+    idx.ResolveIncludes( )
+
+    dim as long a = FakeIndex( idx, "a.bas" )
+    dim as long b = FakeIndex( idx, "b.bi" )
+    dim as long c = FakeIndex( idx, "c.bi" )
+
+    AssertTrue( a >= 0 andalso b >= 0 andalso c >= 0, "the three files are indexed" )
+    AssertEqInt( idx.IncludeCount( a ), 1, "one include is recorded" )
+    AssertEqStr( idx.IncludeAt( a, 0 ).Target, "b.bi", "with the path as written" )
+    AssertEqInt( idx.IncludeAt( a, 0 ).ToFile, b, "pointing at the file it names" )
+    AssertEqInt( idx.IncludeAt( a, 0 ).Line, 0, "on the line it is written on" )
+    AssertFalse( idx.HasUnresolvedIncludes( a ), "and nothing is left dangling" )
+
+    dim visible as FB.Array( of long )
+    idx.VisibleFrom( a, visible )
+    AssertEqInt( visible.Count( ), 3, "the visible set is TRANSITIVE: a sees b sees c" )
+
+    idx.VisibleFrom( c, visible )
+    AssertEqInt( visible.Count( ), 1, "and it is DIRECTED: c sees only itself" )
+
+    AssertTrue ( idx.CanSee( a, c ), "a can see c" )
+    AssertFalse( idx.CanSee( c, a ), "c cannot see a" )
+
+    dim users as FB.Array( of long )
+    idx.IncludedBy( c, users )
+    AssertEqInt( users.Count( ), 3, "everyone that reaches c, however indirectly" )
+
+    idx.IncludedBy( a, users )
+    AssertEqInt( users.Count( ), 1, "and nobody includes the file at the top" )
+end scope
+
+scope
+    '' A CYCLE. `#include once` exists because this is legal and common, and a
+    '' walk that did not remember where it had been would not return.
+    dim as SymbolIndex idx
+    Fake( idx, "x.bi", "#include once ""y.bi""" & LF )
+    Fake( idx, "y.bi", "#include once ""x.bi""" & LF )
+    idx.ResolveIncludes( )
+
+    dim visible as FB.Array( of long )
+    idx.VisibleFrom( FakeIndex( idx, "x.bi" ), visible )
+    AssertEqInt( visible.Count( ), 2, "a cycle terminates, and each file appears once" )
+end scope
+
+scope
+    '' AN EDGE TO NOWHERE. A compiler header, or anything outside the folders
+    '' the client named. It is not an error and not a diagnostic -- it is the
+    '' reason this file's visible set is a lower bound rather than an answer.
+    dim as SymbolIndex idx
+    Fake( idx, "z.bas", "#include once ""crt.bi""" & LF & "#include once ""fb/array.bi""" & LF )
+    idx.ResolveIncludes( )
+
+    dim as long z = FakeIndex( idx, "z.bas" )
+    AssertEqInt( idx.IncludeCount( z ), 2, "both includes are recorded" )
+    AssertEqInt( idx.IncludeAt( z, 0 ).ToFile, -1, "and neither resolves" )
+    AssertTrue ( idx.HasUnresolvedIncludes( z ), "which the file is marked with" )
+
+    dim visible as FB.Array( of long )
+    idx.VisibleFrom( z, visible )
+    AssertEqInt( visible.Count( ), 1, "so it sees only itself" )
+end scope
+
+scope
+    '' A path with the OTHER separator, and in the wrong case. FreeBASIC
+    '' accepts both on Windows and the filesystem does not care about case, so
+    '' neither may cost a resolution.
+    dim as SymbolIndex idx
+    Fake( idx, "m.bas",   "#include once ""sub/D.BI""" & LF )
+    Fake( idx, "sub\d.bi", "dim shared as long DDD" & LF )
+    idx.ResolveIncludes( )
+
+    AssertEqInt( idx.IncludeAt( FakeIndex( idx, "m.bas" ), 0 ).ToFile, _
+                 FakeIndex( idx, "sub\d.bi" ), _
+                 "a forward slash and the wrong case still find the file" )
+end scope
+
+scope
+    '' NOT RELATIVE TO THE INCLUDER. The workspace folders stand in for fbc's
+    '' -i paths, which this server is never told.
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( g_Fixture )
+    idx.SetSearchPaths( roots )
+
+    Fake( idx, "deep\down\far.bas", "#include once ""shared.bi""" & LF )
+    idx.ResolveIncludes( )
+
+    dim as long far_ = FakeIndex( idx, "deep\down\far.bas" )
+    AssertTrue( idx.IncludeAt( far_, 0 ).ToFile < 0, _
+                "with no search path hit and no neighbour, it stays unresolved" )
+
+    '' The real shared.bi, in the fixture root, is what the search path finds.
+    idx.IndexPath( g_Fixture & "\shared.bi" )
+    idx.ResolveIncludes( )
+
+    far_ = FakeIndex( idx, "deep\down\far.bas" )
+    AssertTrue( idx.IncludeAt( far_, 0 ).ToFile >= 0, _
+                "a search path resolves what the includer's directory cannot" )
+end scope
+
+scope
+    '' WHICH DECLARATION DID YOU MEAN. Two files declare `Thing`; only one of
+    '' them is visible from where the question is asked.
+    dim as SymbolIndex idx
+    Fake( idx, "user.bas",  "#include once ""mine.bi""" & LF & "dim as long n = 1" & LF )
+    Fake( idx, "mine.bi",   "sub Thing( )" & LF & "end sub" & LF )
+    Fake( idx, "theirs.bi", "sub Thing( )" & LF & "end sub" & LF )
+    idx.ResolveIncludes( )
+
+    dim as IndexHit hit
+    AssertTrue( idx.FindDefinitionFrom( FakeIndex( idx, "user.bas" ), "thing", hit ), _
+                "the name resolves" )
+    AssertEqInt( hit.FileIndex, FakeIndex( idx, "mine.bi" ), _
+                 "to the declaration this file can SEE, not to the other one" )
+
+    '' Asked from nowhere -- a file the index does not hold -- it still answers,
+    '' because a definition the user can be shown beats none.
+    AssertTrue( idx.FindDefinitionFrom( -1, "thing", hit ), "and from nowhere it still answers" )
+end scope
+
+scope
+    '' And the real fixture, which is what the piped session reads.
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( g_Fixture )
+    idx.SetSearchPaths( roots )
+
+    dim as WorkspaceScan scan
+    ScanFolder( g_Fixture, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long widgets = -1, shared_ = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        if( instr( lcase( idx.FilePath( i ) ), "widgets.bas" ) > 0 ) then widgets = i
+        if( instr( lcase( idx.FilePath( i ) ), "shared.bi" ) > 0 ) then shared_ = i
+    next
+
+    AssertTrue( widgets >= 0 andalso shared_ >= 0, "both fixture files are indexed" )
+    AssertEqInt( idx.IncludeCount( widgets ), 1, "widgets.bas includes one file" )
+    AssertEqInt( idx.IncludeAt( widgets, 0 ).ToFile, shared_, "and it is shared.bi" )
+    AssertEqInt( idx.IncludeAt( widgets, 0 ).Line, 1, "on line 1, where it is written" )
+    AssertTrue ( idx.CanSee( widgets, shared_ ), "so widgets.bas can see it" )
+    AssertFalse( idx.CanSee( shared_, widgets ), "and shared.bi cannot see back" )
+end scope
+
+'' ############################################################################
 ''  The background build
 ''
 ''  The scan runs on a worker thread so the message loop can keep reading. What

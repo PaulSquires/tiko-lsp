@@ -43,7 +43,7 @@ declare sub StartIndexBuild( byref roots as PathArray )
 '' measurably worse: on a 2,000-file workspace a 200-file refresh costs the
 '' next cross-file request about 0.7 s against 2.9 s for a full re-scan, and
 '' re-reading 1,800 files nothing said anything about is work for its own sake.
-declare sub StartIndexRefresh( byref paths as PathArray )
+declare sub StartIndexRefresh( byref paths as PathArray, byref roots as PathArray )
 
 '' True when what is pending -- or waiting to be taken -- is a REFRESH rather
 '' than a whole-workspace build. It decides whether the caller adopts the
@@ -52,6 +52,12 @@ declare function IndexBuildIsRefresh( ) as boolean
 
 '' True while a build is running or finished-but-not-yet-taken.
 declare function IndexBuildPending( ) as boolean
+
+'' True when the worker has FINISHED and its result is only waiting to be
+'' collected. It is what lets a request that must never block -- completion,
+'' which runs on every keystroke -- use the index the moment it is ready
+'' without ever waiting for it to become so.
+declare function IndexBuildReady( ) as boolean
 
 '' WAITS for the running build and hands over its index. The caller OWNS the
 '' returned pointer and must `delete` it. Returns 0 when there was no build to

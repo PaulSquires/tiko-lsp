@@ -17,6 +17,7 @@
 #include once "fb/array.bi"
 #include once "workspace.bi"
 #include once "../analysis/parser.bi"
+#include once "../analysis/includes.bi"
 
 '' A symbol's NAME range, in LSP coordinates, worked out when the file was
 '' indexed.
@@ -44,6 +45,35 @@ end type
 
 type IndexHitArray as FB.Array( of IndexHit )
 
+'' ----------------------------------------------------------------------------
+''  The include graph
+''
+''  One edge per `#include` that names a file THIS INDEX KNOWS ABOUT. Anything
+''  else -- a compiler header, a path built by a macro, a file outside every
+''  workspace folder -- is an edge to nowhere, and a file that has one is a file
+''  whose visibility cannot be known. That distinction is the whole reason the
+''  graph is worth having: it says where the server may be precise, and it says
+''  so per file rather than in general.
+''
+''  RESOLUTION IS LEXICAL, and deliberately does no file I/O. A candidate path
+''  is built from the includer's directory and the workspace roots, normalised,
+''  and looked up among the files already indexed. Twenty thousand includes
+''  then cost twenty thousand hash probes rather than twenty thousand stat
+''  calls -- and the question being asked really is "is this one of ours?".
+'' ----------------------------------------------------------------------------
+type IncludeEdge
+    Target    as string   '' as written
+    ToFile    as long     '' index into the index, or -1 for outside it
+
+    '' Where the quoted path is, in LSP coordinates, so a jump to it has a
+    '' range to answer with.
+    Line      as long
+    StartChar as long
+    EndChar   as long
+end type
+
+type IncludeEdgeArray as FB.Array( of IncludeEdge )
+
 type IndexedFile
     Uri        as string
     Path_      as string
@@ -55,6 +85,7 @@ type IndexedFile
     Key_       as string
     Symbols    as SymbolTable
     Ranges     as IndexedRangeArray   '' one per symbol, aligned by index
+    Includes   as IncludeEdgeArray    '' what this file pulls in
     FromBuffer as boolean    '' indexed from an open document, not from disk
 end type
 
@@ -62,7 +93,8 @@ type IndexedFileArray as FB.Array( of IndexedFile )
 
 type SymbolIndex
     private:
-        m_files as IndexedFileArray
+        m_files       as IndexedFileArray
+        m_searchPaths as PathArray
 
     public:
         declare sub      Clear( )
@@ -85,6 +117,40 @@ type SymbolIndex
         declare function IndexPath( byref path_ as string ) as boolean
 
         declare sub Remove( byref uri as string )
+
+        '' -- the include graph ------------------------------------------------
+
+        '' Where to look for an include that is not relative to its includer:
+        '' the workspace folders. Set once; indexing does not need them, only
+        '' resolution does.
+        declare sub SetSearchPaths( byref paths as PathArray )
+
+        '' Points every include edge at the file it names, or at -1. Cheap
+        '' (one hash probe per edge) and must be re-run after anything that
+        '' adds, removes or replaces a file -- a scan, a merge, a buffer.
+        declare sub ResolveIncludes( )
+
+        declare function IncludeCount( byval fileIndex as long ) as long
+        declare function IncludeAt   ( byval fileIndex as long, byval i as long ) as IncludeEdge
+
+        '' True when this file includes something the index cannot place.
+        '' Its visible set is then a LOWER BOUND, not an answer, and every
+        '' caller treats it that way.
+        declare function HasUnresolvedIncludes( byval fileIndex as long ) as boolean
+
+        '' The files `fileIndex` can see: itself, what it includes, and what
+        '' those include, transitively. Cycles terminate -- a file already
+        '' visited is not visited again, which is also what `#include once`
+        '' means.
+        declare sub VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+
+        '' The reverse: every file that can see `fileIndex`. This is the set a
+        '' rename of something declared there could possibly touch.
+        declare sub IncludedBy( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+
+        '' True when `fromFile` can see `targetFile` -- the question everything
+        '' above is really asking.
+        declare function CanSee( byval fromFile as long, byval targetFile as long ) as boolean
 
         '' Takes every file `other` holds, replacing any entry for the same
         '' file. Used to merge a batch the worker re-indexed back into the live
@@ -110,6 +176,14 @@ type SymbolIndex
         '' false. A body beats a DECLARE, and a file the editor has open beats
         '' one read from disk.
         declare function FindDefinition( byref lowerName as string, byref hit as IndexHit ) as boolean
+
+        '' The same question asked from somewhere: a declaration `fromFile` can
+        '' actually see beats one it cannot, whatever else is true of them.
+        '' Falls back to the workspace-wide answer, because a definition the
+        '' user can be shown beats none -- and an include this server could not
+        '' resolve must not turn into "no such name".
+        declare function FindDefinitionFrom( byval fromFile as long, byref lowerName as string, _
+                                             byref hit as IndexHit ) as boolean
 end type
 
 '' Byte offsets of every identifier token in `text_` that matches `lowerName`.

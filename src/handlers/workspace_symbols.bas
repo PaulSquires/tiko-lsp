@@ -31,14 +31,33 @@ sub StartWorkspaceIndex( byref srv as Server )
         exit sub
     end if
 
+    '' The live index resolves its own graph too: it holds the open buffers,
+    '' and one of those may be the file the user is typing an #include into.
+    srv.Index->SetSearchPaths( roots )
+
     '' Returns immediately. The next message is read while this runs.
     StartIndexBuild( roots )
     LogInfo( "workspace scan started in the background" )
 end sub
 
+'' The workspace folders as native paths -- the include graph's search list,
+'' and what a scan walks.
+private function WorkspaceRoots( byref srv as Server ) as PathArray
+    dim roots as PathArray
+
+    for i as long = 0 to srv.WorkspaceFolders.Count( ) - 1
+        dim as string root = UriToPath( srv.WorkspaceFolders[i].Uri )
+        if( len(root) > 0 ) then roots.Push( root )
+    next
+
+    return roots
+end function
+
 sub RefreshWorkspaceFiles( byref srv as Server, byref paths as PathArray )
     if( paths.IsEmpty( ) ) then exit sub
-    StartIndexRefresh( paths )
+
+    dim roots as PathArray = WorkspaceRoots( srv )
+    StartIndexRefresh( paths, roots )
     LogInfo( "re-indexing " & paths.Count( ) & " file(s) in the background" )
 end sub
 
@@ -71,6 +90,13 @@ sub EnsureWorkspaceIndex( byref srv as Server )
         dim as TextDocumentPtr doc = srv.Documents.Find( uris[i] )
         if( doc <> 0 ) then srv.Index->IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
     next
+
+    '' Every file the index holds has just changed identity or arrived, so the
+    '' graph is pointed at the new set. A merge is the case that needs it most:
+    '' a refreshed header may have been renumbered by the files around it.
+    dim roots as PathArray = WorkspaceRoots( srv )
+    srv.Index->SetSearchPaths( roots )
+    srv.Index->ResolveIncludes( )
 
     dim as double waitMs = ( timer( ) - waited ) * 1000
     if( waitMs >= 1 ) then summary &= " (waited " & int( waitMs ) & " ms for it)"
