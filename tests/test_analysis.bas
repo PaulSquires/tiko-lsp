@@ -3,7 +3,7 @@
 ''
 ''  The last group is the important one: it runs the analyser over THIS
 ''  PROJECT'S OWN SOURCE -- every .bas and .bi in src/ and tests/ -- and
-''  requires zero diagnostics. Several thousand lines of real FreeBASIC is a
+''  requires zero diagnostics. Several thousand lines of real source is a
 ''  far better false-positive test than any hand-written sample, because a
 ''  language server that squiggles valid code is worse than one that reports
 ''  nothing at all.
@@ -270,8 +270,10 @@ AssertOneCode( "#else", DIAGCODE_ORPHAN_CLAUSE, "an #else outside an #if" )
 
 '' ----------------------------------------------------------------------------
 ''  Everything below was found by running this analyser over 432,000 lines of
-''  real FreeBASIC -- fbc's own compiler and standard library, AfxNova, and the
-''  fbc test suite. Each one was a false positive on valid code.
+''  FreeBASIC-COMPATIBLE source -- fbc's own compiler and standard library,
+''  AfxNova, and the fbc test suite. tiko is FreeBASIC-compatible, so all of it
+''  is tiko source too, and every one of these was a false positive on code
+''  that is valid in both.
 '' ----------------------------------------------------------------------------
 TestGroup( "parser: forms found in real source" )
 
@@ -460,7 +462,7 @@ end scope
 ''  The real-source pass
 ''
 ''  Run with the project root as argv(1). Every .bas and .bi under src/ and
-''  tests/ must analyse with ZERO diagnostics -- they are all valid FreeBASIC,
+''  tests/ must analyse with ZERO diagnostics -- they are all valid tiko,
 ''  compiled by this very build.
 '' ----------------------------------------------------------------------------
 private function ReadWholeFile( byref path_ as string, byref outText as string ) as boolean

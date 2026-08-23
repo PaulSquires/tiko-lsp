@@ -47,7 +47,7 @@ name, which is the whole reason that request exists, and returns an **error**
 rather than a null result so the client shows the reason and not just "cannot
 rename".
 
-Two more refusals: a new name that is not a FreeBASIC identifier, or that is a
+Two more refusals: a new name that is not a tiko identifier, or that is a
 reserved word, is `InvalidParams`; and a rename touching more than 5000
 occurrences is refused outright. **A truncated rename is corruption**, so the
 cap must never trim the way the reference cap does.
@@ -103,7 +103,7 @@ All three are asserted directly, including a test that rebuilds the absolute
 positions from the deltas the way a client does.
 
 Comments, strings, numbers and keywords **are** emitted, even though a TextMate
-grammar could colour them, because for FreeBASIC most editors have no grammar at
+grammar could colour them, because for tiko most editors have no grammar at
 all — the server is the only source of colour there. Punctuation is **not**:
 every parenthesis and comma in a file would double the payload to say what is
 already obvious. An identifier that resolves to nothing is left alone as well;
@@ -142,7 +142,7 @@ recognised and skipped.
 
 **What it changes: leading whitespace, trailing whitespace, and the final
 newline.** That is the whole list. Everything else a formatter could do to
-FreeBASIC — keyword case, spacing inside parentheses, alignment of consecutive
+tiko — keyword case, spacing inside parentheses, alignment of consecutive
 assignments — is taste that the language does not settle, and a formatter that
 rewrites a file to its own taste on every save is one the user turns off.
 Indentation has a right answer, because it is the block structure.
@@ -165,7 +165,7 @@ source and AfxNova's, not out of thinking about it first. Each is now a test.
 
 - **A continuation line is left where it is.** Indenting it one level past its
   statement is defensible in the abstract and wrong in practice: real
-  FreeBASIC aligns a wrapped parameter list under the opening parenthesis, and
+  tiko aligns a wrapped parameter list under the opening parenthesis, and
   the server cannot know which column that is. The first version produced a
   thousand edits on this project alone, every one destroying an alignment
   somebody chose.
@@ -290,7 +290,7 @@ carry.
   workspace, which is broader than one file's include set and narrower than
   correct.
 - **Formatting a file that fbc accepts but this parser does not.** The parser is
-  clean across 435,000 lines of real FreeBASIC, so this should be rare, but the
+  clean across 435,000 lines of real source, so this should be rare, but the
   consequence here is a refusal rather than a diagnostic — and a refusal is
   silent apart from the log.
 - **The startup stall** from phase 6 is unchanged: the index build still blocks

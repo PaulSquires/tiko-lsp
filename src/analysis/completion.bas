@@ -192,7 +192,7 @@ private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as Comp
     return -1
 end function
 
-'' Appends, unless that label is already there. FreeBASIC is case-insensitive,
+'' Appends, unless that label is already there. tiko is case-insensitive,
 '' so the comparison is too -- and a DECLARE plus its body must not show the
 '' same name twice.
 private sub AddItem( byref items as CompletionItemArray, byref label_ as string, _

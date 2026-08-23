@@ -305,7 +305,7 @@ function ComputeFormatEdits( byref text_ as string, byref idx as LineIndex, _
         ''
         '' This was not the first rule tried. Indenting a continuation one
         '' level past its statement is defensible in the abstract and wrong in
-        '' practice: real FreeBASIC aligns a wrapped parameter list UNDER THE
+        '' practice: real tiko aligns a wrapped parameter list UNDER THE
         '' OPENING PARENTHESIS, and a formatter cannot know which column that
         '' is without deciding how the line should have been wrapped. Applied
         '' to this project's own source the rule produced a thousand edits,

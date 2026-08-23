@@ -1,7 +1,7 @@
 '' ############################################################################
 ''  workspace/workspace.bi -- finding the source files
 ''
-''  The editor tells us the folders; this finds the FreeBASIC in them. It is
+''  The editor tells us the folders; this finds the tiko in them. It is
 ''  deliberately conservative: a language server that walks a network share or
 ''  a node_modules tree at startup looks hung, and the user cannot tell the
 ''  difference between slow and broken.
@@ -24,7 +24,7 @@ type WorkspaceScan
     Truncated as boolean     '' the file cap was reached and the walk stopped
 end type
 
-'' .bas, .bi and .inc, case-insensitively. Nothing else is FreeBASIC source,
+'' .bas, .bi and .inc, case-insensitively. Nothing else is tiko source,
 '' and guessing wider means indexing build output.
 declare function IsSourceFileName( byref name_ as string ) as boolean
 

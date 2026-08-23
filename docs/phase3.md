@@ -1,6 +1,6 @@
 # Phase 3 — lexer, parser, diagnostics
 
-The first phase that reads FreeBASIC rather than just moving it around.
+The first phase that reads tiko rather than just moving it around.
 
 ## Delivered
 
@@ -20,7 +20,7 @@ is a separate feature, and is not claimed.
 
 From the lexer:
 
-- unterminated string literals (a string never spans a line in FreeBASIC);
+- unterminated string literals (a string never spans a line in tiko);
 - unterminated block comments — which **nest**, so `/' a /' b '/ c '/` is one;
 - malformed numbers: `1.2.3`, `&hzz`, `12abc`;
 - bytes that cannot begin a token.
@@ -66,7 +66,8 @@ hand-written samples. Final state:
 | fbc generics tests | 72 | 11,422 | 3 — all in `fail-*.bas`, which are deliberately unbalanced |
 | this project | 27 | ~4,000 | 0 |
 
-**Roughly 435,000 lines of real FreeBASIC, and the only diagnostics are on files
+**Roughly 435,000 lines of real FreeBASIC-compatible source -- tiko reads the
+same syntax -- and the only diagnostics are on files
 fbc itself expects to reject.**
 
 Fourteen distinct false positives were found and fixed that way. Each is now a

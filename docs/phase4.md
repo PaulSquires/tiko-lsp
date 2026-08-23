@@ -37,7 +37,7 @@ documentation comment, a parent, and two ranges:
 | `dim`, `var`, `static` inside a procedure | Variable, *local* | |
 | every parameter | Variable, *local* | its own text |
 
-Both FreeBASIC declaration orders are handled — `dim a as long, b as string`
+Both tiko declaration orders are handled — `dim a as long, b as string`
 and `dim as long a, b` — and modifiers (`shared`, `private`, `const`, `virtual`)
 are skipped rather than mistaken for names.
 
@@ -106,7 +106,7 @@ broken.
 The piped session proves the whole path against a **real process**: a document
 with a `counter` declared on line 0 and used on line 2 yields an outline of two
 symbols with the right kinds and ranges, a hover on the *use* that returns
-```` ```freebasic\ncounter as long\n``` ```` marked *variable*, and a definition
+```` ```tiko\ncounter as long\n``` ```` marked *variable*, and a definition
 that lands on **line 0, character 19** — the name, not the line.
 
 The parser corpora were re-run after every symbol change: 435,000 lines, still

@@ -1,5 +1,5 @@
 '' ############################################################################
-''  analysis/lexer.bas -- FreeBASIC tokens
+''  analysis/lexer.bas -- tiko tokens
 '' ############################################################################
 
 #include once "fb/map.bi"
@@ -180,7 +180,7 @@ end function
 private function IsAlpha( byval c as ubyte ) as boolean
     if( c >= asc("a") andalso c <= asc("z") ) then return true
     if( c >= asc("A") andalso c <= asc("Z") ) then return true
-    '' A byte >= 128 is part of a UTF-8 sequence. FreeBASIC does not accept it
+    '' A byte >= 128 is part of a UTF-8 sequence. tiko does not accept it
     '' in an identifier, but treating it as one keeps a stray non-ASCII byte
     '' inside a word rather than spraying "unexpected character" over it.
     return c >= 128
@@ -194,7 +194,7 @@ private function IsIdentPart( byval c as ubyte ) as boolean
     return IsIdentStart( c ) orelse IsDigit( c )
 end function
 
-'' $ % & ! # after an identifier are FreeBASIC's type suffixes: a$ is one name.
+'' $ % & ! # after an identifier are tiko's type suffixes: a$ is one name.
 private function IsTypeSuffix( byval c as ubyte ) as boolean
     select case c
         case asc("$"), asc("%"), asc("&"), asc("!"), asc("#") : return true
@@ -332,7 +332,7 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
             continue while
         end if
 
-        '' -- block comment, which NESTS in FreeBASIC ---------------------------
+        '' -- block comment, which NESTS in tiko ---------------------------
         if( c = asc("/") andalso i + 1 < n andalso text_[i + 1] = asc("'") ) then
             dim as long start_ = i
             dim as long depth = 0
@@ -385,7 +385,7 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
             while( i < n )
                 dim as ubyte s = text_[i]
 
-                '' A string never spans a line in FreeBASIC.
+                '' A string never spans a line in tiko.
                 if( s = 10 orelse s = 13 ) then exit while
 
                 if( escaped andalso s = asc("\") andalso i + 1 < n ) then

@@ -17,6 +17,6 @@ declare function RenameRefusal( byref srv as Server, byval doc as TextDocumentPt
                                 byval offset as long, byref lowerName as string, _
                                 byref localScopeStart as long, byref localScopeEnd as long ) as string
 
-'' True when `name_` is something fbc would accept as an identifier and is not
+'' True when `name_` is something tiko would accept as an identifier and is not
 '' a reserved word.
 declare function IsRenameableIdentifier( byref name_ as string ) as boolean

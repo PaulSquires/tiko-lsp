@@ -1,5 +1,5 @@
 '' ############################################################################
-''  main.bas -- tiko-lsp, a Language Server Protocol server for fbc-modern
+''  main.bas -- tiko-lsp, a Language Server Protocol server for tiko
 ''
 ''  Phases 1-6: transport, JSON-RPC, dispatcher, lifecycle, document sync,
 ''  analysis, the language features built on it, and the workspace index.
@@ -53,7 +53,7 @@ end type
 '' Usage goes to stderr, not stdout: an editor that launches the server with a
 '' bad argument would otherwise receive the help text as protocol data.
 private sub PrintUsage( )
-    fprintf( stderr, !"%s %s -- Language Server Protocol server for fbc-modern\n\n", _
+    fprintf( stderr, !"%s %s -- Language Server Protocol server for tiko\n\n", _
              LSP_SERVER_NAME, LSP_SERVER_VERSION )
     fprintf( stderr, !"Usage: tiko-lsp [options]\n\n" )
     fprintf( stderr, !"  --stdio                 communicate over stdin/stdout (default)\n" )

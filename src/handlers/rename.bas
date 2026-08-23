@@ -318,7 +318,7 @@ private function OnRename( byref srv as Server, _
 
     if( IsRenameableIdentifier( newName ) = false ) then
         err_.SetErr( RPC_INVALID_PARAMS, _
-                     "'" & newName & "' is not a name FreeBASIC would accept" )
+                     "'" & newName & "' is not a name tiko would accept" )
         return JsonNode( )
     end if
 

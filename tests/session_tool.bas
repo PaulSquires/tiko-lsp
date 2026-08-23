@@ -130,7 +130,7 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/x.bas" & Q & "," & _
-                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
                 Q & "text" & Q & ":" & Q & "dim shared as long counter\nsub Test( )\ncounter = 1" & Q & "}}}" )
 
     '' 7. two edits in ONE didChange, the second expressed against the text as
@@ -199,7 +199,7 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "," & _
-                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
                 Q & "text" & Q & ":" & JsonQuote( widgetsText ) & "}}}" )
 
     '' 11. cross-file definition: `Widget` at line 4, character 11 is declared
@@ -240,7 +240,7 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "method" & Q & ":" & Q & "textDocument/didOpen" & Q & "," & _
                 Q & "params" & Q & ":{" & Q & "textDocument" & Q & ":{" & _
                 Q & "uri" & Q & ":" & Q & "file:///c%3A/dev/y.bas" & Q & "," & _
-                Q & "languageId" & Q & ":" & Q & "freebasic" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
                 Q & "text" & Q & ":" & Q & "sub Move_( byval x as long, byval y as long )\n" & _
                 "end sub\nsub Go_( )\nMove_( 10, 3 )\nprint " & BS & Q & "oops\nend sub" & Q & "}}}" )
 
@@ -661,7 +661,7 @@ private function CheckSession( byref path as string ) as long
         dim as JsonValue watcher = registration.Member( "registerOptions" ) _
                                                .Member( "watchers" ).Item( 0 )
         AssertEqStr( watcher.Member( "globPattern" ).AsString( ), LSP_WATCH_GLOB, _
-                     "watching FreeBASIC source and nothing else" )
+                     "watching tiko source and nothing else" )
         AssertEqInt( watcher.Member( "kind" ).AsLongInt( ), LSP_WATCH_KIND, _
                      "for creation, change and deletion alike" )
 

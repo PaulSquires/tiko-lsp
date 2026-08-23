@@ -5,7 +5,7 @@
 ''  newline. That is the whole list.
 ''
 ''  WHAT IT DOES NOT CHANGE, and why: everything else a formatter could do to
-''  FreeBASIC is a matter of taste that the language does not settle. Keyword
+''  tiko is a matter of taste that the language does not settle. Keyword
 ''  case (`Sub` or `sub`), space inside parentheses, alignment of consecutive
 ''  assignments, whether a `_` continuation lines up under its opener -- there
 ''  is no compiler rule to appeal to, and a formatter that rewrites a file to

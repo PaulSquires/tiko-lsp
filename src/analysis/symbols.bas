@@ -176,7 +176,7 @@ end function
 '' ############################################################################
 
 function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
-    '' The first line is the declaration as FreeBASIC, in a fenced block, so an
+    '' The first line is the declaration as tiko, in a fenced block, so an
     '' editor syntax-highlights it.
     dim as string decl = sym.Name_
     if( len(sym.Detail_) > 0 ) then decl &= " " & sym.Detail_
@@ -198,7 +198,7 @@ function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
     '' `declare Foo (...)` reads wrong; the kind is already in the second line.
     if( keyword_ = "declare " ) then keyword_ = ""
 
-    dim as string out_ = "```freebasic" & chr(10) & keyword_ & decl & chr(10) & "```"
+    dim as string out_ = "```tiko" & chr(10) & keyword_ & decl & chr(10) & "```"
 
     '' A short note about what kind of thing it is, which is what tells a
     '' reader that `Count` is a field rather than a method.

@@ -18,10 +18,11 @@ The phase where the server stops being one file at a time.
 
 `WalkDir` from `fb/filesystem.bi` does the walking: reentrant, and it does not
 follow directory symlinks, so the traversal is a tree by construction — no
-visited set, no cycles. FreeBASIC's own `DIR`/`DIRNEXT` is a per-thread global
+visited set, no cycles. FreeBASIC's own `DIR`/`DIRNEXT` -- the server is
+written in it -- is a per-thread global
 and cannot be nested at all, which is why this could not be hand-rolled.
 
-- `.bas`, `.bi`, `.inc`, case-insensitively. Nothing else is FreeBASIC source.
+- `.bas`, `.bi`, `.inc`, case-insensitively. Nothing else is tiko source.
 - `.git`, `.svn`, `.hg`, `.vs`, `.vscode`, `.idea`, `node_modules` and
   `__pycache__` are skipped anywhere in the path. **`bin` and `obj` are not** —
   the extension filter already excludes build output, and a project that keeps

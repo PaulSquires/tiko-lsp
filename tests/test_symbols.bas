@@ -323,7 +323,7 @@ scope
     dim as long a = IndexOfName( "Add" )
     dim as string h = SymbolHoverMarkdown( S_(a) )
 
-    AssertContains( h, "```freebasic", "hover is markdown with a code block" )
+    AssertContains( h, "```tiko", "hover is markdown with a code block" )
     AssertContains( h, "Add (byval a as long, byval b as long) as long", "showing the declaration" )
     AssertContains( h, "procedure", "naming the kind" )
     AssertContains( h, "Adds two numbers.", "and carrying the documentation" )

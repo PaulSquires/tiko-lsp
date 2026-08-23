@@ -1,7 +1,7 @@
 # tiko-lsp for Zed
 
-A Zed extension that gives `.bas`, `.bi` and `.inc` files a language —
-**FreeBASIC** — and starts `tiko-lsp` for them.
+A Zed extension that gives `.bas`, `.bi` and `.inc` files a language — **Tiko**
+— and starts `tiko-lsp` for them.
 
 The extension itself does almost nothing, and that is the point: Zed speaks LSP,
 tiko-lsp speaks LSP, and all that was missing between them was a language name
@@ -53,9 +53,9 @@ stdout — that channel belongs to the protocol.
 ## What works
 
 Verified by running Zed **1.16.1** against this extension with a real
-`tiko-lsp.exe`: the extension loads, `widgets.bas` is recognised as FreeBASIC,
-the server starts, `initialize` names the client as Zed, `didOpen` arrives, the
-file is analysed, the workspace scan starts in the background, and Zed's
+`tiko-lsp.exe`: the extension loads, `widgets.bas` is recognised as Tiko, the
+server starts, `initialize` names the client as Zed, `didOpen` arrives, the file
+is analysed, the workspace scan starts in the background, and Zed's
 `textDocument/codeAction` requests are answered.
 
 The server's own list of what it implements is in
@@ -65,11 +65,11 @@ semantic tokens, inlay hints, formatting and quick fixes.
 
 ## What is not verified
 
-- **Syntax highlighting.** This language has **no tree-sitter grammar** — none
-  exists for FreeBASIC — so Zed has nothing to colour with unless it renders the
-  server's semantic tokens, which was not observed in the run above. The
-  language and the server work without one; the file may simply look plain.
-  Writing `tree-sitter-freebasic` is the fix, and it is a project of its own.
+- **Syntax highlighting.** This language has **no tree-sitter grammar** yet — a
+  `tree-sitter-tiko` is in progress under [../../grammar](../../grammar) — so
+  Zed has nothing to colour with unless it renders the server's semantic tokens,
+  which was not observed in the run above. The language and the server work
+  without one; the file may simply look plain.
 - **Every feature through the UI.** The run above confirms the wiring and the
   requests Zed made in the first seconds. Hover, completion and rename were
   exercised against the server over a pipe by

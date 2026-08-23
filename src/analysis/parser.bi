@@ -1,7 +1,7 @@
 '' ############################################################################
 ''  analysis/parser.bi -- structural analysis
 ''
-''  NOT a full FreeBASIC parser. It reads the token stream statement by
+''  NOT a full tiko parser. It reads the token stream statement by
 ''  statement and checks the things that are wrong no matter what the
 ''  expressions mean:
 ''

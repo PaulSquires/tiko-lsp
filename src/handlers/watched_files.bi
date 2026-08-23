@@ -20,6 +20,6 @@
 
 declare sub RegisterWatchedFilesHandlers( )
 
-'' Asks the client to watch the workspace for FreeBASIC source files. Called
+'' Asks the client to watch the workspace for tiko source files. Called
 '' from `initialized`, and only when the client offered dynamic registration.
 declare sub RequestFileWatching( byref srv as Server )

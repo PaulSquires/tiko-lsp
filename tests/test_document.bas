@@ -88,11 +88,11 @@ AssertEqStr( UriFileName( "untitled:Untitled-1" ), "untitled:Untitled-1", "no sl
 TestGroup( "document: opening" )
 
 scope
-    dim as TextDocument doc = TextDocument( "file:///c%3A/dev/x.bas", "freebasic", 1, _
+    dim as TextDocument doc = TextDocument( "file:///c%3A/dev/x.bas", "tiko", 1, _
                                             "dim as long i" & LF & "print i" )
 
     AssertEqStr( doc.Uri( ), "file:///c%3A/dev/x.bas", "the URI is kept verbatim" )
-    AssertEqStr( doc.LanguageId( ), "freebasic", "the language id is kept" )
+    AssertEqStr( doc.LanguageId( ), "tiko", "the language id is kept" )
     AssertEqInt( doc.Version( ), 1, "the version is kept" )
     AssertEqInt( doc.LineCount( ), 2, "the line index is built on open" )
     AssertEqStr( doc.LineText( 0 ), "dim as long i", "line 0 text" )
@@ -103,7 +103,7 @@ scope
 end scope
 
 scope
-    dim as TextDocument doc = TextDocument( "untitled:Untitled-1", "freebasic", 0, "" )
+    dim as TextDocument doc = TextDocument( "untitled:Untitled-1", "tiko", 0, "" )
     AssertEqStr( doc.FilePath( ), "", "an untitled document has no path" )
     AssertEqInt( doc.LineCount( ), 1, "an empty document is one line" )
     AssertEqStr( doc.Text( ), "", "an empty document has no text" )
@@ -113,7 +113,7 @@ end scope
 TestGroup( "document: full replacement" )
 
 scope
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, "old" )
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, "old" )
     doc.ReplaceAll( "new" & LF & "text", 7 )
 
     AssertEqStr( doc.Text( ), "new" & LF & "text", "the text is replaced" )
@@ -129,7 +129,7 @@ end scope
 TestGroup( "document: incremental edits" )
 
 scope
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, "line1" & LF & "line2" )
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, "line1" & LF & "line2" )
 
     '' Insert at the very start: an empty range.
     doc.ApplyRange( 0, 0, 0, 0, "AA", 2 )
@@ -158,7 +158,7 @@ end scope
 scope
     '' What typing actually looks like: one character at a time, each with its
     '' own range, each against the previous state.
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, "" )
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, "" )
     dim as string want = "dim as long i"
 
     for i as long = 0 to len(want) - 1
@@ -173,7 +173,7 @@ end scope
 scope
     '' Ranges are in UTF-16 columns, so an edit after a CJK character must not
     '' be placed by byte count.
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, _
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, _
                                             "print """ & CJK1 & """" )
     '' Columns: p=0 r=1 i=2 n=3 t=4 space=5 quote=6 CJK=7 quote=8
     doc.ApplyRange( 0, 7, 0, 8, "X", 2 )
@@ -182,7 +182,7 @@ end scope
 
 scope
     '' An astral character is TWO columns wide, and deleting it takes both.
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, "a" & EMOJI & "b" )
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, "a" & EMOJI & "b" )
     doc.ApplyRange( 0, 1, 0, 3, "", 2 )
     AssertEqStr( doc.Text( ), "ab", "a surrogate pair is deleted as two columns" )
 end scope
@@ -190,7 +190,7 @@ end scope
 scope
     '' Hostile input: a reversed range, and coordinates past the end. Neither
     '' may lose the buffer.
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, "abcdef" )
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, "abcdef" )
 
     doc.ApplyRange( 0, 4, 0, 1, "-", 2 )
     AssertEqStr( doc.Text( ), "a-ef", "a reversed range is normalised, not dropped" )
@@ -206,7 +206,7 @@ end scope
 TestGroup( "document: coordinates" )
 
 scope
-    dim as TextDocument doc = TextDocument( "file:///x", "freebasic", 1, _
+    dim as TextDocument doc = TextDocument( "file:///x", "tiko", 1, _
                                             "sub Test" & CR & LF & "end sub" )
 
     AssertEqInt( doc.LineCount( ), 2, "CRLF text is two lines" )
@@ -229,8 +229,8 @@ scope
     AssertFalse( mgr.IsOpen( "file:///nope" ), "an unknown URI is not open" )
     AssertFalse( mgr.Close( "file:///nope" ), "closing an unknown URI reports false" )
 
-    dim as TextDocumentPtr a = mgr.Open( "file:///a.bas", "freebasic", 1, "aaa" )
-    dim as TextDocumentPtr b = mgr.Open( "file:///b.bas", "freebasic", 1, "bbb" )
+    dim as TextDocumentPtr a = mgr.Open( "file:///a.bas", "tiko", 1, "aaa" )
+    dim as TextDocumentPtr b = mgr.Open( "file:///b.bas", "tiko", 1, "bbb" )
 
     AssertTrue ( a <> 0 andalso b <> 0, "both documents opened" )
     AssertEqInt( mgr.Count( ), 2, "the manager holds two" )
@@ -242,7 +242,7 @@ scope
     AssertEqInt( mgr.Count( ), 2, "a failed lookup does NOT create an entry" )
 
     '' Re-opening keeps the same object, so a pointer held elsewhere stays good.
-    dim as TextDocumentPtr again = mgr.Open( "file:///a.bas", "freebasic", 9, "zzz" )
+    dim as TextDocumentPtr again = mgr.Open( "file:///a.bas", "tiko", 9, "zzz" )
     AssertTrue ( again = a, "re-opening returns the same pointer" )
     AssertEqStr( a->Text( ), "zzz", "re-opening replaces the content" )
     AssertEqInt( a->Version( ), 9, "re-opening takes the new version" )
@@ -264,7 +264,7 @@ scope
     '' Open and close a hundred documents to exercise the allocate/free path.
     dim as DocumentManager mgr
     for i as long = 1 to 100
-        mgr.Open( "file:///doc" & i & ".bas", "freebasic", 1, "line" & LF & "line" )
+        mgr.Open( "file:///doc" & i & ".bas", "tiko", 1, "line" & LF & "line" )
     next
     AssertEqInt( mgr.Count( ), 100, "a hundred documents open" )
 

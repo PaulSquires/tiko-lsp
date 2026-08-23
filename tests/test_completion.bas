@@ -279,7 +279,7 @@ end scope
 TestGroup( "no duplicates" )
 
 scope
-    '' A prototype and its body are two symbols with one name, and FreeBASIC
+    '' A prototype and its body are two symbols with one name, and tiko
     '' is case-insensitive, so `Helper` and `helper` are the same candidate.
     Analyse( "declare sub Helper( )" & LF & _
              "sub Helper( )" & LF & "end sub" & LF & _

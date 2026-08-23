@@ -136,7 +136,7 @@ that the fix works in a real multi-module program.
 
 ## Next: phase 3
 
-A lexer and an error-recovering parser for fbc-modern, and
+A lexer and an error-recovering parser for tiko, and
 `textDocument/publishDiagnostics`. The document model already gives the parser
 what it needs: authoritative text, a line index, and a position layer that turns
 a byte offset back into the range an editor can draw.

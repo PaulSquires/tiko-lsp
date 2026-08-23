@@ -267,7 +267,7 @@ scope
 
     dim as WorkspaceScan none_
     ScanFolder( g_Fixture & "\notes.txt", none_ )
-    AssertEqInt( none_.Files.Count( ), 0, "and a file that is not FreeBASIC scans to nothing" )
+    AssertEqInt( none_.Files.Count( ), 0, "and a file that is not tiko source scans to nothing" )
 
     dim as WorkspaceScan gone_
     ScanFolder( g_Fixture & "\nothing-here.bas", gone_ )
@@ -369,7 +369,7 @@ scope
 end scope
 
 scope
-    '' A path with the OTHER separator, and in the wrong case. FreeBASIC
+    '' A path with the OTHER separator, and in the wrong case. tiko
     '' accepts both on Windows and the filesystem does not care about case, so
     '' neither may cost a resolution.
     dim as SymbolIndex idx

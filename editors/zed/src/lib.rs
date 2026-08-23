@@ -1,8 +1,8 @@
-//! A Zed extension that runs tiko-lsp for FreeBASIC files.
+//! A Zed extension that runs tiko-lsp for tiko files.
 //!
 //! The extension does almost nothing, and that is the point: Zed speaks LSP,
 //! tiko-lsp speaks LSP, and all that is missing between them is a language
-//! called FreeBASIC and the path to a binary. Everything a user sees --
+//! called Tiko and the path to a binary. Everything a user sees --
 //! diagnostics, completion, hover, rename, formatting, colour -- comes from the
 //! server over the wire, not from here.
 //!

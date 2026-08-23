@@ -127,7 +127,7 @@ declare function TokenIndexAt( byref tokens as TokenArray, byval offset as long 
 '' identifier is being used as a member.
 declare function IsMemberAccess( byref text_ as string, byref tokens as TokenArray, byval index_ as long ) as boolean
 
-'' The markdown a hover shows for a symbol: a FreeBASIC code block with the
+'' The markdown a hover shows for a symbol: a tiko code block with the
 '' declaration, a line naming the kind, then the documentation comment.
 declare function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
 

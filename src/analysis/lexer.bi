@@ -1,5 +1,5 @@
 '' ############################################################################
-''  analysis/lexer.bi -- FreeBASIC tokens
+''  analysis/lexer.bi -- tiko tokens
 ''
 ''  A token carries a BYTE RANGE, not a line and column. Converting to editor
 ''  coordinates happens once, at the point where a diagnostic is published, so

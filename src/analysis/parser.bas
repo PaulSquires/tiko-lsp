@@ -408,7 +408,7 @@ end function
 '' ----------------------------------------------------------------------------
 ''  Lambdas
 ''
-''  fbc-modern's anonymous procedures open a block from inside an EXPRESSION,
+''  tiko's anonymous procedures open a block from inside an EXPRESSION,
 ''  which is the one place a block does not begin a statement:
 ''
 ''      dim as function( byref as T, byref as T ) as boolean less = _
@@ -764,7 +764,7 @@ end sub
 '' DIM, CONST, VAR, STATIC, a field, an EXTERN declaration -- every form that
 '' introduces one or more names with a type.
 ''
-'' FreeBASIC writes them in two orders, and both appear constantly:
+'' tiko writes them in two orders, and both appear constantly:
 ''
 ''     dim a as long, b as string      names first
 ''     dim as long a, b                type first
@@ -1558,7 +1558,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 PushBlock( st, KW_FOR, "", head )
 
             case KW_SELECT
-                '' FreeBASIC spells it `select case expr`. Without the CASE
+                '' tiko spells it `select case expr`. Without the CASE
                 '' this is a field or a variable that happens to be named
                 '' `select`.
                 if( nextKw = KW_CASE ) then PushBlock( st, KW_SELECT, "", head )

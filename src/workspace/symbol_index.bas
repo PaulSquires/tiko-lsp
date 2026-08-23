@@ -223,7 +223,7 @@ end sub
 private function CandidateKey( byref baseDir as string, byref target as string ) as string
     if( len(baseDir) = 0 orelse len(target) = 0 ) then return ""
 
-    '' FreeBASIC accepts either separator on Windows, and so must this.
+    '' tiko accepts either separator on Windows, and so must this.
     dim as string t = target
     for i as long = 0 to len(t) - 1
         if( t[i] = asc( "/" ) ) then t[i] = asc( "\" )

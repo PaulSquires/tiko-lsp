@@ -1,15 +1,20 @@
 # tiko-lsp
 
-A Language Server Protocol server for **fbc-modern**, written in fbc-modern.
+A Language Server Protocol server for **tiko**, written in fbc-modern.
+
+tiko is a FreeBASIC-compatible language ([tiko-lang](https://github.com/PaulSquires/tiko-lang)),
+so the syntax this server reads is FreeBASIC's — which is why its parser could be
+developed against fbc's own sources — but the language it serves, and the
+language id it expects from a client, is **tiko**.
 
 It speaks LSP 3.17 over stdin/stdout and is a plain standalone executable, so any
 LSP-capable editor — Zed, VS Code, Neovim, Helix, Sublime Text — can launch it.
 A **Zed extension** lives in [editors/zed](editors/zed); everything else needs
 only a few lines of client configuration.
 
-The server is designed to end up sharing the compiler's own lexer, parser, AST,
-symbol table and semantic analyser rather than shelling out to `fbc.exe`. Nothing
-here launches a compiler process, and nothing ever will.
+The server is designed to end up sharing the tiko compiler's own lexer, parser,
+AST, symbol table and semantic analyser rather than shelling out to a compiler.
+Nothing here launches one, and nothing ever will.
 
 ```
         LSP client (Zed / VS Code / Neovim / Helix / ...)
@@ -61,7 +66,8 @@ does not have, so it is not claimed. See `LspBuildCapabilities` in
 [src/lsp/protocol.bas](src/lsp/protocol.bas). Diagnostics need no capability: they
 are pushed, and the server publishes them on open, change and save.
 
-The parser was developed against **435,000 lines of real FreeBASIC** — fbc's own
+The parser was developed against **435,000 lines of real FreeBASIC-compatible
+source** — fbc's own
 compiler, the fbc-modern standard library, AfxNova and the fbc test suite — and
 produces zero diagnostics on all of it except the files fbc itself expects to
 reject. False positives are the failure mode that matters for a language server;
@@ -85,7 +91,7 @@ tiko-lsp/
                 publish.bi/.bas       diagnostics -> publishDiagnostics
     document/   document.bi/.bas      TextDocument: text, line index, edits
                 document_manager.bi/.bas   every open buffer, keyed by URI
-    analysis/   lexer.bi/.bas         FreeBASIC tokens, 247 reserved words
+    analysis/   lexer.bi/.bas         tiko tokens, 247 reserved words
                 parser.bi/.bas        block structure and symbols, with recovery
                 symbols.bi/.bas       the symbol table, scope resolution, hover text
                 completion.bi/.bas    what could be typed here
@@ -199,7 +205,7 @@ Neovim:
 ```lua
 vim.lsp.config.tiko_lsp = {
   cmd = { 'C:/dev/tiko-lsp/bin/tiko-lsp.exe', '--stdio' },
-  filetypes = { 'freebasic' },
+  filetypes = { 'tiko' },
   root_markers = { '.git' },
 }
 vim.lsp.enable('tiko_lsp')

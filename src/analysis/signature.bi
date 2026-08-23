@@ -13,7 +13,7 @@
 ''  back into parameters is a string operation on something the parser already
 ''  normalised -- not a second parse of the source.
 ''
-''  WHAT THIS DOES NOT DO: overload resolution. FreeBASIC lets a name carry
+''  WHAT THIS DOES NOT DO: overload resolution. tiko lets a name carry
 ''  several signatures, and choosing between them needs the types of the
 ''  arguments -- which needs the type system this server does not have. The
 ''  first matching declaration is used and the count of alternatives is
