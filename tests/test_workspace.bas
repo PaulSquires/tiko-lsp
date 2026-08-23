@@ -11,6 +11,7 @@
 #include once "assert.bi"
 #include once "../src/workspace/workspace.bi"
 #include once "../src/workspace/symbol_index.bi"
+#include once "../src/workspace/index_builder.bi"
 #include once "../src/utils/uri.bi"
 
 const LF = chr(10)
@@ -254,5 +255,114 @@ scope
     FindIdentifierOffsets( widgetsText, "makewidget", offsets )
     AssertEqInt( offsets.Count( ), 1, "a longer name containing it is its own identifier" )
 end scope
+
+
+'' ############################################################################
+''  The background build
+''
+''  The scan runs on a worker thread so the message loop can keep reading. What
+''  matters here is that the result is the SAME as the synchronous one, that
+''  ownership is unambiguous, and that a cancelled build hands back nothing.
+'' ############################################################################
+TestGroup( "the background index build" )
+
+scope
+    '' The baseline: what a synchronous scan of the fixture produces.
+    dim as WorkspaceScan scan
+    ScanFolder( g_Fixture, scan )
+
+    dim as SymbolIndex direct_
+    for i as long = 0 to scan.Files.Count( ) - 1
+        direct_.IndexPath( scan.Files[i] )
+    next
+
+    AssertTrue( direct_.SymbolCount( ) > 0, "the fixture has symbols to find" )
+
+    '' The same work, on the worker.
+    dim roots as PathArray
+    roots.Push( g_Fixture )
+
+    StartIndexBuild( roots )
+    AssertTrue( IndexBuildPending( ), "a build is pending as soon as it is started" )
+
+    dim as string summary
+    dim as SymbolIndex ptr fresh = TakeIndexBuild( summary )
+
+    AssertTrue( fresh <> 0, "taking it hands back an index" )
+    AssertFalse( IndexBuildPending( ), "and nothing is pending afterwards" )
+
+    if( fresh <> 0 ) then
+        AssertEqInt( fresh->FileCount( ),   direct_.FileCount( ),   "the same files as a synchronous scan" )
+        AssertEqInt( fresh->SymbolCount( ), direct_.SymbolCount( ), "and the same symbols" )
+
+        '' THE REGRESSION THIS EXISTS FOR. The lexer's keyword table used to be
+        '' built on first use; two threads lexing at once raced through the
+        '' guard and one of them saw an empty table, so every file indexed to
+        '' zero symbols -- with no crash and nothing in the log.
+        AssertTrue( fresh->SymbolCount( ) > 0, "with symbols in them, not zero" )
+        delete fresh
+    end if
+
+    AssertContains( summary, "indexed", "and a summary line to log" )
+end scope
+
+scope
+    '' Taking when there is nothing to take is the normal case: every request
+    '' after the first calls this.
+    dim as string summary
+    AssertEqInt( cast( integer, TakeIndexBuild( summary ) ), 0, _
+                 "taking with no build pending hands back nothing" )
+    AssertEqStr( summary, "", "and no summary" )
+end scope
+
+scope
+    '' A cancelled build produces nothing at all -- a half-scanned index would
+    '' answer "not found" for files it simply had not reached yet.
+    dim roots as PathArray
+    roots.Push( g_Root )        '' the whole project: big enough to still be running
+
+    StartIndexBuild( roots )
+    CancelIndexBuild( )
+
+    AssertFalse( IndexBuildPending( ), "a cancelled build leaves nothing pending" )
+
+    dim as string summary
+    AssertEqInt( cast( integer, TakeIndexBuild( summary ) ), 0, _
+                 "and hands back no index" )
+end scope
+
+scope
+    '' TWO THREADS ANALYSING AT ONCE, which is what the server does from the
+    '' moment a document opens during a scan. This can only ever be evidence
+    '' rather than proof -- a race that has been fixed cannot be observed -- but
+    '' it is the shape of the failure that was actually shipped and caught.
+    dim roots as PathArray
+    roots.Push( g_Root )
+    StartIndexBuild( roots )
+
+    dim as long analysed = 0
+    for i as long = 1 to 200
+        dim tokens as TokenArray
+        dim diags  as DiagnosticArray
+        dim syms   as SymbolTable
+        dim as string src = "type Widget" & LF & "    Count as long" & LF & "end type" & LF & _
+                            "sub Go_( )" & LF & "end sub" & LF
+        AnalyzeFull( src, tokens, diags, syms )
+        if( syms.Count( ) >= 3 ) then analysed += 1
+    next
+
+    AssertEqInt( analysed, 200, "the main thread analyses correctly while the worker runs" )
+
+    dim as string summary
+    dim as SymbolIndex ptr fresh = TakeIndexBuild( summary )
+    if( fresh <> 0 ) then
+        AssertTrue( fresh->SymbolCount( ) > 0, "and so does the worker" )
+        delete fresh
+    else
+        TestFail( "and so does the worker", "the build produced nothing" )
+    end if
+end scope
+
+ShutdownIndexBuilder( )
 
 end TestSummary( "workspace" )

@@ -61,13 +61,14 @@ set SOURCES=^
  "%ROOT%\src\analysis\format.bas"^
  "%ROOT%\src\workspace\workspace.bas"^
  "%ROOT%\src\workspace\symbol_index.bas"^
+ "%ROOT%\src\workspace\index_builder.bas"^
  "%ROOT%\src\analysis\diagnostics.bas"^
  "%ROOT%\src\utils\logging.bas"^
  "%ROOT%\src\utils\position.bas"^
  "%ROOT%\src\utils\uri.bas"
 
 echo Building tiko-lsp.exe
-"%FBC%" -w all -i "%YYJSON%\inc" -p "%YYJSON%\lib\win64" %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
+"%FBC%" -w all -mt -i "%YYJSON%\inc" -p "%YYJSON%\lib\win64" %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
 if errorlevel 1 (
     echo.
     echo BUILD FAILED

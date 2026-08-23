@@ -303,7 +303,9 @@ how much it would change the experience:
 
 1. **Move analysis off the message loop.** It is the one structural problem
    left: a large workspace's index build, and every re-analysis, happens where
-   the client is waiting.
+   the client is waiting. *Done, for the workspace scan -- see
+   [phase8.md](phase8.md), which also records the bug that found: the server
+   could not talk to a live editor at all.*
 2. **`workspace/didChangeWatchedFiles`**, so a branch switch does not leave the
    index describing a file that no longer exists.
 3. **An include graph**, which would turn "somewhere in the workspace" into

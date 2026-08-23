@@ -10,6 +10,14 @@
 
 #include once "assert.bi"
 #include once "../src/rpc/transport.bi"
+#include once "crt.bi"
+
+#ifdef __FB_WIN32__
+    #include once "crt/io.bi"
+    #include once "crt/fcntl.bi"
+#else
+    #include once "crt/unistd.bi"
+#endif
 
 const CR = chr(13)
 const LF = chr(10)
@@ -208,6 +216,104 @@ scope
 
     AssertEqInt( ok_, 5000, "5000 messages round-trip in order" )
     AssertTrue( maxPending = 0, "the framer holds no residue between messages" )
+end scope
+
+
+'' ############################################################################
+''  Reading from a LIVE pipe
+''
+''  The bug this exists for shipped, passed every test, and would have made the
+''  server unusable with a real editor.
+''
+''  The reader used fread( buf, 1, 64K, stdin ), which does not return until it
+''  has 64K or the stream ENDS. Every test fed the server a FILE, where the end
+''  arrives immediately, so every test passed. An editor is not a file: it
+''  sends `initialize`, keeps the pipe open, and waits for the answer -- and
+''  the server sat inside fread waiting for 65,000 more bytes that were never
+''  coming.
+''
+''  So this test is the only one in the suite that reads from a pipe with the
+''  writing end STILL OPEN. It runs the read on a worker thread and gives it
+''  two seconds, because the failure mode is a hang rather than a wrong answer,
+''  and a suite that hangs tells you less than one that fails.
+'' ############################################################################
+TestGroup( "reading from a live pipe" )
+
+dim shared as boolean         g_PipeDone
+dim shared as TransportStatus g_PipeStatus
+dim shared as string          g_PipePayload
+
+private sub PipeReader( byval param as any ptr )
+    dim as StdioTransport tp
+    dim as string payload
+    g_PipeStatus  = tp.ReadMessage( payload )
+    g_PipePayload = payload
+    g_PipeDone    = true
+end sub
+
+scope
+    dim as long fds(0 to 1)
+
+    #ifdef __FB_WIN32__
+        '' _O_BINARY, and not for tidiness: a pipe left in TEXT mode
+        '' expands every line feed the writer sends into a carriage
+        '' return plus a line feed, which turns a correct
+        '' Content-Length header into a corrupt one and leaves the
+        '' reader waiting for bytes that will never arrive -- exactly
+        '' the hang this test detects, arrived at from the other end.
+        dim as long rc = _pipe( @fds(0), 64 * 1024, _O_BINARY )
+    #else
+        dim as long rc = pipe( @fds(0) )
+    #endif
+
+    if( rc <> 0 ) then
+        TestFail( "a pipe can be created", "the C library refused" )
+    else
+        '' The read end becomes this process's stdin, which is what the
+        '' transport reads. The write end stays open in this thread -- that is
+        '' the whole point: a live client does not close the pipe between
+        '' messages.
+        #ifdef __FB_WIN32__
+            _dup2( fds(0), 0 )
+        #else
+            dup2( fds(0), 0 )
+        #endif
+
+        dim as string msg = Framed( "{""jsonrpc"":""2.0"",""id"":1,""method"":""initialize""}" )
+
+        #ifdef __FB_WIN32__
+            _write( fds(1), strptr(msg), len(msg) )
+        #else
+            write( fds(1), strptr(msg), len(msg) )
+        #endif
+
+        g_PipeDone = false
+        dim as any ptr th = threadcreate( @PipeReader, 0 )
+
+        if( th = 0 ) then
+            TestFail( "the reader thread starts", "threadcreate failed" )
+        else
+            '' Two seconds is a hundred times what the read needs and still
+            '' short enough that a failure is a test result rather than a
+            '' hung build.
+            dim as double deadline = timer( ) + 2.0
+            while( g_PipeDone = false andalso timer( ) < deadline )
+                sleep 5, 1
+            wend
+
+            if( g_PipeDone = false ) then
+                TestFail( "one message on an OPEN pipe is read at once", _
+                          "the reader was still blocked after 2 seconds -- it is " & _
+                          "waiting for bytes an editor will never send" )
+            else
+                threadwait( th )
+                AssertTrue( g_PipeStatus = TRANSPORT_OK, _
+                            "one message on an OPEN pipe is read at once" )
+                AssertContains( g_PipePayload, """method"":""initialize""", _
+                                "and comes back whole" )
+            end if
+        end if
+    end if
 end scope
 
 end TestSummary( "framing" )

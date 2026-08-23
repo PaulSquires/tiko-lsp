@@ -4,18 +4,16 @@
 
 #include once "workspace_symbols.bi"
 #include once "../workspace/workspace.bi"
+#include once "../workspace/index_builder.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
 
 '' ----------------------------------------------------------------------------
-''  Building the index
+''  Building the index -- starting it, and taking delivery
 '' ----------------------------------------------------------------------------
-sub BuildWorkspaceIndex( byref srv as Server )
-    dim as double started = timer( )
+sub StartWorkspaceIndex( byref srv as Server )
+    dim roots as PathArray
 
-    srv.Index.Clear( )
-
-    dim as WorkspaceScan scan
     for i as long = 0 to srv.WorkspaceFolders.Count( ) - 1
         dim as string root = UriToPath( srv.WorkspaceFolders[i].Uri )
         if( len(root) = 0 ) then
@@ -25,45 +23,42 @@ sub BuildWorkspaceIndex( byref srv as Server )
             LogWarn( "workspace folder is not a file: " & srv.WorkspaceFolders[i].Uri )
             continue for
         end if
-
-        LogInfo( "scanning " & root )
-        ScanFolder( root, scan )
+        roots.Push( root )
     next
 
-    '' Every open buffer is indexed from its BUFFER, so a symbol typed but not
-    '' saved is still found. Done first, so the disk pass skips those files.
+    if( roots.IsEmpty( ) ) then
+        LogInfo( "no workspace folder to index" )
+        exit sub
+    end if
+
+    '' Returns immediately. The next message is read while this runs.
+    StartIndexBuild( roots )
+    LogInfo( "workspace scan started in the background" )
+end sub
+
+sub EnsureWorkspaceIndex( byref srv as Server )
+    if( IndexBuildPending( ) = false ) then exit sub
+
+    dim as double waited = timer( )
+    dim as string summary
+    dim as SymbolIndex ptr fresh = TakeIndexBuild( summary )
+    if( fresh = 0 ) then exit sub
+
+    srv.AdoptIndex( fresh )
+
+    '' THE OPEN BUFFERS GO ON TOP, always. The worker indexed what is on disk,
+    '' because it must not touch documents the message loop owns -- so a file
+    '' the editor has open, and every edit made while the scan was running, is
+    '' applied here. The buffer wins, which is the rule everywhere else in this
+    '' server.
     dim uris as FB.Array( of string ) = srv.Documents.OpenUris( )
     for i as long = 0 to uris.Count( ) - 1
         dim as TextDocumentPtr doc = srv.Documents.Find( uris[i] )
-        if( doc <> 0 ) then srv.Index.IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
+        if( doc <> 0 ) then srv.Index->IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )
     next
 
-    dim as long indexed = 0
-    dim as long failed = 0
-
-    for i as long = 0 to scan.Files.Count( ) - 1
-        dim as string path_ = scan.Files[i]
-
-        '' Already indexed from a buffer: the editor's copy wins.
-        if( srv.Index.IndexOfUri( PathToUri( path_ ) ) >= 0 ) then continue for
-
-        if( srv.Index.IndexPath( path_ ) ) then
-            indexed += 1
-        else
-            failed += 1
-        end if
-    next
-
-    dim as double elapsed = timer( ) - started
-    dim as string summary = "indexed " & srv.Index.FileCount( ) & " file(s), " & _
-                            srv.Index.SymbolCount( ) & " symbol(s) in " & _
-                            int( elapsed * 1000 ) & " ms"
-
-    if( failed > 0 ) then summary &= " (" & failed & " unreadable)"
-    if( scan.Skipped > 0 ) then summary &= " (" & scan.Skipped & " unreadable folder(s))"
-    if( scan.Truncated ) then
-        summary &= " -- STOPPED at the " & WS_MAX_FILES & " file limit"
-    end if
+    dim as double waitMs = ( timer( ) - waited ) * 1000
+    if( waitMs >= 1 ) then summary &= " (waited " & int( waitMs ) & " ms for it)"
 
     LogInfo( summary )
     srv.SendLogMessage( LSPMSG_INFO, summary )
@@ -79,14 +74,18 @@ private function OnWorkspaceSymbol( byref srv as Server, _
 
     dim as string queryText = req.Params( ).Member( "query" ).AsString( "" )
 
+    '' There is no honest answer to "every symbol in the workspace" before the
+    '' workspace has been read.
+    EnsureWorkspaceIndex( srv )
+
     dim as IndexHitArray hits
-    srv.Index.Query( queryText, 200, hits )
+    srv.Index->Query( queryText, 200, hits )
 
     dim as JsonNode list_ = rb.NewArray( )
 
     for i as long = 0 to hits.Count( ) - 1
-        dim as SymbolInfo  sym = srv.Index.SymbolAt( hits[i].FileIndex, hits[i].SymIndex )
-        dim as IndexedRange r  = srv.Index.RangeAt( hits[i].FileIndex, hits[i].SymIndex )
+        dim as SymbolInfo  sym = srv.Index->SymbolAt( hits[i].FileIndex, hits[i].SymIndex )
+        dim as IndexedRange r  = srv.Index->RangeAt( hits[i].FileIndex, hits[i].SymIndex )
 
         '' SymbolInformation, not the 3.17 WorkspaceSymbol: the older shape is
         '' understood by every client, and this server has nothing to gain from
@@ -104,7 +103,7 @@ private function OnWorkspaceSymbol( byref srv as Server, _
         rb.SetNode( range_, "end", end_ )
 
         dim as JsonNode locNode = rb.NewObject( )
-        rb.SetStr ( locNode, "uri", srv.Index.FileUri( hits[i].FileIndex ) )
+        rb.SetStr ( locNode, "uri", srv.Index->FileUri( hits[i].FileIndex ) )
         rb.SetNode( locNode, "range", range_ )
 
         dim as JsonNode node = rb.NewObject( )
@@ -114,7 +113,7 @@ private function OnWorkspaceSymbol( byref srv as Server, _
 
         '' containerName is what a picker shows on the right: the file, since
         '' that is what tells two `Init`s apart.
-        rb.SetStr( node, "containerName", UriFileName( srv.Index.FileUri( hits[i].FileIndex ) ) )
+        rb.SetStr( node, "containerName", UriFileName( srv.Index->FileUri( hits[i].FileIndex ) ) )
 
         rb.PushNode( list_, node )
     next
@@ -150,8 +149,11 @@ private function OnDidChangeWorkspaceFolders( byref srv as Server, _
     '' Rebuilt rather than patched. A folder change is rare and a full scan is
     '' seconds at worst; keeping an incremental version correct across
     '' overlapping folders is not worth the bugs.
+    ''
+    '' A scan already running is cancelled by StartIndexBuild: its answer would
+    '' describe a set of folders that no longer exists.
     LogInfo( "workspace folders changed -- reindexing" )
-    BuildWorkspaceIndex( srv )
+    StartWorkspaceIndex( srv )
     return JsonNode( )
 end function
 

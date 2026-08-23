@@ -126,6 +126,15 @@ workspace's source in memory to answer later would cost tens of megabytes.
 References are the exception: they re-lex on demand, which is
 [phase6.md](phase6.md#references-are-re-lexed-not-stored)'s reasoning.
 
+ONE THREAD READS AND ANSWERS; ONE THREAD SCANS. The message loop handles one
+message to completion before reading the next -- the protocol requires
+notifications to be applied in order, and every answer depends on the buffer as
+the previous message left it. The single exception is the WORKSPACE SCAN, which
+runs on a worker thread with an index of its own and is adopted by pointer when
+a request needs it; nothing else is shared, and the requests that do not need
+cross-file knowledge never wait for it. See
+[phase8.md](phase8.md#what-changed).
+
 Phase 7 added three modules beside those and NO new source of truth. Signature
 help splits the signature text the parser already recorded; semantic tokens
 classify the tokens the document already holds; and the formatter asks the

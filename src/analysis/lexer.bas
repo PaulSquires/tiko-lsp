@@ -112,6 +112,23 @@ private sub EnsureKeywords( )
     Register( "redim",       KW_REDIM )
 end sub
 
+'' BUILT BEFORE main( ) RUNS, and this is not a style preference.
+''
+'' The table used to be filled on first use. That was correct for exactly as
+'' long as this server was single-threaded: the moment the index worker started
+'' lexing at the same time as the message loop, both raced through the guard,
+'' one set the "ready" flag and began filling the map, and the other read an
+'' EMPTY map -- so no word in the language was a keyword, no statement opened a
+'' block, and a whole workspace indexed to two files and ZERO symbols. No
+'' crash, no diagnostic, nothing in the log: just an index that knew nothing.
+''
+'' A module constructor runs while the program is still single-threaded, which
+'' removes the race rather than locking against it -- a lock here would sit on
+'' the hottest path in the lexer, one acquisition per token.
+private sub InitKeywords constructor
+    EnsureKeywords( )
+end sub
+
 function KeywordOf( byref word_ as string ) as FbKeyword
     EnsureKeywords( )
     dim as long kw = 0

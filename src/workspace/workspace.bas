@@ -91,11 +91,38 @@ sub ScanFolder( byref rootPath as string, byref scan as WorkspaceScan )
     next
 end sub
 
+'' FREEFILE IS A RACE, and this is the one function in the server that two
+'' threads call: the index worker reads every file in the workspace while the
+'' message loop may be reading files for a rename. FREEFILE returns a number
+'' that is free RIGHT NOW; between the return and the OPEN that claims it,
+'' the other thread can be handed the same one, and then one of them fails to
+'' open a file that is perfectly readable. The lock covers exactly that gap --
+'' the READ itself is not serialised.
+dim shared as any ptr g_fileMutex
+
+'' Created before main( ), for the same reason the keyword table is: two
+'' threads lazily creating "the" mutex make two mutexes, and two mutexes
+'' exclude nothing.
+private sub InitFileMutex constructor
+    g_fileMutex = mutexcreate( )
+end sub
+
+private sub FreeFileMutex destructor
+    if( g_fileMutex <> 0 ) then
+        mutexdestroy( g_fileMutex )
+        g_fileMutex = 0
+    end if
+end sub
+
 function ReadSourceFile( byref path_ as string, byref outText as string ) as boolean
     outText = ""
 
+    mutexlock( g_fileMutex )
     dim as long f = freefile( )
-    if( open( path_ for binary access read as #f ) <> 0 ) then return false
+    dim as long openErr = open( path_ for binary access read as #f )
+    mutexunlock( g_fileMutex )
+
+    if( openErr <> 0 ) then return false
 
     dim as longint n = lof( f )
     if( n > WS_MAX_FILE_BYTES ) then

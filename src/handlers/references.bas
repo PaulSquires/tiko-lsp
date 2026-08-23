@@ -13,6 +13,7 @@
 '' ############################################################################
 
 #include once "references.bi"
+#include once "workspace_symbols.bi"
 #include once "../workspace/workspace.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
@@ -105,6 +106,11 @@ private function OnReferences( byref srv as Server, _
     if( doc->Tokens( )[tokIdx].Kind <> TK_IDENT ) then return rb.NewArray( )
 
     dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[tokIdx] ) )
+
+    '' "Find all references" means all of them, so this is one of the four
+    '' requests that waits for the workspace scan.
+    EnsureWorkspaceIndex( srv )
+
     dim as double started = timer( )
 
     dim as JsonNode list_ = rb.NewArray( )
@@ -112,10 +118,10 @@ private function OnReferences( byref srv as Server, _
     dim as long searched = 0
 
     '' -- every indexed file ---------------------------------------------------
-    for f as long = 0 to srv.Index.FileCount( ) - 1
+    for f as long = 0 to srv.Index->FileCount( ) - 1
         if( total >= MAX_REFERENCES ) then exit for
 
-        dim as string fileUri = srv.Index.FileUri( f )
+        dim as string fileUri = srv.Index->FileUri( f )
 
         '' The buffer when the editor has this file open -- it is the truth,
         '' and may be a save ahead of the disk.
@@ -124,16 +130,16 @@ private function OnReferences( byref srv as Server, _
 
         if( openDoc <> 0 ) then
             body = openDoc->Text( )
-        elseif( ReadSourceFile( srv.Index.FilePath( f ), body ) = false ) then
+        elseif( ReadSourceFile( srv.Index->FilePath( f ), body ) = false ) then
             continue for
         end if
 
         '' Which occurrences are declarations is already known: the index has
         '' this file's symbol table.
         dim declarations as OffsetArray_
-        for i as long = 0 to srv.Index.FileSymbolCount( f ) - 1
-            if( srv.Index.SymbolAt( f, i ).LowerName = lowerName ) then
-                declarations.Push( srv.Index.SymbolAt( f, i ).NameStart )
+        for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            if( srv.Index->SymbolAt( f, i ).LowerName = lowerName ) then
+                declarations.Push( srv.Index->SymbolAt( f, i ).NameStart )
             end if
         next
 
@@ -146,7 +152,7 @@ private function OnReferences( byref srv as Server, _
     '' No workspace folder, or a file outside every folder: the document the
     '' request came from must still be searched, or "find references" answers
     '' nothing for the file the user is looking at.
-    if( srv.Index.IndexOfUri( uriText ) < 0 ) then
+    if( srv.Index->IndexOfUri( uriText ) < 0 ) then
         dim as string body = doc->Text( )
 
         dim declarations as OffsetArray_

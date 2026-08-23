@@ -30,7 +30,7 @@ here launches a compiler process, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-7 complete
+## Status: phases 1-8 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -41,6 +41,7 @@ here launches a compiler process, and nothing ever will.
 | 5 | completion | **done** |
 | 6 | workspace index, workspace symbols, references | **done** |
 | 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | **done** |
+| 8 | the workspace scan off the message loop | **done** |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
@@ -90,6 +91,7 @@ tiko-lsp/
                 format.bi/.bas        re-indentation, and what it refuses
     workspace/  workspace.bi/.bas     finding the source files
                 symbol_index.bi/.bas  every symbol in the workspace
+                index_builder.bi/.bas the scan, on a worker thread
     handlers/   lifecycle.bi/.bas     initialize / initialized / shutdown / exit
                 text_document.bi/.bas didOpen / didChange / didSave / didClose
                 document_symbols.bi/.bas   the outline
@@ -113,7 +115,7 @@ tiko-lsp/
                 fixtures/workspace/   a two-file workspace the cross-file
                                       assertions are made against
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md .. phase7.md
+  docs/         architecture.md, phase1.md .. phase8.md
 ```
 
 Every directory in the sketch now has something real in it.
@@ -212,9 +214,9 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 934 assertions:
+(or `sh build/_run_tests.sh`). Twelve suites, 953 assertions:
 
-- **framing** — 41 assertions over `MessageFramer`: torn messages fed one byte at a
+- **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
   counts, a payload containing a blank line, every malformed-header case, and 5000
   messages through one framer to prove the buffer is compacted.
@@ -242,7 +244,7 @@ build\_run_tests.bat
   string and inside a comment, where the answer is nothing), member completion
   through a declared type, a pointer, `this.`, an enum and a namespace, the
   scope list with its group ordering, and case-insensitive de-duplication.
-- **workspace** — 64 assertions over discovery rules, indexing and
+- **workspace** — 78 assertions over discovery rules, indexing and
   re-indexing, the one-file-one-entry rule (a path through `build/..` is the
   same file), buffer-beats-disk, query scoring, and identifier scanning —
   including the strings and comments a reference search must NOT match.
@@ -257,7 +259,7 @@ build\_run_tests.bat
   including everything it must leave alone: an already-tidy file (zero edits),
   broken structure (zero edits, and a reason), comment art inside a block
   comment, a `#macro` body, a `#if` body, and a wrapped line's alignment.
-- **piped session** — 155 assertions against a **real `tiko-lsp` process** driven
+- **piped session** — 158 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
   stream — including that two edits in one `didChange` applied in order against

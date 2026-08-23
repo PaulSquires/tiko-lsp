@@ -34,6 +34,7 @@
 #include once "handlers/inlay_hints.bi"
 #include once "handlers/formatting.bi"
 #include once "handlers/code_action.bi"
+#include once "workspace/index_builder.bi"
 
 using FB
 
@@ -150,7 +151,14 @@ private function RunServer( ) as long
         select case st
             case TRANSPORT_OK
                 '' One message is handled to completion before the next is
-                '' read. That is what makes phase 1 free of concurrency.
+                '' read: the protocol requires notifications to be applied in
+                '' order, and every answer depends on the buffer as the
+                '' previous message left it.
+                ''
+                '' The ONE thing that does not happen here is the workspace
+                '' scan -- it runs on its own thread, and only the handful of
+                '' requests that need cross-file knowledge ever wait for it.
+                '' See workspace/index_builder.bi.
                 srv.HandleMessage( payload )
 
             case TRANSPORT_EOF
@@ -158,6 +166,7 @@ private function RunServer( ) as long
                 '' how a crashed or killed client looks, and the specification
                 '' treats it as an error exit.
                 LogWarn( "stdin closed without an exit notification" )
+                ShutdownIndexBuilder( )
                 if( srv.ShutdownReceived( ) ) then return 0
                 return 1
 
@@ -166,10 +175,16 @@ private function RunServer( ) as long
                 '' to a message boundary; there is nothing to resynchronise
                 '' to, so the only honest response is to stop.
                 LogError( "transport error: " & tp.ErrorText( ) )
+                ShutdownIndexBuilder( )
                 return 1
         end select
     loop
 
+    '' EVERY path out of this function stops the worker first. A thread still
+    '' walking a directory when the process tears down is how an orderly
+    '' shutdown turns into a crash report -- and it would be one the user sees
+    '' AFTER asking the editor to quit, which is the worst time to see one.
+    ShutdownIndexBuilder( )
     return srv.ExitCode( )
 end function
 

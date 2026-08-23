@@ -27,7 +27,7 @@ fi
 mkdir -p "$ROOT/bin"
 
 echo "Building tiko-lsp"
-"$FBC" -w all \
+"$FBC" -w all -mt \
     -i "$YYJSON/inc" -p "$YYJSON/lib/linux64" \
     "$ROOT/src/main.bas" \
     "$ROOT/src/json/json.bas" \
@@ -61,6 +61,7 @@ echo "Building tiko-lsp"
     "$ROOT/src/analysis/format.bas" \
     "$ROOT/src/workspace/workspace.bas" \
     "$ROOT/src/workspace/symbol_index.bas" \
+    "$ROOT/src/workspace/index_builder.bas" \
     "$ROOT/src/analysis/diagnostics.bas" \
     "$ROOT/src/utils/logging.bas" \
     "$ROOT/src/utils/position.bas" \

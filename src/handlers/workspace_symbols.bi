@@ -8,8 +8,18 @@
 
 declare sub RegisterWorkspaceHandlers( )
 
-'' Scans every workspace folder and indexes what it finds. Called once, from
-'' the `initialized` notification, and again when the client adds or removes a
-'' folder. Reports what it did through window/logMessage as well as the log,
-'' because a user watching an editor start deserves to know.
-declare sub BuildWorkspaceIndex( byref srv as Server )
+'' Starts the workspace scan ON A WORKER THREAD and returns at once. Called
+'' from the `initialized` notification, and again when the client adds or
+'' removes a folder.
+declare sub StartWorkspaceIndex( byref srv as Server )
+
+'' WAITS for a scan that is still running and adopts its result.
+''
+'' Every request that needs cross-file knowledge calls this first, and nothing
+'' else does -- that split is the whole design: typing, diagnostics, hover,
+'' completion and the outline are answered from the open buffer and never wait
+'' for a scan they do not need. See index_builder.bi.
+''
+'' Cheap and idempotent after the first call: with no build pending it does
+'' nothing at all.
+declare sub EnsureWorkspaceIndex( byref srv as Server )

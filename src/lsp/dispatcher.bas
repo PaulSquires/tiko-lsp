@@ -53,7 +53,27 @@ constructor Server( )
     this.PositionEncoding  = LSP_ENCODING_UTF16
     this.TraceValue        = LSP_TRACE_OFF
     this.ClientProcessId   = 0
+
+    '' The server always has an index. An empty one answers every cross-file
+    '' question with "nothing", which is the truth before a scan has run and
+    '' saves every caller a null check.
+    this.Index             = new SymbolIndex
 end constructor
+
+destructor Server( )
+    if( this.Index <> 0 ) then
+        delete this.Index
+        this.Index = 0
+    end if
+end destructor
+
+sub Server.AdoptIndex( byval fresh as SymbolIndex ptr )
+    if( fresh = 0 ) then exit sub
+    if( fresh = this.Index ) then exit sub
+
+    if( this.Index <> 0 ) then delete this.Index
+    this.Index = fresh
+end sub
 
 sub Server.Attach( byval tp as StdioTransport ptr )
     this.m_tp = tp

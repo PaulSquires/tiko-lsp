@@ -12,6 +12,7 @@
 '' ############################################################################
 
 #include once "definition.bi"
+#include once "workspace_symbols.bi"
 #include once "hover.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"
@@ -42,12 +43,18 @@ private function OnDefinition( byref srv as Server, _
 
         dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[tokIdx] ) )
 
+        '' ONLY HERE. A definition the open file can answer -- which is most of
+        '' them, and all of them while a user is writing a procedure -- was
+        '' answered above without waiting for anything. This is the fallback,
+        '' and it is the only path in this handler that needs the workspace.
+        EnsureWorkspaceIndex( srv )
+
         dim as IndexHit hit
-        if( srv.Index.FindDefinition( lowerName, hit ) = false ) then return rb.NewNull( )
+        if( srv.Index->FindDefinition( lowerName, hit ) = false ) then return rb.NewNull( )
 
         '' The index stores its ranges already converted, so nothing has to be
         '' read from disk to answer this.
-        dim as IndexedRange r = srv.Index.RangeAt( hit.FileIndex, hit.SymIndex )
+        dim as IndexedRange r = srv.Index->RangeAt( hit.FileIndex, hit.SymIndex )
 
         dim as JsonNode start_ = rb.NewObject( )
         rb.SetInt( start_, "line", r.StartLine )
@@ -62,11 +69,11 @@ private function OnDefinition( byref srv as Server, _
         rb.SetNode( range_, "end", end_ )
 
         dim as JsonNode remote = rb.NewObject( )
-        rb.SetStr ( remote, "uri", srv.Index.FileUri( hit.FileIndex ) )
+        rb.SetStr ( remote, "uri", srv.Index->FileUri( hit.FileIndex ) )
         rb.SetNode( remote, "range", range_ )
 
         LogDebug( "definition (workspace): " & lowerName & " in " & _
-                  UriFileName( srv.Index.FileUri( hit.FileIndex ) ) )
+                  UriFileName( srv.Index->FileUri( hit.FileIndex ) ) )
         return remote
     end if
 

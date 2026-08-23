@@ -78,12 +78,23 @@ type Server
 
         '' -- the workspace ---------------------------------------------------
         ''
-        '' Every source file under the workspace folders, indexed by name. Built
-        '' on `initialized`, updated from the buffer as documents change, and
-        '' the reason a definition can be in another file at all.
-        Index            as SymbolIndex
+        '' Every source file under the workspace folders, indexed by name.
+        '' Built on a WORKER THREAD once the client says `initialized`, updated
+        '' from the buffer as documents change, and the reason a definition can
+        '' be in another file at all.
+        ''
+        '' A POINTER, because that is what makes the handover free: the worker
+        '' builds an index of its own and the server adopts it whole. Copying
+        '' it would duplicate a quarter of a million symbols on the message
+        '' loop, which is the stall this design exists to remove.
+        Index            as SymbolIndex ptr
+
+        '' Deletes the current index and takes ownership of `fresh`. Passing 0
+        '' is not allowed: the server always has an index, empty or not.
+        declare sub AdoptIndex( byval fresh as SymbolIndex ptr )
 
         declare constructor( )
+        declare destructor( )
 
         declare sub Attach( byval tp as StdioTransport ptr )
 

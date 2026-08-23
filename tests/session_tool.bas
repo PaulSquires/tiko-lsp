@@ -396,6 +396,10 @@ private function CheckSession( byref path as string ) as long
     ''      shutdown, post-shutdown
     ''    1 parse error
     ''    2 window/logMessage -- "ready", and what the workspace scan found
+    ''                            WHEN IT IS TAKEN DELIVERY OF, which is not
+    ''                            when it was started: the scan runs on its own
+    ''                            thread and the first request that needs it is
+    ''                            what waits for it
     ''    6 $/logTrace          -- didOpen x3, didChange, didSave, didClose
     ''    6 publishDiagnostics, one after each of those
     '' and NOTHING for the two $/ notifications the server must swallow, nor
@@ -461,54 +465,60 @@ private function CheckSession( byref path as string ) as long
         AssertFalse( caps.Has( "documentHighlightProvider" ), "documentHighlight is NOT claimed" )
     end scope
 
-    '' -- 2..3. initialized, and the workspace scan ------------------------------
-    TestGroup( "the workspace index is built on `initialized`" )
+    '' -- 2. initialized ---------------------------------------------------------
+    ''
+    '' ONE message, not two. The workspace scan is started here and finishes on
+    '' its own thread, so what it found is not reported until something asks
+    '' for it -- see the cross-file group below, where it arrives.
+    TestGroup( "the workspace scan starts on `initialized`" )
     scope
-        dim as JsonDoc ready_, indexed_
-        AssertTrue( ready_.Parse  ( messages[1] ), "message 1 is JSON" )
-        AssertTrue( indexed_.Parse( messages[2] ), "message 2 is JSON" )
+        dim as JsonDoc ready_
+        AssertTrue( ready_.Parse( messages[1] ), "message 1 is JSON" )
 
         AssertEqStr( ready_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
                      "the server says it is ready" )
         AssertContains( ready_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         LSP_SERVER_NAME, "naming itself" )
 
-        AssertEqStr( indexed_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
-                     "and then what it indexed" )
-
-        dim as string what = indexed_.Root( ).Member( "params" ).Member( "message" ).AsString( )
-        AssertContains( what, "indexed 2 file(s)", "both fixture files were found" )
-        AssertContains( what, "symbol(s)", "and their symbols counted" )
+        '' The next thing the client hears is the answer to its next request,
+        '' NOT a scan report. This is the whole change: nothing waited.
+        dim as JsonDoc next_
+        AssertTrue( next_.Parse( messages[2] ), "message 2 is JSON" )
+        AssertFalse( next_.Root( ).Member( "method" ).AsString( ) = LSP_WINDOW_LOG_MESSAGE, _
+                     "and then says nothing more until it is asked something" )
     end scope
 
-    '' -- 4. MethodNotFound ------------------------------------------------------
+    '' -- 3. MethodNotFound ------------------------------------------------------
     TestGroup( "unimplemented method" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
+        AssertTrue( doc.Parse( messages[2] ), "message 2 is JSON" )
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 2, "answers id 2" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
                      "textDocument/typeDefinition is MethodNotFound" )
     end scope
 
-    '' -- 5. a second initialize -------------------------------------------------
+    '' -- 4. a second initialize -------------------------------------------------
     TestGroup( "second initialize" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[4] ), "message 4 is JSON" )
+        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsString( ), "a string id is echoed AS A STRING" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
                      "a second initialize is InvalidRequest" )
     end scope
 
-    '' -- 6..9. document synchronisation and diagnostics -------------------------
+    '' -- 5..8. document synchronisation and diagnostics -------------------------
+    ''
+    '' All four of these are answered WHILE THE SCAN IS RUNNING, which is the
+    '' point of phase 8: typing and diagnostics never wait for the workspace.
     TestGroup( "document synchronisation and diagnostics" )
     scope
         dim as JsonDoc openTrace, openDiag, changeTrace, changeDiag
-        AssertTrue( openTrace.Parse  ( messages[5] ), "message 5 is JSON" )
-        AssertTrue( openDiag.Parse   ( messages[6] ), "message 6 is JSON" )
-        AssertTrue( changeTrace.Parse( messages[7] ), "message 7 is JSON" )
-        AssertTrue( changeDiag.Parse ( messages[8] ), "message 8 is JSON" )
+        AssertTrue( openTrace.Parse  ( messages[4] ), "message 4 is JSON" )
+        AssertTrue( openDiag.Parse   ( messages[5] ), "message 5 is JSON" )
+        AssertTrue( changeTrace.Parse( messages[6] ), "message 6 is JSON" )
+        AssertTrue( changeDiag.Parse ( messages[7] ), "message 7 is JSON" )
 
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "v1, 3 line(s), 50 byte(s)", "the opened buffer is measured correctly" )
@@ -531,14 +541,14 @@ private function CheckSession( byref path as string ) as long
                      "and fixing the error publishes an EMPTY list" )
     end scope
 
-    '' -- 10..13. the single-file features ---------------------------------------
+    '' -- 9..12. the single-file features -----------------------------------------
     TestGroup( "outline, hover, definition, completion" )
     scope
         dim as JsonDoc outline_, hover_, defn_, cmp_
-        AssertTrue( outline_.Parse( messages[9]  ), "message 9 is JSON" )
-        AssertTrue( hover_.Parse  ( messages[10] ), "message 10 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[11] ), "message 11 is JSON" )
-        AssertTrue( cmp_.Parse    ( messages[12] ), "message 12 is JSON" )
+        AssertTrue( outline_.Parse( messages[8]  ), "message 8 is JSON" )
+        AssertTrue( hover_.Parse  ( messages[9]  ), "message 9 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[10] ), "message 10 is JSON" )
+        AssertTrue( cmp_.Parse    ( messages[11] ), "message 11 is JSON" )
 
         dim as JsonValue syms = outline_.Root( ).Member( "result" )
         AssertEqInt( syms.Count( ), 2, "the outline has two top-level symbols" )
@@ -560,12 +570,12 @@ private function CheckSession( byref path as string ) as long
         AssertTrue( items.Count( ) > 200, "completion carries the language as well as the file" )
     end scope
 
-    '' -- 14..15. the workspace file opens ---------------------------------------
+    '' -- 13..14. the workspace file opens ---------------------------------------
     TestGroup( "a workspace file opens" )
     scope
         dim as JsonDoc trace_, diag_
-        AssertTrue( trace_.Parse( messages[13] ), "message 13 is JSON" )
-        AssertTrue( diag_.Parse ( messages[14] ), "message 14 is JSON" )
+        AssertTrue( trace_.Parse( messages[12] ), "message 12 is JSON" )
+        AssertTrue( diag_.Parse ( messages[13] ), "message 13 is JSON" )
 
         AssertContains( trace_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen widgets.bas", "the fixture file is opened" )
@@ -580,10 +590,27 @@ private function CheckSession( byref path as string ) as long
     '' Everything below is answered from the workspace index or not at all.
     TestGroup( "cross-file definition, references, workspace symbols" )
     scope
-        dim as JsonDoc defn_, refs_, syms_
-        AssertTrue( defn_.Parse( messages[15] ), "message 15 is JSON" )
-        AssertTrue( refs_.Parse( messages[16] ), "message 16 is JSON" )
-        AssertTrue( syms_.Parse( messages[17] ), "message 17 is JSON" )
+        dim as JsonDoc indexed_, defn_, refs_, syms_
+        AssertTrue( indexed_.Parse( messages[14] ), "message 14 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[15] ), "message 15 is JSON" )
+        AssertTrue( refs_.Parse   ( messages[16] ), "message 16 is JSON" )
+        AssertTrue( syms_.Parse   ( messages[17] ), "message 17 is JSON" )
+
+        '' -- the scan is delivered HERE ------------------------------------------
+        ''
+        '' Thirteen messages after it was started, and immediately before the
+        '' first request that could not be answered without it. Everything in
+        '' between -- three documents opened, an edit, an outline, a hover, a
+        '' definition, a completion list -- was answered while it ran.
+        AssertEqStr( indexed_.Root( ).Member( "method" ).AsString( ), LSP_WINDOW_LOG_MESSAGE, _
+                     "the scan reports in when its result is taken" )
+
+        dim as string what = indexed_.Root( ).Member( "params" ).Member( "message" ).AsString( )
+        AssertContains( what, "indexed 2 file(s)", "both fixture files were found" )
+        AssertContains( what, "symbol(s)", "and their symbols counted" )
+        AssertFalse( instr( what, "0 symbol(s)" ) > 0, _
+                     "with symbols in them -- a keyword table raced into by two " & _
+                     "threads indexes every file to nothing, silently" )
 
         '' -- definition, into another file --------------------------------------
         dim as JsonValue where_ = defn_.Root( ).Member( "result" )

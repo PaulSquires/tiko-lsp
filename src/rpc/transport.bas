@@ -10,6 +10,8 @@
 #ifdef __FB_WIN32__
     #include once "crt/io.bi"
     #include once "crt/fcntl.bi"
+#else
+    #include once "crt/unistd.bi"
 #endif
 
 using FB
@@ -24,6 +26,27 @@ const FRAME_COMPACT_THRESHOLD = 64 * 1024
 '' Size of one read from stdin. Large enough that a whole didOpen usually
 '' arrives in one or two reads, small enough to stay off the stack limit.
 const READ_CHUNK_BYTES = 64 * 1024
+
+'' ONE READ, WHATEVER HAS ARRIVED.
+''
+'' NOT fread. fread( buf, 1, n, stdin ) does not return until it has n bytes or
+'' the stream ends -- which is fine for a FILE on stdin, where the end comes at
+'' once, and a HANG for a pipe, where the other end is an editor that has sent
+'' one message and is waiting for the answer before it sends another. The
+'' server would read the first message only if it happened to fill the buffer,
+'' and otherwise sit there forever.
+''
+'' This is not a theoretical difference: the piped-session test feeds a FILE,
+'' so it passed throughout while a real editor would have hung on the
+'' `initialize` request. read( ) returns as soon as ANY bytes are available,
+'' which is what the framing state machine was written to expect.
+private function ReadSomeStdin( byval buf as any ptr, byval maxBytes as long ) as long
+    #ifdef __FB_WIN32__
+        return _read( _fileno( stdin ), buf, maxBytes )
+    #else
+        return read( fileno( stdin ), buf, maxBytes )
+    #endif
+end function
 
 '' ############################################################################
 ''  MessageFramer
@@ -217,15 +240,15 @@ function StdioTransport.ReadMessage( byref payload as string ) as TransportStatu
                 return TRANSPORT_ERROR
         end select
 
-        dim as uinteger got = fread( @chunk(0), 1, READ_CHUNK_BYTES, stdin )
-        if( got = 0 ) then
-            if( feof( stdin ) <> 0 ) then return TRANSPORT_EOF
-            if( ferror( stdin ) <> 0 ) then
-                this.m_err = "read error on stdin"
-                return TRANSPORT_ERROR
-            end if
-            '' Neither EOF nor error: a zero-length read. Try again.
-            continue do
+        dim as long got = ReadSomeStdin( @chunk(0), READ_CHUNK_BYTES )
+
+        '' 0 is end of stream -- the editor closed the pipe. Negative is a real
+        '' error. Anything else is a short read, which is NORMAL and is the
+        '' whole reason the framer exists.
+        if( got = 0 ) then return TRANSPORT_EOF
+        if( got < 0 ) then
+            this.m_err = "read error on stdin"
+            return TRANSPORT_ERROR
         end if
 
         dim as string block_ = space( got )

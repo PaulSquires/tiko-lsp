@@ -30,6 +30,7 @@
 '' ############################################################################
 
 #include once "rename.bi"
+#include once "workspace_symbols.bi"
 #include once "hover.bi"
 #include once "../lsp/publish.bi"
 #include once "../workspace/workspace.bi"
@@ -118,14 +119,17 @@ function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
 
     '' -- everything else: by name, across the workspace ----------------------
     ''
-    '' The guard that makes that safe enough to do at all.
-    for f as long = 0 to srv.Index.FileCount( ) - 1
-        for i as long = 0 to srv.Index.FileSymbolCount( f ) - 1
-            if( srv.Index.SymbolAt( f, i ).LowerName <> lowerName ) then continue for
-            if( srv.Index.SymbolAt( f, i ).IsLocal = false ) then continue for
+    '' The guard below reads the whole index, so the scan has to have finished.
+    '' A rename that silently skipped half the workspace because it was asked
+    '' early would be the worst bug this server could have.
+    EnsureWorkspaceIndex( srv )
+    for f as long = 0 to srv.Index->FileCount( ) - 1
+        for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            if( srv.Index->SymbolAt( f, i ).LowerName <> lowerName ) then continue for
+            if( srv.Index->SymbolAt( f, i ).IsLocal = false ) then continue for
 
             return "'" & lowerName & "' is also a local in " & _
-                   UriFileName( srv.Index.FileUri( f ) ) & _
+                   UriFileName( srv.Index->FileUri( f ) ) & _
                    " -- this server matches by name, so renaming it here would " & _
                    "change that one too"
         next
@@ -133,7 +137,7 @@ function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
 
     '' The open document may not be in the index at all -- no workspace folder,
     '' or a file outside every folder -- and its locals count just as much.
-    if( srv.Index.IndexOfUri( doc->Uri( ) ) < 0 ) then
+    if( srv.Index->IndexOfUri( doc->Uri( ) ) < 0 ) then
         for i as long = 0 to doc->Symbols( ).Count( ) - 1
             if( doc->Symbols( ).Items[i].LowerName <> lowerName ) then continue for
             if( doc->Symbols( ).Items[i].IsLocal = false ) then continue for
@@ -315,8 +319,8 @@ private function OnRename( byref srv as Server, _
         '' -- everything else: every file that mentions the name -------------
         dim as long files_ = 0
 
-        for f as long = 0 to srv.Index.FileCount( ) - 1
-            dim as string fileUri = srv.Index.FileUri( f )
+        for f as long = 0 to srv.Index->FileCount( ) - 1
+            dim as string fileUri = srv.Index->FileUri( f )
 
             '' The open buffer, when there is one: it is the truth, and its
             '' version is what the edit must be applied against.
@@ -324,7 +328,7 @@ private function OnRename( byref srv as Server, _
             dim as string body
             if( openDoc <> 0 ) then
                 body = openDoc->Text( )
-            elseif( ReadSourceFile( srv.Index.FilePath( f ), body ) = false ) then
+            elseif( ReadSourceFile( srv.Index->FilePath( f ), body ) = false ) then
                 continue for
             end if
 
@@ -357,7 +361,7 @@ private function OnRename( byref srv as Server, _
 
         '' A file the index has never seen -- no workspace folder, or one
         '' outside every folder -- still has to be renamed in.
-        if( srv.Index.IndexOfUri( uriText ) < 0 ) then
+        if( srv.Index->IndexOfUri( uriText ) < 0 ) then
             dim as JsonNode editList = rb.NewArray( )
             dim as long made = EditsForFile( rb, editList, doc->Text( ), lowerName, newName, -1, -1 )
 
