@@ -180,3 +180,7 @@ user is not watching.
   cancellation protocol and a class of stale-answer bugs.
 - **Nothing is cancellable.** `$/cancelRequest` is still ignored; a rename over a
   large workspace runs to completion whatever the client does.
+
+## Next
+
+Files changed behind the editor's back -- which is [phase9.md](phase9.md).

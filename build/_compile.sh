@@ -50,6 +50,7 @@ echo "Building tiko-lsp"
     "$ROOT/src/handlers/inlay_hints.bas" \
     "$ROOT/src/handlers/formatting.bas" \
     "$ROOT/src/handlers/code_action.bas" \
+    "$ROOT/src/handlers/watched_files.bas" \
     "$ROOT/src/document/document.bas" \
     "$ROOT/src/document/document_manager.bas" \
     "$ROOT/src/analysis/lexer.bas" \

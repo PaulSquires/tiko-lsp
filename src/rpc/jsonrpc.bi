@@ -134,5 +134,11 @@ declare function RpcBuildResponse    ( byref id as RpcId, byref rb as JsonBuilde
 declare function RpcBuildError       ( byref id as RpcId, byval code as long, byref msg as string ) as string
 declare function RpcBuildNotification( byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
 
+'' A request FROM the server TO the client -- `client/registerCapability` is
+'' the only one this server sends. The id is a string, deliberately: the
+'' client's ids and the server's are separate spaces, and a string id can
+'' never be mistaken for one of the client's numbers in a log.
+declare function RpcBuildRequest     ( byref id as string, byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
+
 '' Default human text for a standard code, for when a handler supplies none.
 declare function RpcErrorText( byval code as long ) as string

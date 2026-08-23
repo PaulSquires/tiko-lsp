@@ -73,7 +73,9 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "capabilities" & Q & ":{" & Q & "general" & Q & ":{" & _
                 Q & "positionEncodings" & Q & ":[" & Q & "utf-16" & Q & "," & Q & "utf-8" & Q & "]}," & _
                 Q & "workspace" & Q & ":{" & Q & "workspaceEdit" & Q & ":{" & _
-                Q & "documentChanges" & Q & ":true}}}," & _
+                Q & "documentChanges" & Q & ":true}," & _
+                Q & "didChangeWatchedFiles" & Q & ":{" & _
+                Q & "dynamicRegistration" & Q & ":true}}}," & _
                 Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
                 Q & "name" & Q & ":" & Q & "fixture" & Q & "}]}}" )
 
@@ -83,7 +85,16 @@ private function SessionBytes( byref workspaceRoot as string ) as string
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "initialized" & Q & "," & Q & "params" & Q & ":{}}" )
 
-    '' 3. a request for something not implemented -> MethodNotFound. It used
+    '' 3. the answer to the server's own request. It asked the client to watch
+    ''    the workspace the moment `initialized` arrived, and a client that
+    ''    never answers is a client that never registered.
+    ''
+    ''    The id is the server's, and it is a STRING -- "tiko-1" -- so it can
+    ''    never be confused with one of the numbered ids below.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "id" & Q & ":" & Q & "tiko-1" & Q & "," & Q & "result" & Q & ":null}" )
+
+    '' 4. a request for something not implemented -> MethodNotFound. It used
     ''    to be textDocument/rename, which phase 7 implements; typeDefinition
     ''    needs the type system this server does not have, so it is the honest
     ''    stand-in.
@@ -314,7 +325,35 @@ private function SessionBytes( byref workspaceRoot as string ) as string
                 Q & "options" & Q & ":{" & Q & "tabSize" & Q & ":4," & _
                 Q & "insertSpaces" & Q & ":true}}}" )
 
-    '' 24. save and close the first document. widgets.bas stays open, so the
+    '' 24. A FILE CHANGES BEHIND THE EDITOR'S BACK. shared.bi is reported
+    ''     deleted -- a branch switch, say -- and the workspace picker must
+    ''     stop offering what was in it.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "workspace/didChangeWatchedFiles" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "changes" & Q & ":[{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( workspaceRoot & "\shared.bi" ) & Q & "," & _
+                Q & "type" & Q & ":3}]}}" )
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":22," & _
+                Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
+
+    '' 25. and back again: the same file reported created.
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                Q & "method" & Q & ":" & Q & "workspace/didChangeWatchedFiles" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "changes" & Q & ":[{" & _
+                Q & "uri" & Q & ":" & Q & PathToUri( workspaceRoot & "\shared.bi" ) & Q & "," & _
+                Q & "type" & Q & ":1}," & _
+                "{" & Q & "uri" & Q & ":" & Q & PathToUri( workspaceRoot & "\notes.txt" ) & Q & "," & _
+                Q & "type" & Q & ":1}," & _
+                "{" & Q & "uri" & Q & ":" & Q & PathToUri( widgetsPath ) & Q & "," & _
+                Q & "type" & Q & ":2}]}}" )
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":23," & _
+                Q & "method" & Q & ":" & Q & "workspace/symbol" & Q & "," & _
+                Q & "params" & Q & ":{" & Q & "query" & Q & ":" & Q & "widget" & Q & "}}" )
+
+    '' 26. save and close the first document. widgets.bas stays open, so the
     ''     close trace must say ONE document is still open.
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
                 Q & "method" & Q & ":" & Q & "textDocument/didSave" & Q & "," & _
@@ -387,12 +426,15 @@ private function CheckSession( byref path as string ) as long
         messages.Push( payload )
     loop
 
-    '' Thirty-seven, and exactly thirty-seven:
-    ''   22 answers to requests -- initialize, typeDefinition, second
+    '' Forty-two, and exactly forty-two:
+    ''    1 request FROM the server -- client/registerCapability, asking the
+    ''      client to watch the workspace for source files
+    ''   24 answers to requests -- initialize, typeDefinition, second
     ''      initialize, documentSymbol, hover, definition, completion,
     ''      cross-file definition, references, workspace/symbol, two signature
     ''      helps, inlay hints, semantic tokens, code actions, prepareRename,
     ''      rename, a refused prepareRename, a refused rename, formatting,
+    ''      two more workspace/symbol queries around a watched-file change,
     ''      shutdown, post-shutdown
     ''    1 parse error
     ''    2 window/logMessage -- "ready", and what the workspace scan found
@@ -400,13 +442,15 @@ private function CheckSession( byref path as string ) as long
     ''                            when it was started: the scan runs on its own
     ''                            thread and the first request that needs it is
     ''                            what waits for it
-    ''    6 $/logTrace          -- didOpen x3, didChange, didSave, didClose
-    ''    6 publishDiagnostics, one after each of those
-    '' and NOTHING for the two $/ notifications the server must swallow, nor
-    '' for the didChange against a document that was never opened.
+    ''    8 $/logTrace          -- didOpen x3, didChange, didSave, didClose,
+    ''                            and two didChangeWatchedFiles
+    ''    6 publishDiagnostics, one after each of the document ones
+    '' and NOTHING for the two $/ notifications the server must swallow, for
+    '' the didChange against a document that was never opened, or for the
+    '' client's answer to the registration request.
     AssertEqInt( f.Pending( ), 0, "the server's output ends on a message boundary" )
-    AssertEqInt( messages.Count( ), 37, "the session produced exactly thirty-seven messages" )
-    if( messages.Count( ) <> 37 ) then
+    AssertEqInt( messages.Count( ), 42, "the session produced exactly forty-two messages" )
+    if( messages.Count( ) <> 42 ) then
         for i as long = 0 to messages.Count( ) - 1
             print "      [" & i & "] " & left( messages[i], 150 )
         next
@@ -480,19 +524,42 @@ private function CheckSession( byref path as string ) as long
         AssertContains( ready_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         LSP_SERVER_NAME, "naming itself" )
 
-        '' The next thing the client hears is the answer to its next request,
-        '' NOT a scan report. This is the whole change: nothing waited.
+        '' Then it asks the client for something: to watch the workspace. This
+        '' is the only request this server ever sends, and it is a REQUEST --
+        '' there is no capability for file watching, so registering at run time
+        '' is the only way to have it.
+        dim as JsonDoc reg_
+        AssertTrue( reg_.Parse( messages[2] ), "message 2 is JSON" )
+        AssertEqStr( reg_.Root( ).Member( "method" ).AsString( ), LSP_REGISTER_CAPABILITY, _
+                     "the server registers for file watching" )
+        AssertTrue( reg_.Root( ).Member( "id" ).IsString( ), _
+                    "with an id of its own, in its own namespace" )
+
+        dim as JsonValue registration = reg_.Root( ).Member( "params" ) _
+                                            .Member( "registrations" ).Item( 0 )
+        AssertEqStr( registration.Member( "method" ).AsString( ), LSP_DID_CHANGE_WATCHED, _
+                     "for didChangeWatchedFiles" )
+
+        dim as JsonValue watcher = registration.Member( "registerOptions" ) _
+                                               .Member( "watchers" ).Item( 0 )
+        AssertEqStr( watcher.Member( "globPattern" ).AsString( ), LSP_WATCH_GLOB, _
+                     "watching FreeBASIC source and nothing else" )
+        AssertEqInt( watcher.Member( "kind" ).AsLongInt( ), LSP_WATCH_KIND, _
+                     "for creation, change and deletion alike" )
+
+        '' And then it says nothing more until it is asked something: the scan
+        '' it started reports in later, when its result is taken.
         dim as JsonDoc next_
-        AssertTrue( next_.Parse( messages[2] ), "message 2 is JSON" )
+        AssertTrue( next_.Parse( messages[3] ), "message 3 is JSON" )
         AssertFalse( next_.Root( ).Member( "method" ).AsString( ) = LSP_WINDOW_LOG_MESSAGE, _
-                     "and then says nothing more until it is asked something" )
+                     "and nothing else before the next answer" )
     end scope
 
     '' -- 3. MethodNotFound ------------------------------------------------------
     TestGroup( "unimplemented method" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[2] ), "message 2 is JSON" )
+        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 2, "answers id 2" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_METHOD_NOT_FOUND, _
                      "textDocument/typeDefinition is MethodNotFound" )
@@ -502,7 +569,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "second initialize" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[3] ), "message 3 is JSON" )
+        AssertTrue( doc.Parse( messages[4] ), "message 4 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsString( ), "a string id is echoed AS A STRING" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_INVALID_REQUEST, _
                      "a second initialize is InvalidRequest" )
@@ -515,10 +582,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "document synchronisation and diagnostics" )
     scope
         dim as JsonDoc openTrace, openDiag, changeTrace, changeDiag
-        AssertTrue( openTrace.Parse  ( messages[4] ), "message 4 is JSON" )
-        AssertTrue( openDiag.Parse   ( messages[5] ), "message 5 is JSON" )
-        AssertTrue( changeTrace.Parse( messages[6] ), "message 6 is JSON" )
-        AssertTrue( changeDiag.Parse ( messages[7] ), "message 7 is JSON" )
+        AssertTrue( openTrace.Parse  ( messages[5] ), "message 5 is JSON" )
+        AssertTrue( openDiag.Parse   ( messages[6] ), "message 6 is JSON" )
+        AssertTrue( changeTrace.Parse( messages[7] ), "message 7 is JSON" )
+        AssertTrue( changeDiag.Parse ( messages[8] ), "message 8 is JSON" )
 
         AssertContains( openTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
                         "v1, 3 line(s), 50 byte(s)", "the opened buffer is measured correctly" )
@@ -545,10 +612,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "outline, hover, definition, completion" )
     scope
         dim as JsonDoc outline_, hover_, defn_, cmp_
-        AssertTrue( outline_.Parse( messages[8]  ), "message 8 is JSON" )
-        AssertTrue( hover_.Parse  ( messages[9]  ), "message 9 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[10] ), "message 10 is JSON" )
-        AssertTrue( cmp_.Parse    ( messages[11] ), "message 11 is JSON" )
+        AssertTrue( outline_.Parse( messages[9]  ), "message 9 is JSON" )
+        AssertTrue( hover_.Parse  ( messages[10]  ), "message 10 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[11] ), "message 11 is JSON" )
+        AssertTrue( cmp_.Parse    ( messages[12] ), "message 12 is JSON" )
 
         dim as JsonValue syms = outline_.Root( ).Member( "result" )
         AssertEqInt( syms.Count( ), 2, "the outline has two top-level symbols" )
@@ -574,8 +641,8 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "a workspace file opens" )
     scope
         dim as JsonDoc trace_, diag_
-        AssertTrue( trace_.Parse( messages[12] ), "message 12 is JSON" )
-        AssertTrue( diag_.Parse ( messages[13] ), "message 13 is JSON" )
+        AssertTrue( trace_.Parse( messages[13] ), "message 13 is JSON" )
+        AssertTrue( diag_.Parse ( messages[14] ), "message 14 is JSON" )
 
         AssertContains( trace_.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen widgets.bas", "the fixture file is opened" )
@@ -591,10 +658,10 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "cross-file definition, references, workspace symbols" )
     scope
         dim as JsonDoc indexed_, defn_, refs_, syms_
-        AssertTrue( indexed_.Parse( messages[14] ), "message 14 is JSON" )
-        AssertTrue( defn_.Parse   ( messages[15] ), "message 15 is JSON" )
-        AssertTrue( refs_.Parse   ( messages[16] ), "message 16 is JSON" )
-        AssertTrue( syms_.Parse   ( messages[17] ), "message 17 is JSON" )
+        AssertTrue( indexed_.Parse( messages[15] ), "message 15 is JSON" )
+        AssertTrue( defn_.Parse   ( messages[16] ), "message 16 is JSON" )
+        AssertTrue( refs_.Parse   ( messages[17] ), "message 17 is JSON" )
+        AssertTrue( syms_.Parse   ( messages[18] ), "message 18 is JSON" )
 
         '' -- the scan is delivered HERE ------------------------------------------
         ''
@@ -657,13 +724,13 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "signature help, inlay hints, semantic tokens, code actions" )
     scope
         dim as JsonDoc yTrace, yDiag, sig1, sig2, hints_, sem_, actions_
-        AssertTrue( yTrace.Parse  ( messages[18] ), "message 18 is JSON" )
-        AssertTrue( yDiag.Parse   ( messages[19] ), "message 19 is JSON" )
-        AssertTrue( sig1.Parse    ( messages[20] ), "message 20 is JSON" )
-        AssertTrue( sig2.Parse    ( messages[21] ), "message 21 is JSON" )
-        AssertTrue( hints_.Parse  ( messages[22] ), "message 22 is JSON" )
-        AssertTrue( sem_.Parse    ( messages[23] ), "message 23 is JSON" )
-        AssertTrue( actions_.Parse( messages[24] ), "message 24 is JSON" )
+        AssertTrue( yTrace.Parse  ( messages[19] ), "message 19 is JSON" )
+        AssertTrue( yDiag.Parse   ( messages[20] ), "message 20 is JSON" )
+        AssertTrue( sig1.Parse    ( messages[21] ), "message 21 is JSON" )
+        AssertTrue( sig2.Parse    ( messages[22] ), "message 22 is JSON" )
+        AssertTrue( hints_.Parse  ( messages[23] ), "message 23 is JSON" )
+        AssertTrue( sem_.Parse    ( messages[24] ), "message 24 is JSON" )
+        AssertTrue( actions_.Parse( messages[25] ), "message 25 is JSON" )
 
         AssertContains( yTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didOpen y.bas", "the third document opens" )
@@ -731,11 +798,11 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "rename" )
     scope
         dim as JsonDoc prep_, ren_, refused_, badName_, fmt_
-        AssertTrue( prep_.Parse   ( messages[25] ), "message 25 is JSON" )
-        AssertTrue( ren_.Parse    ( messages[26] ), "message 26 is JSON" )
-        AssertTrue( refused_.Parse( messages[27] ), "message 27 is JSON" )
-        AssertTrue( badName_.Parse( messages[28] ), "message 28 is JSON" )
-        AssertTrue( fmt_.Parse    ( messages[29] ), "message 29 is JSON" )
+        AssertTrue( prep_.Parse   ( messages[26] ), "message 26 is JSON" )
+        AssertTrue( ren_.Parse    ( messages[27] ), "message 27 is JSON" )
+        AssertTrue( refused_.Parse( messages[28] ), "message 28 is JSON" )
+        AssertTrue( badName_.Parse( messages[29] ), "message 29 is JSON" )
+        AssertTrue( fmt_.Parse    ( messages[30] ), "message 30 is JSON" )
 
         '' -- prepareRename ------------------------------------------------------
         dim as JsonValue prep = prep_.Root( ).Member( "result" )
@@ -782,14 +849,62 @@ private function CheckSession( byref path as string ) as long
                      "inserting one level of indentation" )
     end scope
 
-    '' -- 31..34. save and close --------------------------------------------------
+    '' -- 31..34. A FILE CHANGES BEHIND THE EDITOR'S BACK -------------------------
+    ''
+    '' shared.bi is reported deleted and then created again. Nothing on disk
+    '' actually moves: what is under test is that the server believes the
+    '' client, because the client is the only one watching.
+    TestGroup( "watched files" )
+    scope
+        dim as JsonDoc goneTrace, goneSyms, backTrace, backSyms
+        AssertTrue( goneTrace.Parse( messages[31] ), "message 31 is JSON" )
+        AssertTrue( goneSyms.Parse ( messages[32] ), "message 32 is JSON" )
+        AssertTrue( backTrace.Parse( messages[33] ), "message 33 is JSON" )
+        AssertTrue( backSyms.Parse ( messages[34] ), "message 34 is JSON" )
+
+        '' -- deleted -------------------------------------------------------------
+        AssertContains( goneTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
+                        "didChangeWatchedFiles", "the notification is acted on" )
+        AssertContains( goneTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "1 removed", "one file leaves the index" )
+
+        dim as JsonValue after_ = goneSyms.Root( ).Member( "result" )
+        dim as boolean sawShared = false
+        for i as long = 0 to after_.Count( ) - 1
+            if( instr( lcase( after_.Item( i ).Member( "location" ).Member( "uri" ).AsString( ) ), _
+                       "shared.bi" ) > 0 ) then sawShared = true
+        next
+        AssertFalse( sawShared, "and the picker stops offering what was in it" )
+
+        '' -- created again --------------------------------------------------------
+        ''
+        '' The same batch reports two more changes that must be IGNORED: a
+        '' .txt file, because a client may watch more than it was asked to,
+        '' and widgets.bas, which the editor has OPEN -- re-reading the disk
+        '' copy of that would replace what the user can see with what was last
+        '' saved.
+        AssertContains( backTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "1 re-indexed", "the file comes back" )
+        AssertContains( backTrace.Root( ).Member( "params" ).Member( "verbose" ).AsString( ), _
+                        "2 ignored", "a non-source file and an OPEN document are both ignored" )
+
+        dim as JsonValue back_ = backSyms.Root( ).Member( "result" )
+        sawShared = false
+        for i as long = 0 to back_.Count( ) - 1
+            if( instr( lcase( back_.Item( i ).Member( "location" ).Member( "uri" ).AsString( ) ), _
+                       "shared.bi" ) > 0 ) then sawShared = true
+        next
+        AssertTrue( sawShared, "and its symbols are findable again" )
+    end scope
+
+    '' -- 35..38. save and close --------------------------------------------------
     TestGroup( "save and close" )
     scope
         dim as JsonDoc saveTrace, saveDiag, closeTrace, closeDiag
-        AssertTrue( saveTrace.Parse ( messages[30] ), "message 30 is JSON" )
-        AssertTrue( saveDiag.Parse  ( messages[31] ), "message 31 is JSON" )
-        AssertTrue( closeTrace.Parse( messages[32] ), "message 32 is JSON" )
-        AssertTrue( closeDiag.Parse ( messages[33] ), "message 33 is JSON" )
+        AssertTrue( saveTrace.Parse ( messages[35] ), "message 35 is JSON" )
+        AssertTrue( saveDiag.Parse  ( messages[36] ), "message 36 is JSON" )
+        AssertTrue( closeTrace.Parse( messages[37] ), "message 37 is JSON" )
+        AssertTrue( closeDiag.Parse ( messages[38] ), "message 38 is JSON" )
 
         AssertContains( saveTrace.Root( ).Member( "params" ).Member( "message" ).AsString( ), _
                         "didSave x.bas", "the save names the file" )
@@ -807,7 +922,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "malformed message" )
     scope
         dim as JsonDoc doc
-        AssertTrue( doc.Parse( messages[34] ), "message 34 is JSON" )
+        AssertTrue( doc.Parse( messages[39] ), "message 39 is JSON" )
         AssertTrue( doc.Root( ).Member( "id" ).IsNull( ), "an unparseable request is answered with a null id" )
         AssertEqInt( doc.Root( ).Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, _
                      "broken JSON is a ParseError" )
@@ -817,8 +932,8 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "shutdown" )
     scope
         dim as JsonDoc doc, after_
-        AssertTrue( doc.Parse   ( messages[35] ), "message 35 is JSON" )
-        AssertTrue( after_.Parse( messages[36] ), "message 36 is JSON" )
+        AssertTrue( doc.Parse   ( messages[40] ), "message 40 is JSON" )
+        AssertTrue( after_.Parse( messages[41] ), "message 41 is JSON" )
 
         AssertEqInt( doc.Root( ).Member( "id" ).AsLongInt( ), 3, "answers id 3" )
         AssertTrue ( doc.Root( ).Member( "result" ).IsNull( ), "the shutdown result is null" )

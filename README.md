@@ -30,7 +30,7 @@ here launches a compiler process, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-8 complete
+## Status: phases 1-9 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -42,6 +42,7 @@ here launches a compiler process, and nothing ever will.
 | 6 | workspace index, workspace symbols, references | **done** |
 | 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | **done** |
 | 8 | the workspace scan off the message loop | **done** |
+| 9 | watched files: an index that notices `git checkout` | **done** |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
@@ -100,6 +101,7 @@ tiko-lsp/
                 completion.bi/.bas    completion
                 workspace_symbols.bi/.bas  workspace/symbol, and the index build
                 references.bi/.bas    find all references
+                watched_files.bi/.bas files changed outside the editor
                 rename.bi/.bas        prepareRename and rename
                 signature_help.bi/.bas     the signature popup
                 semantic_tokens.bi/.bas    semanticTokens/full
@@ -115,7 +117,7 @@ tiko-lsp/
                 fixtures/workspace/   a two-file workspace the cross-file
                                       assertions are made against
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md .. phase8.md
+  docs/         architecture.md, phase1.md .. phase9.md
 ```
 
 Every directory in the sketch now has something real in it.
@@ -214,7 +216,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 953 assertions:
+(or `sh build/_run_tests.sh`). Twelve suites, 969 assertions:
 
 - **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -259,7 +261,7 @@ build\_run_tests.bat
   including everything it must leave alone: an already-tidy file (zero edits),
   broken structure (zero edits, and a reason), comment art inside a block
   comment, a `#macro` body, a `#if` body, and a wrapped line's alignment.
-- **piped session** — 158 assertions against a **real `tiko-lsp` process** driven
+- **piped session** — 174 assertions against a **real `tiko-lsp` process** driven
   over a pipe: `session_tool --write` emits a byte-exact scripted session, the
   server runs it, and `session_tool --check` reframes and validates the reply
   stream — including that two edits in one `didChange` applied in order against
@@ -275,7 +277,11 @@ build\_run_tests.bat
   a signature with the right active parameter before and after the comma, two
   inlay hints, a semantic-token array, a quick fix that inserts one quote, a
   local rename producing three edits in one file, and the refusal for a name a
-  local elsewhere shares.
+  local elsewhere shares. It also drives the one request the server SENDS --
+  `client/registerCapability`, asking the client to watch the workspace — and
+  the file events that come back: a deleted file leaves the workspace picker,
+  a created one returns to it, and a change reported for a file the editor has
+  open is ignored, because the buffer is the truth.
 
 ## Licence
 

@@ -48,6 +48,17 @@ const LSP_REFERENCES        = "textDocument/references"
 const LSP_WORKSPACE_SYMBOL  = "workspace/symbol"
 const LSP_DID_CHANGE_FOLDERS = "workspace/didChangeWorkspaceFolders"
 
+'' Watched files (phase 9). There is NO static capability for this one: a
+'' server that wants to hear about files changed behind the editor's back has
+'' to ask for it with client/registerCapability, at run time.
+const LSP_DID_CHANGE_WATCHED = "workspace/didChangeWatchedFiles"
+const LSP_REGISTER_CAPABILITY = "client/registerCapability"
+
+'' The glob the server asks to be watched, and the kind bits: 1 create,
+'' 2 change, 4 delete -- all three.
+const LSP_WATCH_GLOB = "**/*.{bas,bi,inc}"
+const LSP_WATCH_KIND = 7
+
 '' Editing features (phase 7).
 const LSP_PREPARE_RENAME     = "textDocument/prepareRename"
 const LSP_RENAME             = "textDocument/rename"

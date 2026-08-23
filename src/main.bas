@@ -34,6 +34,7 @@
 #include once "handlers/inlay_hints.bi"
 #include once "handlers/formatting.bi"
 #include once "handlers/code_action.bi"
+#include once "handlers/watched_files.bi"
 #include once "workspace/index_builder.bi"
 
 using FB
@@ -141,6 +142,7 @@ private function RunServer( ) as long
     RegisterInlayHintHandlers( )
     RegisterFormattingHandlers( )
     RegisterCodeActionHandlers( )
+    RegisterWatchedFilesHandlers( )
     LogDebug( RegisteredCount( ) & " methods registered" )
 
     dim as string payload

@@ -139,7 +139,7 @@ Measured on win64/gas64: scan, then index, then twenty queries.
   object, but it is not done.
 - **Live file watching.** A file changed on disk by another program — a branch
   switch, a build step — is not noticed. `workspace/didChangeWatchedFiles` is
-  not handled.
+  not handled. *Handled since [phase9.md](phase9.md).*
 - **Include graphs.** Nothing follows `#include`; a name resolves because it is
   somewhere in the workspace, not because this file can actually see it.
 - **Symbol identity.** References and cross-file definitions match by name, so

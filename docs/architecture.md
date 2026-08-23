@@ -126,6 +126,12 @@ workspace's source in memory to answer later would cost tens of megabytes.
 References are the exception: they re-lex on demand, which is
 [phase6.md](phase6.md#references-are-re-lexed-not-stored)'s reasoning.
 
+THE CLIENT WATCHES THE FILESYSTEM, not the server. File events arrive as
+`workspace/didChangeWatchedFiles` after the server registers for them at run
+time -- there is no capability for it -- and they are the only thing besides an
+open buffer that can change the index between scans. See
+[phase9.md](phase9.md).
+
 ONE THREAD READS AND ANSWERS; ONE THREAD SCANS. The message loop handles one
 message to completion before reading the next -- the protocol requires
 notifications to be applied in order, and every answer depends on the buffer as

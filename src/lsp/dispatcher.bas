@@ -53,6 +53,7 @@ constructor Server( )
     this.PositionEncoding  = LSP_ENCODING_UTF16
     this.TraceValue        = LSP_TRACE_OFF
     this.ClientProcessId   = 0
+    this.m_nextReqId       = 0
 
     '' The server always has an index. An empty one answers every cross-file
     '' question with "nothing", which is the truth before a scan has run and
@@ -135,6 +136,17 @@ function Server.SendNotification( byref methodName as string, byref rb as JsonBu
     return this.SendRaw( RpcBuildNotification( methodName, rb, paramsNode ) )
 end function
 
+function Server.SendRequest( byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
+    this.m_nextReqId += 1
+
+    '' "tiko-1", not 1. The client numbers its own requests and the two spaces
+    '' are independent, so a shared numbering would put two different meanings
+    '' on one id in every log on both sides.
+    dim as string id = "tiko-" & this.m_nextReqId
+    if( this.SendRaw( RpcBuildRequest( id, methodName, rb, paramsNode ) ) = false ) then return ""
+    return id
+end function
+
 sub Server.SendLogMessage( byval kind as LspMessageType, byref text_ as string )
     '' Only meaningful once the client is listening; before initialize it has
     '' nowhere to put the message.
@@ -193,10 +205,12 @@ sub Server.Dispatch( byref req as RpcMessage )
 
     '' ---- a reply to something we sent ---------------------------------------
     if( req.Kind( ) = RPC_RESPONSE ) then
-        '' Phase 1 sends no server-to-client requests, so there is nothing to
-        '' correlate this with. Log it and move on rather than answering it,
-        '' which would be a protocol error.
-        LogDebug( "ignoring response for id " & id.ToText( ) )
+        '' The client answering `client/registerCapability`. There is nothing
+        '' to correlate it with and nothing to do about it -- but it must NOT
+        '' be answered, and it must not fall through to MethodNotFound, which
+        '' would answer a response with an error and confuse a client that
+        '' matched it back to its own table.
+        LogDebug( "response for id " & id.ToText( ) & " (nothing waits for it)" )
         exit sub
     end if
 

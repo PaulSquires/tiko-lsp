@@ -70,6 +70,12 @@ type Server
         '' user typed since -- and plain `changes` when it does not.
         SupportsDocumentChanges as boolean
 
+        '' Whether the client can be asked to WATCH FILES for us. There is no
+        '' static capability for `workspace/didChangeWatchedFiles`: a server
+        '' that wants it must register for it at run time, and only a client
+        '' offering dynamicRegistration will accept that.
+        SupportsFileWatching    as boolean
+
         '' -- open buffers ----------------------------------------------------
         ''
         '' Every handler that needs source text goes through here, never
@@ -114,6 +120,12 @@ type Server
         '' -- outgoing --------------------------------------------------------
         declare function SendRaw         ( byref payload as string ) as boolean
         declare function SendNotification( byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as boolean
+
+        '' Sends a request to the client and returns the id it was given.
+        '' Nothing waits for the answer: this server asks the client for
+        '' exactly one thing, and there is nothing to do differently if the
+        '' answer is late.
+        declare function SendRequest     ( byref methodName as string, byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
         declare sub      SendLogMessage  ( byval kind as LspMessageType, byref text_ as string )
 
         '' $/logTrace, the protocol's own debug channel. Silent unless the
@@ -128,6 +140,7 @@ type Server
         m_running   as boolean
         m_shutdown  as boolean
         m_exitCode  as long
+        m_nextReqId as long
 
         declare sub Dispatch    ( byref req as RpcMessage )
         declare sub SendResponse( byref id as RpcId, byref rb as JsonBuilder, byval resultNode as JsonNode )

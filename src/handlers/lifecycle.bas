@@ -4,6 +4,7 @@
 
 #include once "lifecycle.bi"
 #include once "workspace_symbols.bi"
+#include once "watched_files.bi"
 #include once "../workspace/index_builder.bi"
 #include once "../utils/logging.bi"
 
@@ -68,6 +69,11 @@ private function OnInitialize( byref srv as Server, _
                                         .Member( "workspaceEdit" ) _
                                         .Member( "documentChanges" ).AsBoolean( false )
 
+    srv.SupportsFileWatching    = params.Member( "capabilities" ) _
+                                        .Member( "workspace" ) _
+                                        .Member( "didChangeWatchedFiles" ) _
+                                        .Member( "dynamicRegistration" ).AsBoolean( false )
+
     '' -- position encoding ---------------------------------------------------
     ''
     '' The client offers a list; the server picks one and echoes it in its
@@ -111,6 +117,12 @@ private function OnInitialized( byref srv as Server, _
                                 byref err_ as RpcError ) as JsonNode
     LogInfo( "client reports initialized" )
     srv.SendLogMessage( LSPMSG_LOG, LSP_SERVER_NAME & " " & LSP_SERVER_VERSION & " ready" )
+
+    '' Asking the client to watch the workspace comes FIRST, and before the
+    '' scan rather than after it: a file changed while the scan runs then
+    '' produces a notification the server can act on, instead of falling into
+    '' the gap between "scanned" and "watched".
+    RequestFileWatching( srv )
 
     '' The workspace scan is STARTED here and finishes on its own thread. It is
     '' not done during `initialize` because the client is blocked waiting for

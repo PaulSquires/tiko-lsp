@@ -175,8 +175,10 @@ function RpcMessage.ParseFrom( byref text_ as string, byref err_ as RpcError ) a
     end if
 
     if( rootVal.Has( "result" ) orelse rootVal.Has( "error" ) ) then
-        '' A reply to a request WE sent. Phase 1 sends none, so nothing
-        '' correlates it -- it is parsed, logged and dropped by the dispatcher.
+        '' A reply to a request WE sent -- in practice the client's answer to
+        '' `client/registerCapability`. Nothing correlates it: the only server
+        '' request there is has no result worth acting on, and a failure to
+        '' register is reported by the client refusing, not by this reply.
         this.m_kind = RPC_RESPONSE
         return true
     end if
@@ -267,6 +269,20 @@ function RpcBuildError( byref id as RpcId, byval code as long, byref msg as stri
         rb.SetStr( errObj, "message", RpcErrorText( code ) )
     end if
     rb.SetNode( root, "error", errObj )
+
+    rb.SetRoot( root )
+    return rb.Serialize( )
+end function
+
+function RpcBuildRequest( byref id as string, byref methodName as string, _
+                         byref rb as JsonBuilder, byval paramsNode as JsonNode ) as string
+    dim as JsonNode root = rb.NewObject( )
+    if( root.IsValid( ) = false ) then return ""
+
+    rb.SetStr( root, "jsonrpc", "2.0" )
+    rb.SetStr( root, "id", id )
+    rb.SetStr( root, "method", methodName )
+    if( paramsNode.IsValid( ) ) then rb.SetNode( root, "params", paramsNode )
 
     rb.SetRoot( root )
     return rb.Serialize( )
