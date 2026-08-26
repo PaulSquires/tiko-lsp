@@ -58,9 +58,9 @@ end type
     base: (identifier)
     (access_specifier)
     (identifier)
-    (identifier)
-    (identifier)
-    (identifier)
+    (type_annotation
+      (identifier)
+      (identifier))
     (declare_statement
       name: (qualified_name
         (identifier))
@@ -96,9 +96,9 @@ type Handle as any ptr
   (union_definition
     name: (identifier)
     (identifier)
-    (identifier)
-    (identifier)
-    (identifier))
+    (type_annotation
+      (identifier)
+      (identifier)))
   (type_alias
     name: (identifier)
     type: (identifier)
@@ -149,7 +149,7 @@ end type
     (generic_parameters
       (identifier))
     (identifier)
-    (identifier)
-    (identifier)
-    (identifier)
-    (identifier)))
+    (type_annotation
+      (identifier)
+      (identifier)
+      (identifier))))

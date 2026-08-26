@@ -20,6 +20,74 @@
     }
   },
   {
+    "type": "bitfield",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      },
+      "width": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "case_clause",
     "named": true,
     "fields": {
@@ -64,6 +132,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -73,6 +149,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -127,6 +207,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -144,6 +228,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -192,6 +284,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -278,6 +374,14 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
             "type": "generic_parameters",
             "named": true
           },
@@ -288,6 +392,10 @@
           {
             "type": "parameter_list",
             "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       }
@@ -360,6 +468,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -369,6 +485,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -423,6 +543,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -440,6 +564,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -488,6 +620,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -554,6 +690,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -571,6 +711,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -619,6 +767,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -689,6 +841,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -698,6 +858,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -752,6 +916,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -769,6 +937,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -820,6 +996,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -855,6 +1035,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -864,6 +1052,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -901,6 +1093,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "modifier",
           "named": true
         },
@@ -918,6 +1118,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -951,6 +1155,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -960,6 +1172,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -1025,6 +1241,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1042,6 +1262,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1093,6 +1321,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -1110,6 +1342,49 @@
         },
         {
           "type": "with_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "extern_declaration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "operator",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
+          "type": "type_literal",
           "named": true
         }
       ]
@@ -1160,6 +1435,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -1169,6 +1452,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -1223,6 +1510,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1240,6 +1531,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1291,6 +1590,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -1323,6 +1626,10 @@
       "types": [
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1390,6 +1697,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -1399,6 +1714,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -1433,7 +1752,19 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
+          "named": true
+        },
+        {
+          "type": "open_statement",
           "named": true
         },
         {
@@ -1441,7 +1772,15 @@
           "named": true
         },
         {
+          "type": "result_assignment",
+          "named": true
+        },
+        {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -1496,6 +1835,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -1505,6 +1852,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -1567,6 +1918,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1584,6 +1939,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1635,6 +1998,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -1674,6 +2041,243 @@
     }
   },
   {
+    "type": "lambda",
+    "named": true,
+    "fields": {
+      "close": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "end function",
+            "named": false
+          },
+          {
+            "type": "end sub",
+            "named": false
+          }
+        ]
+      },
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "asm_block",
+          "named": true
+        },
+        {
+          "type": "declare_statement",
+          "named": true
+        },
+        {
+          "type": "do_statement",
+          "named": true
+        },
+        {
+          "type": "end_statement",
+          "named": true
+        },
+        {
+          "type": "end_with_value",
+          "named": true
+        },
+        {
+          "type": "enum_definition",
+          "named": true
+        },
+        {
+          "type": "exit_statement",
+          "named": true
+        },
+        {
+          "type": "extern_block",
+          "named": true
+        },
+        {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
+          "type": "for_statement",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_single_line",
+          "named": true
+        },
+        {
+          "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
+          "type": "modified_statement",
+          "named": true
+        },
+        {
+          "type": "namespace_definition",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "open_statement",
+          "named": true
+        },
+        {
+          "type": "operator",
+          "named": true
+        },
+        {
+          "type": "parameter_list",
+          "named": true
+        },
+        {
+          "type": "preproc",
+          "named": true
+        },
+        {
+          "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "result_assignment",
+          "named": true
+        },
+        {
+          "type": "scope_block",
+          "named": true
+        },
+        {
+          "type": "select_statement",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
+          "type": "type_definition",
+          "named": true
+        },
+        {
+          "type": "type_literal",
+          "named": true
+        },
+        {
+          "type": "union_definition",
+          "named": true
+        },
+        {
+          "type": "while_statement",
+          "named": true
+        },
+        {
+          "type": "with_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "member_access",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "modified_statement",
     "named": true,
     "fields": {},
@@ -1683,6 +2287,14 @@
       "types": [
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1699,6 +2311,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -1765,6 +2381,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -1782,6 +2402,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -1830,6 +2458,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -1911,6 +2543,10 @@
             "named": true
           },
           {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -1959,6 +2595,14 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
             "type": "generic_parameters",
             "named": true
           },
@@ -1969,6 +2613,10 @@
           {
             "type": "parameter_list",
             "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       }
@@ -1982,6 +2630,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -1991,6 +2647,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2066,6 +2726,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -2075,6 +2743,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2158,6 +2830,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -2167,6 +2847,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2267,6 +2951,14 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
             "type": "generic_parameters",
             "named": true
           },
@@ -2277,6 +2969,10 @@
           {
             "type": "parameter_list",
             "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       }
@@ -2318,6 +3014,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -2335,6 +3035,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -2394,6 +3102,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -2422,7 +3134,7 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
         {
           "type": "generic_parameters",
@@ -2430,6 +3142,10 @@
         },
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "operator",
           "named": true
         }
       ]
@@ -2467,6 +3183,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -2476,6 +3200,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2526,6 +3254,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -2543,6 +3275,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -2591,6 +3331,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2661,6 +3405,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -2670,6 +3422,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -2700,6 +3456,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -2713,6 +3477,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -2764,6 +3532,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -2781,6 +3553,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -2832,6 +3612,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -2859,8 +3643,8 @@
     "named": true,
     "fields": {
       "name": {
-        "multiple": false,
-        "required": true,
+        "multiple": true,
+        "required": false,
         "types": [
           {
             "type": "identifier",
@@ -2885,6 +3669,14 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
             "type": "generic_parameters",
             "named": true
           },
@@ -2895,9 +3687,48 @@
           {
             "type": "parameter_list",
             "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       }
+    }
+  },
+  {
+    "type": "type_annotation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "generic_parameters",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "operator",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2921,6 +3752,14 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
             "type": "generic_parameters",
             "named": true
           },
@@ -2931,6 +3770,10 @@
           {
             "type": "parameter_list",
             "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       },
@@ -2955,6 +3798,10 @@
         },
         {
           "type": "asm_block",
+          "named": true
+        },
+        {
+          "type": "bitfield",
           "named": true
         },
         {
@@ -3006,6 +3853,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "modified_statement",
           "named": true
         },
@@ -3050,6 +3905,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -3082,6 +3941,10 @@
       "types": [
         {
           "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -3124,6 +3987,10 @@
         },
         {
           "type": "asm_block",
+          "named": true
+        },
+        {
+          "type": "bitfield",
           "named": true
         },
         {
@@ -3171,6 +4038,14 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
           "type": "modified_statement",
           "named": true
         },
@@ -3212,6 +4087,10 @@
         },
         {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -3282,6 +4161,14 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
             "type": "number",
             "named": true
           },
@@ -3291,6 +4178,10 @@
           },
           {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
             "named": true
           },
           {
@@ -3345,6 +4236,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -3362,6 +4257,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -3410,6 +4313,10 @@
         },
         {
           "type": "type_alias",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
           "named": true
         },
         {
@@ -3476,6 +4383,10 @@
           "named": true
         },
         {
+          "type": "extern_declaration",
+          "named": true
+        },
+        {
           "type": "for_statement",
           "named": true
         },
@@ -3493,6 +4404,14 @@
         },
         {
           "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
           "named": true
         },
         {
@@ -3544,6 +4463,10 @@
           "named": true
         },
         {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
           "type": "type_definition",
           "named": true
         },
@@ -3591,6 +4514,10 @@
     "named": false
   },
   {
+    "type": "( of",
+    "named": false
+  },
+  {
     "type": ")",
     "named": false
   },
@@ -3600,6 +4527,10 @@
   },
   {
     "type": ",",
+    "named": false
+  },
+  {
+    "type": "->",
     "named": false
   },
   {

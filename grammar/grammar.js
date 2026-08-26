@@ -86,6 +86,28 @@ module.exports = grammar({
     // name, and only what follows tells them apart.
     [$.enum_member, $._atom],
 
+    // `extern "C"` opens a block and `extern import x as T` is one statement.
+    // Both start with the same word, and the line has to be read to the end
+    // before anything separates them.
+    // `function It( of T ).IsValid( )` -- the parentheses after the name are
+    // the NAME's type arguments, and `function Some( of T )( v )` -- the same
+    // parentheses are the procedure's. The dot after them is what decides.
+    [$.qualified_name, $.procedure_definition],
+    [$.qualified_name, $.declare_statement],
+
+    // `operator = ( a, b ) as boolean` opens a definition; `operator = x`
+    // assigns the result. Same two tokens, and only the rest of the line --
+    // and whether an `end operator` follows -- separates them.
+    [$._operator_symbol, $.result_assignment],
+
+    [$.extern_block, $._atom],
+    [$.extern_block, $.extern_declaration],
+
+    // `operator Foo.Bar` names a member operator, and `operator Foo.@` a
+    // symbol one. Both start with the same words and only the last token
+    // separates them.
+    [$.qualified_name, $.operator_name],
+
     // `private:` inside a TYPE is an access specifier; `private const x = 1`
     // is a statement with modifiers. The colon is what tells them apart, one
     // token too late for LR.
@@ -208,11 +230,45 @@ module.exports = grammar({
       $.type_alias,
       $.namespace_definition,
       $.extern_block,
+      $.extern_declaration,
     ),
 
+    // AN OPERATOR IS NAMED BY A SYMBOL, not by a word: `operator = ( ... )`,
+    // `operator -> ( ... )`, `operator []`. Every COM wrapper and every value
+    // type in AfxNova declares several, and reading the name as an identifier
+    // loses the file from the first one onwards.
+    operator_name: $ => seq(
+      // A MEMBER OPERATOR carries its type in front of the symbol:
+      // `operator CID2D1Geometry.@ ( )`. AfxNova's D2D wrappers define one per
+      // class, and each was the last line of its file to parse.
+      optional(seq(
+        $.identifier, optional($.generic_parameters),
+        repeat(seq('.', $.identifier, optional($.generic_parameters))),
+        '.',
+      )),
+      $._operator_symbol,
+
+      // A GLOBAL GENERIC OPERATOR names its type parameters after the symbol:
+      // `operator + ( of T )( byref a as Box( of T ), ... )`.
+      optional($.generic_parameters),
+    ),
+
+    _operator_symbol: $ => choice(
+      $.operator,
+      '=', ',', '.',
+      seq('[', ']'),
+      seq('(', ')'),
+      // A WORD-NAMED operator -- `cast`, `let`, `for`, `next`, `step` -- takes
+      // the ordinary name path; only the symbols need this rule.
+    ),
+
+    // OPERATOR IS NOT IN HERE. It gets its own branch in the two rules below,
+    // because only after that word may the name be a symbol -- and one choice
+    // over every procedure word makes the two readings of `operator ...`
+    // indistinguishable to LR.
     _procedure_keyword: $ => choice(
       kw('sub'), kw('function'), kw('property'),
-      kw('constructor'), kw('destructor'), kw('operator'),
+      kw('constructor'), kw('destructor'),
     ),
 
     modifier: $ => choice(
@@ -222,8 +278,16 @@ module.exports = grammar({
 
     procedure_definition: $ => seq(
       repeat($.modifier),
-      field('kind', $._procedure_keyword),
-      field('name', $.qualified_name),
+      // The name is a symbol ONLY after `operator`; written as one choice over
+      // every procedure word, `property = x` becomes ambiguous with assigning
+      // a result and nothing can tell the two apart.
+      choice(
+        seq(field('kind', $._procedure_keyword), field('name', $.qualified_name)),
+        seq(field('kind', kw('operator')), field('name', choice(
+          $.qualified_name,                                  // `operator cast`
+          alias($.operator_name, $.qualified_name),          // `operator =`
+        ))),
+      ),
       repeat($._signature_tail),
       $._line_end,
       repeat($._body_item),
@@ -237,8 +301,16 @@ module.exports = grammar({
       repeat($.modifier),
       kw('declare'),
       repeat($.modifier),
-      field('kind', $._procedure_keyword),
-      field('name', $.qualified_name),
+      // The name is a symbol ONLY after `operator`; written as one choice over
+      // every procedure word, `property = x` becomes ambiguous with assigning
+      // a result and nothing can tell the two apart.
+      choice(
+        seq(field('kind', $._procedure_keyword), field('name', $.qualified_name)),
+        seq(field('kind', kw('operator')), field('name', choice(
+          $.qualified_name,                                  // `operator cast`
+          alias($.operator_name, $.qualified_name),          // `operator =`
+        ))),
+      ),
       repeat($._signature_tail),
       $._line_end,
     ),
@@ -254,6 +326,7 @@ module.exports = grammar({
       kw('static'),
       kw('const'),
       $.parameter_list,
+
       $.string,
       $.identifier,
     ),
@@ -262,6 +335,11 @@ module.exports = grammar({
 
     parameter: $ => choice(
       '...',
+
+      // `#macro M( args... )` -- the variadic one is NAMED, and every list
+      // macro in tiko-lang's own test corpus is written this way.
+      seq(field('name', $.identifier), '...'),
+
       seq(
         optional(choice(kw('byval'), kw('byref'))),
         field('name', $.identifier),
@@ -298,9 +376,19 @@ module.exports = grammar({
       $.generic_parameters,
     ),
 
-    // `( of T )`, and `( of MirFunction ptr )` -- each argument is a TYPE, so
-    // it is a run of words rather than a single one.
-    generic_parameters: $ => seq('(', kw('of'), commaSep1($._value), ')'),
+    // `( of T )`, `( of MirFunction ptr )` -- each argument is a TYPE, so it
+    // is a run of words rather than a single one.
+    //
+    // `( of` IS ONE TOKEN, and that is what makes a generic argument list
+    // decidable at all: `Foo( of T )` and `Foo( x )` differ only after the
+    // parenthesis, and as two tokens the parser has to choose between a
+    // generic list and a parameter list before it can see which it is.
+    // Longest match settles it in the lexer instead.
+    generic_parameters: $ => seq(
+      alias(token(seq('(', /[ \t]*/, ciAlt(['of']))), '( of'),
+      commaSep1($._value),
+      ')',
+    ),
 
     _type_member: $ => choice(
       $._terminator,
@@ -311,7 +399,20 @@ module.exports = grammar({
       $.type_definition,
       $.union_definition,
       $.enum_definition,
+      $.bitfield,
       $._statement,
+    ),
+
+    // `a : 3 as ulong` -- a bitfield. The colon ends a statement everywhere
+    // else, so without this the member is read as `a`, then a stray `3 as
+    // ulong` that begins with a number and cannot be anything.
+    bitfield: $ => seq(
+      field('name', $.identifier),
+      ':',
+      field('width', $.number),
+      kw('as'),
+      field('type', $._type),
+      $._line_end,
     ),
 
     access_specifier: $ => seq(
@@ -337,11 +438,30 @@ module.exports = grammar({
     ),
 
     // `type Handle as any ptr` -- a typedef, and not a block.
+    // BOTH SPELLINGS, and both are comma lists:
+    //
+    //     type fwd1 as integer, fwd2 as double     each name its own type
+    //     type as integer rev1, rev2               one type across the names
     type_alias: $ => seq(
       kw('type'),
-      field('name', $.identifier),
-      kw('as'),
-      field('type', $._type),
+      choice(
+        seq(
+          field('name', $.identifier),
+          kw('as'),
+          field('type', $._type),
+          repeat(seq(',', field('name', $.identifier), kw('as'),
+                     field('type', $._type))),
+        ),
+        // In the reversed form the FIRST name is swallowed by the type run --
+        // `integer rev1` is indistinguishable from a two-word type until the
+        // comma, and a greedy type is what every other rule here depends on.
+        // The later names are named properly.
+        seq(
+          kw('as'),
+          field('type', $._type),
+          repeat(seq(',', field('name', $.identifier))),
+        ),
+      ),
       $._line_end,
     ),
 
@@ -360,6 +480,20 @@ module.exports = grammar({
       repeat($._body_item),
       endkw('extern'),
     ),
+
+    // `extern import _ctype alias "_ctype" as ushort ptr ptr` -- a DLL-imported
+    // VARIABLE, and a whole statement rather than a block. It shares its first
+    // word with the block, and only the rest of the line separates them.
+    // A DYNAMIC precedence, because both readings can complete: taking the
+    // declaration for a block header swallows a LATER block's `end extern` and
+    // still parses. Preferring the one-line reading is what makes the nesting
+    // come out right.
+    extern_declaration: $ => prec.dynamic(1, seq(
+      kw('extern'),
+      $.identifier,
+      optional($._atoms),
+      $._line_end,
+    )),
 
     // ------------------------------------------------------------ statements
     _body_item: $ => choice(
@@ -435,6 +569,13 @@ module.exports = grammar({
     _inline_statement: $ => choice(
       $.exit_statement,
       $.end_statement,
+
+      // `if pwsz = NULL then function = "" : exit function` -- assigning the
+      // result is a statement like any other, and it is written inline more
+      // often than not.
+      $.result_assignment,
+
+      $.open_statement,
       $._simple_statement,
     ),
 
@@ -558,6 +699,11 @@ module.exports = grammar({
     // opens a procedure that is never closed -- 222 files of one project here
     // failed on that one line shape.
     result_assignment: $ => seq(
+      // `operator` IS HERE TOO, and it is the hard one: `operator = ( a, b ) as
+      // boolean` is a DEFINITION and `operator = *cast( ... )` assigns the
+      // result, and the two are identical until the end of the line. The
+      // conflict below hands both readings to the GLR parser, which keeps
+      // whichever one goes on to parse.
       field('kind', choice(kw('function'), kw('property'), kw('operator'))),
       '=',
       $._atoms,
@@ -600,6 +746,23 @@ module.exports = grammar({
       seq('(', repeat($._nested_atom), ')'),
       seq('[', repeat($._nested_atom), ']'),
 
+      // `as <type>` INSIDE A STATEMENT. A function pointer's type spells
+      // FUNCTION and carries a parameter list -- `dim as function( byval as T
+      // ) as T f` -- and read as loose words it ends the statement at a word
+      // that can only open a procedure. 68 files of tiko-lang's own test
+      // corpus are that one shape.
+      $.type_annotation,
+
+      // A LAMBDA: `= function( byval v as T ) as T ... end function`. It is a
+      // procedure with NO NAME, which is exactly what tells it apart from a
+      // definition -- nothing else in the language opens a block here.
+      $.lambda,
+
+      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME, not a block opener:
+      // `rtp.type = nType`. Nothing can follow a dot but a name, so this
+      // reading is never in competition with the other one.
+      $.member_access,
+
       // An array or UDT initialiser: `= { 1, 2, 3 }`.
       seq('{', repeat($._nested_atom), '}'),
 
@@ -608,6 +771,50 @@ module.exports = grammar({
       // word is the only thing that tells them apart.
       $.type_literal,
     ),
+
+    // Higher precedence than a bare `.` atom followed by whatever comes next:
+    // once a dot is seen, a structural word after it can only be a name.
+    // NOT `_type`: that one carries `const`, and `const` is also how a
+    // statement may START -- `select case as const x` cannot be resolved with
+    // one token of lookahead. Everything else a type can hold is here.
+    type_annotation: $ => prec.right(seq(kw('as'), repeat1(choice(
+      $.identifier,
+      '.', '*',
+      $.generic_parameters,
+
+      // A BALANCED GROUP, not a parameter list: the parentheses after a type
+      // are the function pointer's parameters in `as function( byval as T )`
+      // and the ARRAY BOUNDS in `as ubyte chunk( 0 to N - 1 )`, and only one
+      // of those is a parameter list.
+      seq('(', repeat($._nested_atom), ')'),
+
+      kw('function'), kw('sub'),
+      kw('as'),
+    )))),
+
+    lambda: $ => seq(
+      field('kind', choice(kw('function'), kw('sub'))),
+      $.parameter_list,
+      repeat($._signature_tail),
+      $._line_end,
+      repeat($._body_item),
+      field('close', choice(endkw('function'), endkw('sub'))),
+    ),
+
+    // `.name` AND `->name`: a structural word after either is a member name.
+    // `m_pRange->lpvtbl->Select( ... )` is the shape that found the arrow.
+    member_access: $ => prec(1, seq(choice('.', token(prec(1, '->'))), alias(choice(
+      // An ORDINARY name too, not only the structural words: once the arrow is
+      // a member-access token rather than an operator, `p->q` has to be read
+      // here as well, and reading `a.b` the same way costs nothing.
+      $.identifier,
+      kw('type'), kw('union'), kw('enum'), kw('function'), kw('sub'),
+      kw('property'), kw('operator'), kw('namespace'), kw('scope'),
+      kw('with'), kw('select'), kw('case'), kw('next'), kw('end'),
+      kw('for'), kw('do'), kw('while'), kw('if'), kw('then'), kw('else'),
+      kw('as'), kw('is'), kw('of'), kw('const'), kw('static'), kw('shared'),
+      kw('private'), kw('public'), kw('protected'),
+    ), $.identifier))),
 
     type_literal: $ => seq(
       kw('type'),
@@ -623,6 +830,11 @@ module.exports = grammar({
       seq('(', repeat($._nested_atom), ')'),
       seq('[', repeat($._nested_atom), ']'),
 
+      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME, not a block opener:
+      // `rtp.type = nType`. Nothing can follow a dot but a name, so this
+      // reading is never in competition with the other one.
+      $.member_access,
+
       // An array or UDT initialiser: `= { 1, 2, 3 }`.
       seq('{', repeat($._nested_atom), '}'),
     ),
@@ -633,6 +845,14 @@ module.exports = grammar({
     _type: $ => prec.right(repeat1(choice(
       $.identifier,
       '.', '*',
+
+      // A FUNCTION POINTER IS A TYPE: `as function( ... ) as long`, `as sub( )`.
+      kw('function'), kw('sub'),
+
+      // CONST IS PART OF THE TYPE, and it appears more than once in one:
+      // `as const IID const ptr` is what every COM interface in AfxNova
+      // declares its parameters as.
+      kw('const'),
       // The only parentheses a TYPE can carry: a generic's arguments, or the
       // parameters of a function pointer. Anything else in parentheses
       // belongs to the statement around the type, not to the type.
@@ -652,6 +872,10 @@ module.exports = grammar({
     // `Customer.SetName`, and `Optional( of T ).HasValue` -- a generic's type
     // arguments are part of the name, which is what keeps the member out of
     // the signature.
+    // THE GENERIC ARGUMENTS BELONG TO THE NAME, in every position: a generic
+    // procedure (`function Some( of T )( v )`) and a member of a generic type
+    // (`function It( of T ).IsValid( )`) are then the same shape, and the
+    // parameter list that follows is an ordinary signature tail.
     qualified_name: $ => prec.left(seq(
       $.identifier,
       optional($.generic_parameters),

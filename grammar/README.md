@@ -67,8 +67,13 @@ by whether it is elegant.
 | --- | ---: | ---: |
 | `tiko-lsp/src` | 77 | 0 |
 | `tiko-lsp/tests` | 15 | 0 |
-| `tiko-lang/src` | 123 | 0 |
+| `tiko-lang/src` | 123 | 2 |
+| `tiko-lang/tests` | 3029 | 141 |
 | `PsControls` (FreeBASIC) | 572 | 0 |
+| `AfxNova/src` (FreeBASIC) | 179 | 7 |
+
+`tiko-lang/tests` is the compiler's own corner-case corpus, and several of the
+141 are deliberately invalid programs that a grammar is *supposed* to reject.
 
 Two files in `tiko-lang/src` (`mir/lowerstr.bas`, `parser/parser.bas`) open a
 `namespace` and leave the `end namespace` to a file they `#include` at the

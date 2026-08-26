@@ -40,6 +40,19 @@ reference lists it.
 | `r = type<POINT>( x, y )` | A UDT literal spelled with the block word. |
 | `declare sub puts_ cdecl alias "puts" ( ... )` | The parameter list does not come last; it is one signature tail among others. |
 | `Call_( a, _  '' note` | A comment may follow the continuation underscore. |
+| `operator = ( ... )`, `operator C.@ ( )` | An operator is named by a **symbol**, and a member operator carries its type in front of it. AfxNova defines dozens; each lost its file from the first one on. |
+| `as const IID const ptr` | `const` is part of a type, and appears twice in one — every COM parameter in AfxNova. |
+| `function Some( of T )( byref v as T )` | A generic procedure names its type parameters between the name and the value parameters. |
+| `#macro M( args... )` | The variadic macro parameter is named. |
+| `a : 3 as ulong` | A bitfield member — the colon ends a statement everywhere else. |
+| `rtp.type = nType` | A structural word after a dot is a member name. |
+| `operator = ( ... )` vs `operator = *cast( ... )` | The same two tokens open a definition and assign a result. Both readings go to the GLR parser, and whichever goes on to parse wins. |
+| `( of T )` | One token, `( of`. `Foo( of T )` and `Foo( x )` differ only *after* the parenthesis, so as two tokens the parser has to pick a generic list or a parameter list before it can see which it is. |
+| `extern import x alias "y" as T` | A statement, not a block — same first word as `extern "C"`, and a dynamic precedence keeps it from swallowing a later block's `end extern`. |
+| `= function( byval v as T ) as T ... end function` | A lambda: a procedure with no name. |
+| `p->lpvtbl->Select( p )` | A structural word after `.` or `->` is a member name. |
+| `if p = 0 then function = "" : exit function` | Assigning the result inline. |
+| `type as integer rev1, rev2` | The reversed type-alias list. |
 | a file with no trailing newline | Every buffer being typed into. An external scanner contributes one zero-width token: **end of file ends a line**. |
 | an unterminated `"` | fbc accepts it, this project's corpus contains one, and an editor sees one on every keystroke while a string is typed. |
 
@@ -51,8 +64,10 @@ Corpus-driven means judged by whether it parses real code:
 | --- | ---: | ---: |
 | `tiko-lsp/src` | 77 | 0 |
 | `tiko-lsp/tests` | 15 | 0 |
-| `tiko-lang/src` | 123 | 0 |
+| `tiko-lang/src` | 123 | 2 |
+| `tiko-lang/tests` | 3029 | 141 |
 | `PsControls` (FreeBASIC) | 572 | 0 |
+| `AfxNova/src` (FreeBASIC) | 179 | 7 |
 
 `tree-sitter test` runs 19 corpus cases covering declarations, statements, the
 preprocessor and the lexical corners; all pass.
@@ -68,6 +83,16 @@ preprocessor and the lexical corners; all pass.
 - **Two files parse with a `MISSING "end namespace"`**: `mir/lowerstr.bas` and
   `parser/parser.bas` open a namespace and leave the closer to a file they
   `#include` at the bottom. Legal, and no file-at-a-time parser can balance it.
+- **What still fails is listed, not rounded away.** In `tiko-lang/tests`
+  (3029 files, the compiler's own corner-case corpus) 141 files carry an
+  ERROR — and some of them **should**: `bad-decl.bas`, `bad-expr.bas`,
+  `broken.bas`, `missing-end.bas` and `unclosed-paren.bas` are deliberately
+  invalid programs, and `field-keyword-name.bas` exists to prove a field may be
+  named after almost any keyword. The rest are `#macro` bodies, `#print`, and
+  declarations spelled in ways this grammar reads as one statement rather than
+  several.
+- **A member named with a structural word and no dot in front of it** —
+  `as UINT Type` — still fails; it is 4 of AfxNova's 7.
 - **PsControls is FreeBASIC, not tiko** -- it is in the table because it is
   25 owner-drawn controls of hand-written real code, and it is what found
   `function = 0` and `type<POINT>( ... )`.

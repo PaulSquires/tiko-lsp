@@ -15,15 +15,15 @@ dim as long kept = 2
   (comment)
   (comment)
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (number)
   (comment)
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (number))
 
 ================================================================================
@@ -55,25 +55,25 @@ dim as zstring ptr z = @"raw"
 
 (source_file
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (number)
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (number)
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (string)
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier)
+    (identifier))
   (operator)
   (string))
 
@@ -86,9 +86,9 @@ dim as long i : i = 0 : print i
 
 (source_file
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (identifier)
   (number)
   (identifier)

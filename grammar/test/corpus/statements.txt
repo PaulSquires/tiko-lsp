@@ -99,8 +99,8 @@ next
 (source_file
   (for_statement
     variable: (identifier)
-    variable: (identifier)
-    variable: (identifier)
+    variable: (type_annotation
+      (identifier))
     variable: (number)
     variable: (identifier)
     variable: (number)
@@ -140,12 +140,13 @@ end with
 (source_file
   (scope_block
     (identifier)
-    (identifier)
-    (identifier)
-    (identifier))
+    (type_annotation
+      (identifier)
+      (identifier)))
   (with_block
     (identifier)
-    (identifier)
+    (member_access
+      (identifier))
     (number)))
 
 ================================================================================

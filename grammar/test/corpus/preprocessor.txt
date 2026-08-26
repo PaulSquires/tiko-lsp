@@ -47,16 +47,16 @@ Conditional directives are opaque lines
       (identifier)
       (identifier)))
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (preproc
     (preproc_other
       directive: (preproc_directive)))
   (identifier)
-  (identifier)
-  (identifier)
-  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
   (preproc
     (preproc_other
       directive: (preproc_directive))))
