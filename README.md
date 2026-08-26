@@ -127,8 +127,10 @@ tiko-lsp/
                 fixtures/workspace/   a two-file workspace the cross-file
                                       assertions are made against
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
-  docs/         architecture.md, phase1.md .. phase10.md
+  docs/         architecture.md, phase1.md .. phase10.md, grammar.md
   editors/zed/  a Zed extension: the language, and where to find the server
+  grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
+                for editors that colour and fold without a server
 ```
 
 Every directory in the sketch now has something real in it.

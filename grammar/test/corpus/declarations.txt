@@ -1,0 +1,155 @@
+================================================================================
+A procedure, with modifiers, defaults and a return type
+================================================================================
+
+private function Add( byval a as long, byval b as long = 1 ) as long
+    return a + b
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    (modifier)
+    name: (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        name: (identifier)
+        type: (identifier))
+      (parameter
+        name: (identifier)
+        type: (identifier)
+        default: (number)))
+    return_type: (identifier)
+    (identifier)
+    (identifier)
+    (operator)
+    (identifier)))
+
+================================================================================
+A method body, named with a dot
+================================================================================
+
+sub Engine.Flush( )
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (qualified_name
+      (identifier)
+      (identifier))
+    (parameter_list)))
+
+================================================================================
+A declare inside a type, with an access specifier and a base
+================================================================================
+
+type Point extends Base
+private:
+    dim as long x
+    declare sub Move( byval dx as long )
+end type
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    name: (identifier)
+    base: (identifier)
+    (access_specifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (declare_statement
+      name: (qualified_name
+        (identifier))
+      (parameter_list
+        (parameter
+          name: (identifier)
+          type: (identifier))))))
+
+================================================================================
+An enum, a union and a type alias
+================================================================================
+
+enum Colour
+    RED = 0
+    GREEN
+end enum
+
+union Word_
+    dim as short s
+end union
+
+type Handle as any ptr
+--------------------------------------------------------------------------------
+
+(source_file
+  (enum_definition
+    name: (identifier)
+    (enum_member
+      name: (identifier)
+      (number))
+    (enum_member
+      name: (identifier)))
+  (union_definition
+    name: (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier))
+  (type_alias
+    name: (identifier)
+    type: (identifier)
+    type: (identifier)))
+
+================================================================================
+A namespace holding an extern block
+================================================================================
+
+namespace Tko.Diag
+extern "C"
+    declare sub puts_ cdecl alias "puts" ( byval s as zstring ptr )
+end extern
+end namespace
+--------------------------------------------------------------------------------
+
+(source_file
+  (namespace_definition
+    name: (qualified_name
+      (identifier)
+      (identifier))
+    (extern_block
+      (string)
+      (declare_statement
+        name: (qualified_name
+          (identifier))
+        (identifier)
+        (identifier)
+        (string)
+        (parameter_list
+          (parameter
+            name: (identifier)
+            type: (identifier)
+            type: (identifier)))))))
+
+================================================================================
+A generic type
+================================================================================
+
+type Vector( of T )
+    dim as T ptr items
+end type
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    name: (identifier)
+    (generic_parameters
+      (identifier))
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)))

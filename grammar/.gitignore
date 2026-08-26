@@ -1,0 +1,9 @@
+node_modules/
+build/
+*.wasm
+q.bas
+q2.bas
+q2.txt
+s1.bas
+s2.bas
+sample.bas

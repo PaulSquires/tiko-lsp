@@ -1,0 +1,20 @@
+{
+  "name": "tree-sitter-tiko",
+  "version": "0.1.0",
+  "description": "A tree-sitter grammar for tiko, written for editors.",
+  "license": "MIT",
+  "tree-sitter": [
+    {
+      "scope": "source.tiko",
+      "file-types": [
+        "bas",
+        "bi",
+        "inc"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.26.13"
+  }
+}

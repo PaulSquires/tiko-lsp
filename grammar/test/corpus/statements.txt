@@ -1,0 +1,180 @@
+================================================================================
+if / elseif / else
+================================================================================
+
+if a = 1 then
+    f( )
+elseif a = 2 then
+    g( )
+else
+    h( )
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    condition: (number)
+    (identifier)
+    (elseif_clause
+      condition: (identifier)
+      condition: (number)
+      (identifier))
+    (else_clause
+      (identifier))))
+
+================================================================================
+A single-line if, both spellings of the closer
+================================================================================
+
+if a then return 1
+if a then f( ) else g( )
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_single_line
+    condition: (identifier)
+    (identifier)
+    (number))
+  (if_single_line
+    condition: (identifier)
+    (identifier)
+    (identifier)))
+
+================================================================================
+select case, with a range and a comparison arm
+================================================================================
+
+select case n
+case 0
+    f( )
+case 1 to 9, 20
+    g( )
+case is > 100
+    h( )
+case else
+    k( )
+end select
+--------------------------------------------------------------------------------
+
+(source_file
+  (select_statement
+    value: (identifier)
+    (case_clause
+      value: (number)
+      (identifier))
+    (case_clause
+      value: (number)
+      value: (identifier)
+      value: (number)
+      value: (number)
+      (identifier))
+    (case_clause
+      value: (operator)
+      value: (number)
+      (identifier))
+    (case_clause
+      (identifier))))
+
+================================================================================
+Loops
+================================================================================
+
+for i as long = 0 to 9 step 2
+    continue for
+next i
+
+while more
+    exit while
+wend
+
+do
+    x += 1
+loop until x > 3
+
+for each d in items
+next
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    variable: (identifier)
+    variable: (identifier)
+    variable: (identifier)
+    variable: (number)
+    variable: (identifier)
+    variable: (number)
+    variable: (identifier)
+    variable: (number)
+    (exit_statement)
+    (identifier))
+  (while_statement
+    condition: (identifier)
+    (exit_statement))
+  (do_statement
+    (identifier)
+    (operator)
+    (number)
+    condition: (identifier)
+    condition: (operator)
+    condition: (number))
+  (for_statement
+    variable: (identifier)
+    variable: (identifier)
+    variable: (identifier)
+    variable: (identifier)))
+
+================================================================================
+scope, with and asm blocks
+================================================================================
+
+scope
+    dim as long t
+end scope
+
+with obj
+    .x = 1
+end with
+--------------------------------------------------------------------------------
+
+(source_file
+  (scope_block
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier))
+  (with_block
+    (identifier)
+    (identifier)
+    (number)))
+
+================================================================================
+open, which spells FOR and AS without meaning either
+================================================================================
+
+open err for output as #fh
+open "log.txt" for binary access read as #2
+--------------------------------------------------------------------------------
+
+(source_file
+  (open_statement
+    (open_text))
+  (open_statement
+    (open_text)))
+
+================================================================================
+A label, a goto and end as a statement
+================================================================================
+
+retry:
+    goto retry
+    end 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (label
+    name: (identifier))
+  (identifier)
+  (identifier)
+  (end_with_value
+    (number)))

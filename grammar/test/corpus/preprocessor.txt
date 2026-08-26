@@ -1,0 +1,62 @@
+================================================================================
+include, define and a multi-line macro
+================================================================================
+
+#include once "diag/engine.bi"
+#define MAX_N 32
+#macro CHECK( x )
+    if not (x) then
+        Fail( #x )
+    end if
+#endmacro
+--------------------------------------------------------------------------------
+
+(source_file
+  (preproc
+    (preproc_include
+      path: (string)))
+  (preproc
+    (preproc_define
+      name: (identifier)
+      (number)))
+  (preproc
+    (preproc_macro
+      name: (identifier)
+      (parameter_list
+        (parameter
+          name: (identifier)))
+      (macro_text)
+      (macro_text)
+      (macro_text))))
+
+================================================================================
+Conditional directives are opaque lines
+================================================================================
+
+#if defined( __FB_WIN32__ )
+    dim as long n
+#else
+    dim as long n
+#endif
+--------------------------------------------------------------------------------
+
+(source_file
+  (preproc
+    (preproc_other
+      directive: (preproc_directive)
+      (identifier)
+      (identifier)))
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (preproc
+    (preproc_other
+      directive: (preproc_directive)))
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (preproc
+    (preproc_other
+      directive: (preproc_directive))))

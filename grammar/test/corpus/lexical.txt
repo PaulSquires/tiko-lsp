@@ -1,0 +1,95 @@
+================================================================================
+Comments: apostrophe, REM as a whole word, and the block form
+================================================================================
+
+'' a comment
+rem another one
+dim as long removed = 1
+/'
+   a block comment
+'/
+dim as long kept = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number)
+  (comment)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number))
+
+================================================================================
+A continued line, with a comment after the underscore
+================================================================================
+
+Call_( a, _   '' the first
+       b, _
+       c )
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (identifier)
+  (line_continuation)
+  (identifier)
+  (line_continuation)
+  (identifier))
+
+================================================================================
+Literals
+================================================================================
+
+dim as long   h = &hFF
+dim as double d = 1.5e-3
+dim as string s = "a ""quoted"" word"
+dim as zstring ptr z = @"raw"
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (string)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (operator)
+  (string))
+
+================================================================================
+Statements separated by colons
+================================================================================
+
+dim as long i : i = 0 : print i
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier))
