@@ -91,8 +91,11 @@ correct apart from one `MISSING "end namespace"` at EOF.
 
 ## Using it from an editor
 
-The grammar is a plain tree-sitter grammar and works anywhere one does. For
-Zed, the extension in [`../editors/zed`](../editors/zed) declares the language
-and the language server; wiring the grammar into it needs the grammar published
-as a git repository of its own, because a Zed extension names a grammar by
-repository URL and commit, never by a local path.
+The grammar is a plain tree-sitter grammar and works anywhere one does. The Zed
+extension is in [`../editors/zed`](../editors/zed), and it names this grammar by
+REPOSITORY AND REVISION -- never by a path, and the repository root is where it
+looks for `src/parser.c`. This directory is not a repository root, so it is
+mirrored to one (`C:\dev\tree-sitter-tiko` by default) and loaded through a
+`file://` URL. Run [`../editors/zed/sync-grammar.sh`](../editors/zed/sync-grammar.sh)
+after changing the grammar: it regenerates, mirrors, commits and re-pins the
+revision in `extension.toml`.

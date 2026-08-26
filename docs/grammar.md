@@ -74,12 +74,14 @@ preprocessor and the lexical corners; all pass.
 
 ## Not verified
 
-- **No editor has rendered it.** The queries are checked with
-  `tree-sitter query`, which proves they compile and capture the nodes they
-  name — not that a colour scheme maps every capture to a colour.
-- **Wiring it into the Zed extension is not done.** A Zed extension names a
-  grammar by *repository URL and commit*, never by a local path, so the grammar
-  has to be published as a repository of its own first.
+- **Zed is wired up, but nothing has rendered it yet.** A Zed extension names a
+  grammar by *repository and revision*, never by a path -- and the repository
+  root is where it looks for `src/parser.c`. A `file://` URL is allowed, so the
+  grammar is mirrored to a local repository at `C:\dev\tree-sitter-tiko` and
+  `editors/zed/extension.toml` pins that revision. `editors/zed/sync-grammar.sh`
+  re-mirrors and re-pins after a grammar change. What has NOT happened is a
+  reload inside Zed: the queries are checked with `tree-sitter query`, which
+  proves they compile and capture, and no more than that.
 - **Two files parse with a `MISSING "end namespace"`**: `mir/lowerstr.bas` and
   `parser/parser.bas` open a namespace and leave the closer to a file they
   `#include` at the bottom. Legal, and no file-at-a-time parser can balance it.

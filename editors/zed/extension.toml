@@ -6,6 +6,14 @@ description = "Language support for tiko, served by tiko-lsp."
 repository = "https://github.com/PaulSquires/tiko-lsp"
 authors = ["Paul Squires"]
 
+# The grammar is named by REPOSITORY AND REVISION -- never by a local path.
+# A `file://` URL is how a grammar is loaded from the filesystem while it is
+# being developed; swap in the GitHub URL once the grammar is published, and
+# change the rev with it.
+[grammars.tiko]
+repository = "file:///C:/dev/tree-sitter-tiko"
+rev = "3a3adedfaaeb0d6259ea700b699c62ff5bd01929"
+
 [language_servers.tiko-lsp]
 name = "tiko-lsp"
 languages = ["Tiko"]

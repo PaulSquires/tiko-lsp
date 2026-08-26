@@ -76,3 +76,34 @@ semantic tokens, inlay hints, formatting and quick fixes.
   [the test suite](../../tests/session_tool.bas), not through Zed's interface.
 - **macOS and Linux.** The extension has no platform-specific code, and the
   server has never been built for either.
+
+## The grammar
+
+Syntax highlighting, folding, the outline and indentation come from
+**tree-sitter-tiko**, which lives at `../../grammar` and is declared here as:
+
+```toml
+[grammars.tiko]
+repository = "file:///C:/dev/tree-sitter-tiko"
+rev = "..."
+```
+
+A Zed extension names a grammar by REPOSITORY AND REVISION -- never by a path --
+and the repository root is where Zed looks for `src/parser.c`. `../../grammar`
+is not a repository root, so it is mirrored to one; a `file://` URL keeps that
+local until the grammar is published. Zed clones that revision and compiles it
+to wasm itself.
+
+After changing the grammar, run:
+
+```bash
+bash editors/zed/sync-grammar.sh
+```
+
+which regenerates the parser, mirrors it, commits, and rewrites `rev` above.
+Then run **`zed: reload extensions`** in Zed (or restart it) -- a dev extension
+is a symlink to this directory, so nothing else has to be reinstalled.
+
+The queries Zed uses are `languages/tiko/*.scm` in THIS directory, not the ones
+in the grammar: the capture names are mapped onto the set Zed's themes colour,
+and a capture a theme does not know is simply not painted.

@@ -1,4 +1,5 @@
 name = "Tiko"
+grammar = "tiko"
 path_suffixes = ["bas", "bi", "inc"]
 line_comments = ["' ", "'' "]
 block_comment = { start = "/'", prefix = "", end = "'/", tab_size = 0 }
