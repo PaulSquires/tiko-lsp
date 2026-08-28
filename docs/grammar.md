@@ -80,8 +80,19 @@ preprocessor and the lexical corners; all pass.
   grammar is mirrored to a local repository at `C:\dev\tree-sitter-tiko` and
   `editors/zed/extension.toml` pins that revision. `editors/zed/sync-grammar.sh`
   re-mirrors and re-pins after a grammar change. What has NOT happened is a
-  reload inside Zed: the queries are checked with `tree-sitter query`, which
-  proves they compile and capture, and no more than that.
+  reload inside Zed VERIFIED THE LANGUAGE SERVER, not the colours: with the
+  queries in place Zed logs `start/finish loading grammar "tiko"` and starts
+  `tiko-lsp.exe`. Nobody has looked at a rendered buffer yet.
+
+- **ONE PATTERN SHAPE ZED REFUSES**, found the hard way: anything that names a
+  FIELD or a KEYWORD inside `enum_definition` --
+  `(enum_definition name: (identifier) @type)`,
+  `(enum_definition "enum" @open "end enum" @close)`. Zed says NOTHING: the
+  language never attaches, so the file loses its highlighting *and* its
+  language server, and the log is silent at every trace level. `tree-sitter
+  query` accepts both, so the grammar's own queries are not a check on Zed's.
+  A named child -- `(enum_definition (identifier) @type)` -- is fine, and that
+  is what the Zed queries use.
 - **Two files parse with a `MISSING "end namespace"`**: `mir/lowerstr.bas` and
   `parser/parser.bas` open a namespace and leave the closer to a file they
   `#include` at the bottom. Legal, and no file-at-a-time parser can balance it.

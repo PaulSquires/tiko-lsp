@@ -1,2 +1,6 @@
 target/
 extension.wasm
+
+# Zed compiles the declared grammar to wasm INSIDE the extension directory,
+# because a dev extension is a symlink to this one.
+grammars/

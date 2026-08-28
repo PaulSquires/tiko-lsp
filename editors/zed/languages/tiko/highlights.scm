@@ -57,7 +57,12 @@
 
 (type_definition  name: (identifier) @type)
 (union_definition name: (identifier) @type)
-(enum_definition  name: (identifier) @type)
+; ZED WILL NOT TAKE A FIELD OR A KEYWORD INSIDE `enum_definition`, and it
+; says nothing when it refuses: the language never attaches, so the file
+; loses its highlighting AND its language server together, with no line in
+; the log. A NAMED child is accepted, and an enum's members are
+; `enum_member` nodes, so this matches the name and nothing else.
+(enum_definition (identifier) @type)
 (type_alias       name: (identifier) @type)
 (namespace_definition name: (qualified_name (identifier) @type))
 (generic_parameters (identifier) @type)
