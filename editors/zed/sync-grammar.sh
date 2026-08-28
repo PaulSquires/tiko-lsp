@@ -4,8 +4,11 @@
 # WHY A SECOND REPOSITORY AT ALL: a Zed extension names a grammar by REPOSITORY
 # AND REVISION, never by a path, and the repository root is where it looks for
 # `src/parser.c`. The grammar is developed at tiko-lsp/grammar, which is not a
-# repository root -- so it is mirrored to one. A `file://` URL keeps that local
-# until the grammar is published.
+# repository root -- so it is mirrored to one. Zed loads that mirror through a
+# `file://` URL, and the mirror is ALSO published at
+# github.com/PaulSquires/tree-sitter-tiko, so the push below keeps the two from
+# drifting. The push is not what Zed reads: a failed push leaves the local
+# reload working, and says so.
 #
 # Run this after every grammar change, then reload extensions in Zed.
 set -e
@@ -27,6 +30,21 @@ cd "$DST"
 git add -A
 git commit -q -m "sync from tiko-lsp/grammar" || echo "nothing changed in the grammar"
 REV="$(git log --format=%H -1)"
+
+# Publish it. `set -e` is lifted for this one command on purpose: what Zed
+# reads is the LOCAL clone, so a network failure must not stop the pin below
+# and leave the extension naming a revision that was never written.
+if git remote get-url origin >/dev/null 2>&1; then
+    set +e
+    git push -q origin HEAD
+    if [ $? -ne 0 ]; then
+        echo "WARNING: the push to origin failed -- the local reload still works," >&2
+        echo "         but github is now behind $(echo "$REV" | cut -c1-12)" >&2
+    fi
+    set -e
+else
+    echo "no origin on $DST -- nothing published"
+fi
 
 cd "$HERE"
 python - "$REV" <<'PY'
