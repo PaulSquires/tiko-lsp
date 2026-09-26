@@ -53,15 +53,20 @@ private function OnHover( byref srv as Server, _
     dim as long wordStart, wordEnd
     dim as long symIndex = ResolveAtOffset( doc, offset, wordStart, wordEnd )
 
+    dim as string markdown = ""
+    if( symIndex >= 0 ) then
+        markdown = SymbolHoverMarkdown( doc->Symbols( ).Items[symIndex] )
+    else
+        markdown = BuiltinTypedefHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
+    end if
+
     '' A null result is the correct answer for "nothing to say here", and is
     '' what stops an editor from showing an empty tooltip.
-    if( symIndex < 0 ) then return rb.NewNull( )
-
-    dim as SymbolInfo sym = doc->Symbols( ).Items[symIndex]
+    if( len(markdown) = 0 ) then return rb.NewNull( )
 
     dim as JsonNode contents = rb.NewObject( )
     rb.SetStr( contents, "kind",  "markdown" )
-    rb.SetStr( contents, "value", SymbolHoverMarkdown( sym ) )
+    rb.SetStr( contents, "value", markdown )
 
     dim as JsonNode result_ = rb.NewObject( )
     rb.SetNode( result_, "contents", contents )

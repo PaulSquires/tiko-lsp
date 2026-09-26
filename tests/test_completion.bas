@@ -276,6 +276,33 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "the fixed-width type names" )
+
+scope
+    Analyse( "sub Work( )" & LF & "    x" & LF & "end sub" )
+    CompleteAfter( "    x" )
+
+    AssertTrue ( Has( "int32" ), "tiko-lang's int32 is offered" )
+    AssertTrue ( Has( "float64" ), "and so is float64" )
+    AssertEqInt( KindOf( "uint8" ), CMP_STRUCT, "as a type, as a UDT is" )
+    AssertEqStr( DetailOf( "int64" ), "type int64 as longint", "naming the type it stands for" )
+    AssertEqInt( GroupOf( "int16" ), CMPGROUP_KEYWORD, "ranked with the language" )
+end scope
+
+scope
+    '' A file's own float32 has replaced tiko's: one candidate, the file's.
+    Analyse( "dim shared as long float32" & LF & "x" )
+    CompleteAfter( LF & "x" )
+
+    AssertEqInt( KindOf( "float32" ), CMP_VARIABLE, "a file's own float32 wins" )
+    dim as long n = 0
+    for i as long = 0 to g_Items.Count( ) - 1
+        if( lcase( g_Items[i].Label ) = "float32" ) then n += 1
+    next
+    AssertEqInt( n, 1, "and is the only float32 offered" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "no duplicates" )
 
 scope

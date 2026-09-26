@@ -211,3 +211,33 @@ function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
 
     return out_
 end function
+
+'' The size of the type a fixed-width name stands for.
+private function BuiltinTypedefBytes( byref target as string ) as long
+    select case target
+        case "byte", "ubyte"       : return 1
+        case "short", "ushort"     : return 2
+        case "long", "ulong"       : return 4
+        case "single"              : return 4
+        case "longint", "ulongint" : return 8
+        case "double"              : return 8
+    end select
+    return 0
+end function
+
+function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
+                                      byval offset as long ) as string
+    dim as long tokIdx = TokenIndexAt( tokens, offset )
+    if( tokIdx < 0 ) then return ""
+
+    dim as Token tok = tokens[tokIdx]
+    if( tok.Kind <> TK_IDENT ) then return ""
+    if( IsMemberAccess( text_, tokens, tokIdx ) ) then return ""
+
+    dim as string word_ = TokenText( text_, tok )
+    dim as string target = BuiltinTypedefTarget( word_ )
+    if( len(target) = 0 ) then return ""
+
+    return "```tiko" & chr(10) & "type " & lcase(word_) & " as " & target & chr(10) & "```" & _
+           chr(10) & chr(10) & "*built-in type, " & BuiltinTypedefBytes( target ) & " bytes*"
+end function

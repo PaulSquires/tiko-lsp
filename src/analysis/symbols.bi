@@ -131,5 +131,12 @@ declare function IsMemberAccess( byref text_ as string, byref tokens as TokenArr
 '' declaration, a line naming the kind, then the documentation comment.
 declare function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
 
+'' The hover for one of tiko-lang's fixed-width type names at `offset` --
+'' `type int32 as long` and its size -- or "" when the token there is not one,
+'' or is a member after a dot. The caller asks only once the name has failed
+'' to resolve, so a file's own int32 wins, as it does in the compiler.
+declare function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
+                                              byval offset as long ) as string
+
 '' The human name for a kind, used in hover text.
 declare function SymbolKindName( byval kind as SymbolKind ) as string

@@ -106,4 +106,4 @@
 ; The built-in TYPE names, coloured as types rather than as plain keywords.
 ((identifier) @type.builtin
   (#match? @type.builtin
-   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer)$"))
+   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64)$"))

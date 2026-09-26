@@ -145,6 +145,48 @@ function AllKeywords( ) as FB.Array( of string )
     return g_KeywordNames
 end function
 
+'' ############################################################################
+''  The fixed-width type names
+''
+''  tiko-lang declares ten typedefs for every program, in its prelude:
+''  `type int32 as long` and its siblings. They are NOT in the table above,
+''  and must not be: a program's own declaration of one of the names replaces
+''  tiko's -- a variable called int32, win/basetsd.bi's `type INT32 as long`
+''  -- so to the lexer they are identifiers like any other, and only a name
+''  the file does not declare itself means the built-in.
+'' ############################################################################
+
+function BuiltinTypedefTarget( byref word_ as string ) as string
+    select case lcase(word_)
+        case "int8"    : return "byte"
+        case "uint8"   : return "ubyte"
+        case "int16"   : return "short"
+        case "uint16"  : return "ushort"
+        case "int32"   : return "long"
+        case "uint32"  : return "ulong"
+        case "int64"   : return "longint"
+        case "uint64"  : return "ulongint"
+        case "float32" : return "single"
+        case "float64" : return "double"
+    end select
+    return ""
+end function
+
+function AllBuiltinTypedefs( ) as FB.Array( of string )
+    dim out_ as FB.Array( of string )
+    out_.Push( "int8" )
+    out_.Push( "uint8" )
+    out_.Push( "int16" )
+    out_.Push( "uint16" )
+    out_.Push( "int32" )
+    out_.Push( "uint32" )
+    out_.Push( "int64" )
+    out_.Push( "uint64" )
+    out_.Push( "float32" )
+    out_.Push( "float64" )
+    return out_
+end function
+
 '' The preprocessor directives that open or close a block; every other
 '' directive is KW_PP_OTHER and the parser ignores the rest of its line.
 private function PpKeywordOf( byref word_ as string ) as FbKeyword
