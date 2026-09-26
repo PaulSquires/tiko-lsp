@@ -190,6 +190,11 @@ desynchronises the framing.
 
 ### Editor configuration
 
+tiko source files are `.tko` and headers are `.ti`; the legacy `.bas`, `.bi` and `.inc`
+are still tiko source. The workspace scan indexes all five, case-insensitively, and
+the server asks the client to watch the same set. Map all five to the language in
+your editor.
+
 Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
 
 ```json
@@ -205,6 +210,8 @@ Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
 Neovim:
 
 ```lua
+vim.filetype.add( { extension = { tko = 'tiko', ti = 'tiko', bas = 'tiko', bi = 'tiko', inc = 'tiko' } } )
+
 vim.lsp.config.tiko_lsp = {
   cmd = { 'C:/dev/tiko-lsp/bin/tiko-lsp.exe', '--stdio' },
   filetypes = { 'tiko' },
@@ -229,7 +236,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 1,035 assertions:
+(or `sh build/_run_tests.sh`). Twelve suites, 1,056 assertions:
 
 - **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -259,9 +266,10 @@ build\_run_tests.bat
   string and inside a comment, where the answer is nothing), member completion
   through a declared type, a pointer, `this.`, an enum and a namespace, the
   scope list with its group ordering, and case-insensitive de-duplication.
-- **workspace** — 107 assertions over discovery rules, the include graph
+- **workspace** — 128 assertions over discovery rules, the include graph
   (a chain, a cycle, an edge to nowhere, a wrong-case forward-slash path, and
-  two files declaring one name where only one is visible), indexing and
+  two files declaring one name where only one is visible, and a `.tko` that
+  includes a `.ti` and a legacy `.bi`), indexing and
   re-indexing, the one-file-one-entry rule (a path through `build/..` is the
   same file), buffer-beats-disk, query scoring, and identifier scanning —
   including the strings and comments a reference search must NOT match.

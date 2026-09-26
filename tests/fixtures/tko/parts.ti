@@ -1,0 +1,7 @@
+'' Types shared across the .tko fixture: a header with the .ti extension.
+type Gadget
+    Name_ as string
+    Parts_ as long
+end type
+
+declare function MakeGadget( byref name_ as string ) as Gadget

@@ -56,7 +56,7 @@ const LSP_REGISTER_CAPABILITY = "client/registerCapability"
 
 '' The glob the server asks to be watched, and the kind bits: 1 create,
 '' 2 change, 4 delete -- all three.
-const LSP_WATCH_GLOB = "**/*.{bas,bi,inc}"
+const LSP_WATCH_GLOB = "**/*.{tko,ti,bas,bi,inc}"
 const LSP_WATCH_KIND = 7
 
 '' Editing features (phase 7).
