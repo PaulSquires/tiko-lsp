@@ -22,7 +22,9 @@ visited set, no cycles. FreeBASIC's own `DIR`/`DIRNEXT` -- the server is
 written in it -- is a per-thread global
 and cannot be nested at all, which is why this could not be hand-rolled.
 
-- `.bas`, `.bi`, `.inc`, case-insensitively. Nothing else is tiko source.
+- `.tko` and `.ti`, and the legacy `.bas`, `.bi` and `.inc`, case-insensitively. Nothing
+  else is tiko source. (`.tko` for sources and `.ti` for headers were added 2026-09-26, when
+  tiko adopted them; the older three stay recognised.)
 - `.git`, `.svn`, `.hg`, `.vs`, `.vscode`, `.idea`, `node_modules` and
   `__pycache__` are skipped anywhere in the path. **`bin` and `obj` are not** —
   the extension filter already excludes build output, and a project that keeps

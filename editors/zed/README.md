@@ -1,7 +1,7 @@
 # tiko-lsp for Zed
 
-A Zed extension that gives `.bas`, `.bi` and `.inc` files a language — **Tiko**
-— and starts `tiko-lsp` for them.
+A Zed extension that gives `.tko` and `.ti` files (and the legacy `.bas`, `.bi` and `.inc`)
+a language — **Tiko** — and starts `tiko-lsp` for them.
 
 The extension itself does almost nothing, and that is the point: Zed speaks LSP,
 tiko-lsp speaks LSP, and all that was missing between them was a language name

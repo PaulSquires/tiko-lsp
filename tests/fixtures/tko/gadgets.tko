@@ -1,0 +1,10 @@
+'' A gadget factory: a .tko source that includes a .ti header and a legacy .bi one.
+#include once "parts.ti"
+#include once "legacy.bi"
+
+function MakeGadget( byref name_ as string ) as Gadget
+    dim as Gadget g
+    g.Name_ = name_
+    g.Parts_ = LEGACY_PARTS
+    return g
+end function
