@@ -210,6 +210,34 @@ private sub TestUtf16( )
 end sub
 
 '' ############################################################################
+''  tiko-lang's fixed-width type names
+''
+''  No file declares them, so without a rule of their own they would get no
+''  colour at all -- and a file that DOES declare one has replaced tiko's.
+'' ############################################################################
+private sub TestFixedWidthTypes( )
+    TestGroup( "the fixed-width type names" )
+
+    ''         0         1         2
+    ''         0123456789012345678901234567890
+    Analyse( "dim as int32 n" & LF & _                 '' line 0
+             "dim as UINT8 b" & LF & _                 '' line 1
+             "print intx32" & LF & _                   '' line 2
+             "print rec.int64" & LF )                  '' line 3
+
+    AssertEqInt( TypeAt( 0, 7 ), SEMTYPE_TYPE, "int32 is a type though the file never declares it" )
+    AssertEqInt( ModsAt( 0, 7 ), 0, "with no modifiers" )
+    AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_TYPE, "in any case" )
+    AssertEqInt( TypeAt( 2, 6 ), -1, "and a name that is not one still gets nothing" )
+    AssertEqInt( TypeAt( 3, 10 ), -1, "nor does a member after a dot" )
+
+    Analyse( "dim shared as long int32" & LF & _       '' line 0
+             "int32 = 5" & LF )                        '' line 1
+
+    AssertEqInt( TypeAt( 1, 0 ), SEMTYPE_VARIABLE, "a file's own int32 is its variable" )
+end sub
+
+'' ############################################################################
 ''  Main
 '' ############################################################################
 print "tiko-lsp -- semantic token tests"
@@ -219,5 +247,6 @@ TestClassification( )
 TestLineSplitting( )
 TestEncoding( )
 TestUtf16( )
+TestFixedWidthTypes( )
 
 end TestSummary( "semantic tokens" )

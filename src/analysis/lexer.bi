@@ -131,3 +131,11 @@ declare function IsKeyword( byref word_ as string ) as boolean
 
 '' Every reserved word, lower-cased, in table order.
 declare function AllKeywords( ) as FB.Array( of string )
+
+'' tiko-lang's fixed-width type names -- int8 .. uint64, float32, float64. NOT
+'' keywords: they lex as identifiers. Returns the FreeBASIC type the name is a
+'' typedef for ("long" for int32), or "" when the word is not one of them.
+declare function BuiltinTypedefTarget( byref word_ as string ) as string
+
+'' The ten names, lower-cased, narrowest first.
+declare function AllBuiltinTypedefs( ) as FB.Array( of string )

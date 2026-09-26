@@ -139,11 +139,22 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                 dim as long packed = 0
                 if( declAt.TryGet( tok.Start_, packed ) = false ) then
                     if( byName.TryGet( lcase( TokenText( text_, tok ) ), packed ) = false ) then
-                        '' An identifier this file never declares: a name from
-                        '' an #include, or one being typed. The grammar can
-                        '' have it -- a guess here would be a wrong colour
-                        '' rather than no colour.
-                        continue for
+                        '' One of tiko-lang's own typedefs, int32 and the rest.
+                        '' Only here, after the file's own names: a file that
+                        '' declares int32 itself has replaced tiko's. Never after
+                        '' a dot, where `rec.int32` is a member of something.
+                        dim as boolean builtinType = _
+                            len( BuiltinTypedefTarget( TokenText( text_, tok ) ) ) > 0
+                        if( builtinType ) then builtinType = ( IsMemberAccess( text_, tokens, i ) = false )
+                        if( builtinType ) then
+                            packed = SEMTYPE_TYPE * 16
+                        else
+                            '' An identifier this file never declares: a name
+                            '' from an #include, or one being typed. The
+                            '' grammar can have it -- a guess here would be a
+                            '' wrong colour rather than no colour.
+                            continue for
+                        end if
                     end if
                 end if
 

@@ -329,6 +329,31 @@ scope
     AssertContains( h, "Adds two numbers.", "and carrying the documentation" )
 end scope
 
+scope
+    '' tiko-lang's fixed-width names: asked only when a name did not resolve.
+    Analyse( "dim as int32 n" & LF & _
+             "dim as FLOAT32 f" & LF & _
+             "dim as long float64" & LF & _
+             "print rec.uint16" )
+
+    dim as string h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "int32", 1 ) )
+    AssertContains( h, "```tiko", "a fixed-width name hovers as a code block" )
+    AssertContains( h, "type int32 as long", "showing the type it stands for" )
+    AssertContains( h, "4 bytes", "and its size" )
+
+    h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "FLOAT32", 1 ) )
+    AssertContains( h, "type float32 as single", "in any case" )
+
+    AssertEqStr( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "uint16", 1 ) ), "", _
+                 "never after a dot: rec.uint16 is a member" )
+    AssertEqStr( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "dim", 1 ) ), "", _
+                 "and a keyword is not one" )
+
+    '' The handler asks Resolve first, which is what lets a file's own name win.
+    AssertTrue( g_Syms.Resolve( "float64", ByteAt( "print" ) ) >= 0, _
+                "a file's own float64 resolves, so it is hovered as the file's" )
+end scope
+
 '' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 
