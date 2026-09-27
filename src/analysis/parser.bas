@@ -142,6 +142,9 @@ type ParseState
     '' The '' comment block sitting immediately above the statement being read,
     '' which becomes the next symbol's documentation.
     PendingDoc as string
+
+    '' The statement being read began with `public`: what it declares is marked so.
+    PendingPublic as boolean
 end type
 
 private function MacroOpenerKind( byref st as ParseState, byref name_ as string ) as FbKeyword
@@ -621,6 +624,7 @@ private function AddSymbol( byref st as ParseState, byref name_ as string, _
     sym.NameEnd       = nameStart + nameLen
     sym.IsLocal       = isLocal
     sym.IsDeclaration = isDeclaration
+    sym.IsPublic      = st.PendingPublic
 
     return st.Symbols_->Add( sym )
 end function
@@ -1062,6 +1066,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
 
         '' -- what kind of statement is it? -------------------------------------
         dim as long first_ = 0
+        st.PendingPublic = false
 
         '' Leading modifiers only qualify what follows: `private virtual
         '' destructor Renderer( )` is a destructor body, and
@@ -1073,6 +1078,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
 
             select case m.Kw
                 case KW_PRIVATE, KW_PUBLIC, KW_PROTECTED, KW_VIRTUAL, KW_ABSTRACT
+                    if( m.Kw = KW_PUBLIC ) then st.PendingPublic = true
                     first_ += 1
 
                 case KW_CONST, KW_STATIC

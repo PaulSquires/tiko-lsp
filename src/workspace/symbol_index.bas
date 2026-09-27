@@ -3,6 +3,8 @@
 '' ############################################################################
 
 #include once "symbol_index.bi"
+#include once "modules.bi"
+#include once "fb/filesystem.bi"
 #include once "fb/map.bi"
 #include once "../utils/uri.bi"
 #include once "../utils/position.bi"
@@ -121,6 +123,23 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
     dim refs as IncludeRefArray
     FindIncludes( text_, tokens, refs )
 
+    '' ...and the imports, the same way.
+    dim irefs as ImportRefArray
+    FindImports( text_, tokens, irefs )
+    dim imports as ImportEdgeArray
+    for i as long = 0 to irefs.Count( ) - 1
+        dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, irefs[i].Start_ )
+        dim as SourcePosition b = OffsetToSourcePosition( text_, lines_, irefs[i].Start_ + irefs[i].Length_ )
+        dim as ImportEdge e
+        e.Alias_    = irefs[i].Alias_
+        e.Target    = irefs[i].Path_
+        e.Public_   = irefs[i].Public_
+        e.Line      = a.Line
+        e.StartChar = a.Column
+        e.EndChar   = b.Column
+        imports.Push( e )
+    next
+
     dim edges as IncludeEdgeArray
     for i as long = 0 to refs.Count( ) - 1
         dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, refs[i].Start_ )
@@ -157,6 +176,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
         this.m_files[existing].Symbols    = syms
         this.m_files[existing].Ranges     = ranges
         this.m_files[existing].Includes   = edges
+        this.m_files[existing].Imports    = imports
         this.m_files[existing].FromBuffer = fromBuffer
         exit sub
     end if
@@ -168,6 +188,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
     entry.Symbols    = syms
     entry.Ranges     = ranges
     entry.Includes   = edges
+    entry.Imports    = imports
     entry.FromBuffer = fromBuffer
     this.m_files.Push( entry )
 end sub
@@ -242,8 +263,51 @@ private function FileNameOf( byref path_ as string ) as string
     return lcase( path_ )
 end function
 
+'' THE IMPORTS, each to its module directory's files (workspace/modules.bi). The first
+'' candidate directory that holds a file of the index wins. A candidate the index knows
+'' nothing of but that exists -- the toolchain's pkg/, which no workspace folder covers --
+'' has its source files indexed first, so `std` resolves like anything else.
+private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as PathArray, _
+                             byref idx as SymbolIndex )
+    dim as long n0 = files_.Count( )
+    for i as long = 0 to n0 - 1
+        for k as long = 0 to files_[i].Imports.Count( ) - 1
+            files_[i].Imports[k].Dir_ = ""
+            files_[i].Imports[k].Files.Clear( )
+            dim cands as PathArray
+            ModuleCandidates( files_[i].Path_, files_[i].Imports[k].Target, roots, cands )
+            for c as long = 0 to cands.Count( ) - 1
+                dim as string want = lcase( cands[c] )
+                dim found as FB.Array( of long )
+                for f as long = 0 to files_.Count( ) - 1
+                    if( lcase( DirOf( NormalizePath( files_[f].Path_ ) ) ) = want ) then found.Push( f )
+                next
+                if( found.Count( ) = 0 andalso FB.IsDir( cands[c] ) ) then
+                    dim entries as FB.Array( of FB.DirEntry )
+                    if( FB.ListDir( cands[c], entries ).IsOk( ) ) then
+                        for q as long = 0 to entries.Count( ) - 1
+                            if( entries[q].IsFile( ) = false ) then continue for
+                            if( IsSourceFileName( entries[q].Name( ) ) = false ) then continue for
+                            if( idx.IndexPath( FB.PathJoin( cands[c], entries[q].Name( ) ) ) ) then
+                                found.Push( files_.Count( ) - 1 )
+                            end if
+                        next
+                    end if
+                end if
+                if( found.Count( ) = 0 ) then continue for
+                files_[i].Imports[k].Dir_ = cands[c]
+                for each f as long in found
+                    files_[i].Imports[k].Files.Push( f )
+                next
+                exit for
+            next
+        next
+    next
+end sub
+
 sub SymbolIndex.ResolveIncludes( )
     if( this.m_files.IsEmpty( ) ) then exit sub
+    ResolveImports_( this.m_files, this.m_searchPaths, this )
 
     '' One pass to know what exists, so the resolution below is a probe rather
     '' than a scan. Without this a workspace of n files with e includes each
@@ -324,6 +388,50 @@ function SymbolIndex.IncludeCount( byval fileIndex as long ) as long
     if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return 0
     return this.m_files[fileIndex].Includes.Count( )
 end function
+
+function SymbolIndex.ImportCount( byval fileIndex as long ) as long
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return 0
+    return this.m_files[fileIndex].Imports.Count( )
+end function
+
+function SymbolIndex.ImportAt( byval fileIndex as long, byval i as long ) as ImportEdge
+    dim as ImportEdge none_
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return none_
+    if( i < 0 orelse i >= this.m_files[fileIndex].Imports.Count( ) ) then return none_
+    return this.m_files[fileIndex].Imports[i]
+end function
+
+function SymbolIndex.ModuleFilesOf( byval fileIndex as long, byref lowerAlias as string, _
+                                    byref out_ as FB.Array( of long ) ) as boolean
+    out_.Clear( )
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return false
+    for k as long = 0 to this.m_files[fileIndex].Imports.Count( ) - 1
+        if( this.m_files[fileIndex].Imports[k].Alias_ <> lowerAlias ) then continue for
+        for each f as long in this.m_files[fileIndex].Imports[k].Files
+            out_.Push( f )
+        next
+        return true
+    next
+    return false
+end function
+
+sub SymbolIndex.ModuleMembers( byval fileIndex as long, byref lowerAlias as string, _
+                               byref out_ as IndexHitArray )
+    out_.Clear( )
+    dim files_ as FB.Array( of long )
+    if( this.ModuleFilesOf( fileIndex, lowerAlias, files_ ) = false ) then exit sub
+    for each f as long in files_
+        for s as long = 0 to this.m_files[f].Symbols.Count( ) - 1
+            dim as SymbolInfo sym = this.m_files[f].Symbols.Items[s]
+            dim as boolean fileLevel = (sym.Parent = -1)
+            if( fileLevel = false orelse sym.IsLocal orelse sym.IsPublic = false ) then continue for
+            dim as IndexHit h
+            h.FileIndex = f
+            h.SymIndex  = s
+            out_.Push( h )
+        next
+    next
+end sub
 
 function SymbolIndex.IncludeAt( byval fileIndex as long, byval i as long ) as IncludeEdge
     dim as IncludeEdge none_

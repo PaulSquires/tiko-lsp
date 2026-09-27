@@ -1,0 +1,6 @@
+# A package: its own modules, and a path dependency.
+[package]
+name = "proj"
+
+[dependencies]
+libz = { path = "../pkglib" }

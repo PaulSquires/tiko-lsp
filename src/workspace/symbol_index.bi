@@ -74,6 +74,30 @@ end type
 
 type IncludeEdgeArray as FB.Array( of IncludeEdge )
 
+'' ONE `#import` (tiko-lang ADR 0017; the resolution rules are workspace/modules.bi). The
+'' import edges, like the include edges, are resolved by ResolveIncludes -- but not only
+'' lexically: a module directory no indexed file lives in, which is what the toolchain's
+'' pkg/ looks like, is read and its files indexed.
+''
+'' The alias it binds, the module directory it
+'' resolved to, and that module's files in the index. A module is a directory, so an
+'' import is an edge to SEVERAL files; an unresolved one has Dir_ "" and no files.
+'' Aliased before use in a field: a generic will not instantiate as a TYPE field.
+type ImportFileArray as FB.Array( of long )
+
+type ImportEdge
+    Alias_    as string    '' lower-cased: the path's last segment, or what `as` says
+    Target    as string    '' the path as written
+    Public_   as boolean   '' `#import ... public`
+    Line      as long
+    StartChar as long
+    EndChar   as long
+    Dir_      as string    '' the module's directory, native, or ""
+    Files     as ImportFileArray
+end type
+
+type ImportEdgeArray as FB.Array( of ImportEdge )
+
 type IndexedFile
     Uri        as string
     Path_      as string
@@ -86,6 +110,7 @@ type IndexedFile
     Symbols    as SymbolTable
     Ranges     as IndexedRangeArray   '' one per symbol, aligned by index
     Includes   as IncludeEdgeArray    '' what this file pulls in
+    Imports    as ImportEdgeArray     '' the modules it imports
     FromBuffer as boolean    '' indexed from an open document, not from disk
 end type
 
@@ -137,6 +162,19 @@ type SymbolIndex
         '' Its visible set is then a LOWER BOUND, not an answer, and every
         '' caller treats it that way.
         declare function HasUnresolvedIncludes( byval fileIndex as long ) as boolean
+
+        '' The file's `#import`s, resolved by ResolveIncludes (workspace/modules.bi).
+        declare function ImportCount( byval fileIndex as long ) as long
+        declare function ImportAt   ( byval fileIndex as long, byval i as long ) as ImportEdge
+
+        '' The files of the module `lowerAlias` names in that file -- false when it is
+        '' no alias of the file's imports.
+        declare function ModuleFilesOf( byval fileIndex as long, byref lowerAlias as string, _
+                                        byref out_ as FB.Array( of long ) ) as boolean
+
+        '' WHAT `alias.` MAY NAME: the module's file-level declarations marked `public`.
+        declare sub ModuleMembers( byval fileIndex as long, byref lowerAlias as string, _
+                                   byref out_ as IndexHitArray )
 
         '' The files `fileIndex` can see: itself, what it includes, and what
         '' those include, transitively. Cycles terminate -- a file already
