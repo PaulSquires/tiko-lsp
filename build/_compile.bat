@@ -63,6 +63,7 @@ set SOURCES=^
  "%ROOT%\src\analysis\format.bas"^
  "%ROOT%\src\workspace\workspace.bas"^
  "%ROOT%\src\workspace\symbol_index.bas"^
+ "%ROOT%\src\workspace\modules.bas"^
  "%ROOT%\src\workspace\index_builder.bas"^
  "%ROOT%\src\analysis\diagnostics.bas"^
  "%ROOT%\src\utils\logging.bas"^

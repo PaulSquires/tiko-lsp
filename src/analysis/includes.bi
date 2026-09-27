@@ -37,6 +37,22 @@ end type
 
 type IncludeRefArray as FB.Array( of IncludeRef )
 
+'' ONE `#import "path" [as alias] [public]` LINE (tiko-lang ADR 0017; RFC-0001). The alias
+'' is lower-cased -- names are compared that way -- and is the path's last segment when no
+'' `as` is written.
+type ImportRef
+    Path_    as string
+    Alias_   as string
+    Public_  as boolean
+    Start_   as long      '' byte offset of the opening quote
+    Length_  as long      '' in bytes, quotes included
+end type
+
+type ImportRefArray as FB.Array( of ImportRef )
+
+declare sub FindImports( byref text_ as string, byref tokens as TokenArray, _
+                         byref out_ as ImportRefArray )
+
 '' Every include directive in the token stream, in source order.
 declare sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
                           byref out_ as IncludeRefArray )

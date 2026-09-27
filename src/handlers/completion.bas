@@ -10,6 +10,7 @@
 #include once "workspace_symbols.bi"
 #include once "../workspace/index_builder.bi"
 #include once "../analysis/completion.bi"
+#include once "../analysis/includes.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
 
@@ -99,6 +100,45 @@ private function AddIncludedSymbols( byref srv as Server, byval doc as TextDocum
     '' are the ones that were filtered out here.
     return truncated orelse ( len(want) > 0 )
 end function
+
+'' Is `name_` one of this document's import aliases? Read from its own tokens, so a file
+'' that imports nothing never asks the index.
+private function IsImportAlias_( byval doc as TextDocumentPtr, byref name_ as string ) as boolean
+    dim refs as ImportRefArray
+    FindImports( doc->Text( ), doc->Tokens( ), refs )
+    dim as string want = lcase( name_ )
+    for i as long = 0 to refs.Count( ) - 1
+        if( refs[i].Alias_ = want ) then return true
+    next
+    return false
+end function
+
+'' `http.` WHERE http IS AN IMPORT'S ALIAS (tiko-lang ADR 0017): what the module lets out --
+'' its file-level declarations marked `public` -- and nothing else. The file-wide member
+'' guess CollectCompletions offers for an unknown base is dropped: the base is known.
+private sub AddModuleMembers( byref srv as Server, byval doc as TextDocumentPtr, _
+                              byref alias_ as string, byref items as CompletionItemArray )
+    items.Clear( )
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then exit sub
+    dim hits as IndexHitArray
+    srv.Index->ModuleMembers( here, lcase( alias_ ), hits )
+    dim seen_ as FB.Map( of string, boolean )
+    for i as long = 0 to hits.Count( ) - 1
+        dim as SymbolInfo sym = srv.Index->SymbolAt( hits[i].FileIndex, hits[i].SymIndex )
+        if( seen_.Contains( sym.LowerName ) ) then continue for
+        seen_.Put( sym.LowerName, true )
+        dim as CompletionItem it
+        it.Label      = sym.Name_
+        it.LowerLabel = sym.LowerName
+        it.Kind_      = CompletionKindOf( sym.Kind_ )
+        it.Detail_    = sym.Detail_
+        it.Doc_       = sym.Doc_
+        it.SortGroup  = CMPGROUP_INCLUDE
+        items.Push( it )
+    next
+    LogDebug( "completion: " & items.Count( ) & " public name(s) of module '" & alias_ & "'" )
+end sub
 
 '' The members of a type declared in an INCLUDED file.
 ''
@@ -194,9 +234,17 @@ private function OnCompletion( byref srv as Server, _
     dim as boolean indexUsable = ( IndexBuildPending( ) = false ) orelse IndexBuildReady( )
     dim as boolean incomplete_ = false
 
+    '' An import's alias before a dot names a module, not a variable (tiko-lang ADR 0017).
+    dim as boolean onModule = false
+    if( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable ) then onModule = IsImportAlias_( doc, ctx.BaseName )
+
     if( ctx.Kind_ = CMPCTX_SCOPE andalso indexUsable ) then
         EnsureWorkspaceIndex( srv )
         incomplete_ = AddIncludedSymbols( srv, doc, ctx.Prefix, items )
+
+    elseif( onModule ) then
+        EnsureWorkspaceIndex( srv )
+        AddModuleMembers( srv, doc, ctx.BaseName, items )
 
     elseif( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable ) then
         '' The base's type is read from ITS declaration, which is in this file

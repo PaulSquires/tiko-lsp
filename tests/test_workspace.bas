@@ -13,6 +13,7 @@
 #include once "../src/workspace/symbol_index.bi"
 #include once "../src/workspace/index_builder.bi"
 #include once "../src/utils/uri.bi"
+#include once "../src/analysis/includes.bi"
 
 const LF = chr(10)
 
@@ -501,6 +502,110 @@ scope
     AssertTrue( idx.FindDefinitionFrom( gadgets, "legacy_parts", hit ), "and `LEGACY_PARTS` resolves" )
     AssertEqInt( hit.FileIndex, legacy, "to legacy.bi" )
 end scope
+
+'' ############################################################################
+''  Modules: #import (tiko-lang ADR 0017)
+''
+''  tests/fixtures/modules holds two modules (acme/net/http, two files, and
+''  acme/text/esc), a root that imports them, and a package with a tiko.toml
+''  and a path dependency. tests/fixtures/modpkg stands in for the toolchain's
+''  pkg/, outside every workspace folder.
+'' ############################################################################
+TestGroup( "modules" )
+
+scope
+    dim tokens as TokenArray
+    dim diags  as DiagnosticArray
+    dim syms   as SymbolTable
+    dim as string src = "#import ""acme/net/http""" & LF & _
+                        "#import ""x/y"" as zz public" & LF & _
+                        "public function A( ) as long" & LF & "end function" & LF & _
+                        "function B( ) as long" & LF & "end function" & LF
+    AnalyzeFull( src, tokens, diags, syms )
+
+    dim refs as ImportRefArray
+    FindImports( src, tokens, refs )
+    AssertEqInt( refs.Count( ), 2, "two #import lines are found" )
+    AssertEqStr( refs[0].Path_, "acme/net/http", "the first names its path" )
+    AssertEqStr( refs[0].Alias_, "http", "and binds its last segment" )
+    AssertEqStr( refs[1].Alias_, "zz", "the second binds what 'as' says" )
+    AssertTrue ( refs[1].Public_, "and is a re-export" )
+    AssertEqInt( diags.Count( ), 0, "#import is no diagnostic" )
+
+    dim as long a = -1, b = -1
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.Items[i].LowerName = "a" ) then a = i
+        if( syms.Items[i].LowerName = "b" ) then b = i
+    next
+    AssertTrue ( a >= 0 andalso b >= 0, "both functions are symbols" )
+    AssertTrue ( syms.Items[a].IsPublic, "a leading 'public' marks A" )
+    AssertFalse( syms.Items[b].IsPublic, "and B, without it, is not public" )
+end scope
+
+'' The toolchain's pkg/: std/strings lives there and in no workspace folder.
+dim shared as string g_pkgEnv
+g_pkgEnv = "TKO_PKG=" & g_Root & "\tests\fixtures\modpkg"
+setenviron g_pkgEnv
+
+scope
+    dim as string fx = g_Root & "\tests\fixtures\modules"
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    dim as long before = idx.FileCount( )
+    idx.ResolveIncludes( )
+
+    dim as long app = -1, proj = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        dim as string p = lcase( idx.FilePath( i ) )
+        if( instr( p, "app\main.bas" ) > 0 ) then app = i
+        if( instr( p, "pkgproj\main.bas" ) > 0 ) then proj = i
+    next
+    AssertTrue( app >= 0 andalso proj >= 0, "both roots are indexed" )
+    AssertEqInt( idx.ImportCount( app ), 3, "app/main.bas imports three modules" )
+
+    dim files_ as FB.Array( of long )
+    AssertTrue ( idx.ModuleFilesOf( app, "http", files_ ), "'http' is one of its aliases" )
+    AssertEqInt( files_.Count( ), 2, "and names a module of two files" )
+    AssertTrue ( idx.ModuleFilesOf( app, "e", files_ ), "'e' is esc's alias, by 'as'" )
+    AssertEqInt( files_.Count( ), 1, "one file" )
+    AssertFalse( idx.ModuleFilesOf( app, "esc", files_ ), "and 'esc' is not an alias there" )
+
+    dim hits as IndexHitArray
+    idx.ModuleMembers( app, "http", hits )
+    dim as string names_ = ""
+    for i as long = 0 to hits.Count( ) - 1
+        names_ &= " " & idx.SymbolAt( hits[i].FileIndex, hits[i].SymIndex ).LowerName
+    next
+    AssertTrue ( instr( names_, " fetch" ) > 0, "http. offers Fetch" )
+    AssertTrue ( instr( names_, " response" ) > 0, "and the public type Response" )
+    AssertTrue ( instr( names_, " port" ) > 0, "and PORT, from the module's other file" )
+    AssertFalse( instr( names_, " send_" ) > 0, "but not Send_, which is not public" )
+
+    '' std: no workspace folder holds it; the toolchain's pkg/ does, and its files are
+    '' indexed when the import is resolved.
+    AssertTrue ( idx.ModuleFilesOf( app, "strings", files_ ), "std/strings resolves" )
+    AssertEqInt( files_.Count( ), 1, "to the toolchain's one file" )
+    AssertTrue ( idx.FileCount( ) > before, "which was indexed on demand" )
+    idx.ModuleMembers( app, "strings", hits )
+    AssertEqInt( hits.Count( ), 1, "and offers Repeat" )
+
+    '' A package: its own module by its manifest's name, and a path dependency.
+    AssertTrue ( idx.ModuleFilesOf( proj, "util", files_ ), "proj/util: the current package" )
+    AssertEqInt( files_.Count( ), 1, "one file" )
+    AssertTrue ( idx.ModuleFilesOf( proj, "core", files_ ), "libz/core: a [dependencies] path" )
+    AssertEqInt( files_.Count( ), 1, "one file" )
+    AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), "pkglib\core" ) > 0, "in ../pkglib" )
+end scope
+
+setenviron "TKO_PKG="
 
 '' ############################################################################
 ''  The background build

@@ -78,6 +78,11 @@ type SymbolInfo
     '' a signature -- which is what inlay hints and semantic tokens need to
     '' tell them apart, and what nothing before phase 7 had to ask.
     IsParameter   as boolean
+
+    '' Declared with a leading `public`. In a tiko MODULE (a directory of files that each
+    '' begin `#module "name"`) that is what an importer may name through the import's
+    '' alias; in classic code it means nothing, as in FreeBASIC.
+    IsPublic      as boolean
 end type
 
 type SymbolArray as FB.Array( of SymbolInfo )

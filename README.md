@@ -37,7 +37,7 @@ Nothing here launches one, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-10 complete
+## Status: phases 1-11 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -51,6 +51,7 @@ Nothing here launches one, and nothing ever will.
 | 8 | the workspace scan off the message loop | **done** |
 | 9 | watched files: an index that notices `git checkout`, bursts included | **done** |
 | 10 | the include graph: what a file can actually see | **done** |
+| 11 | tiko modules: `#import`, `alias.` completion and definition, `tiko.toml` packages, the toolchain `std` | **done** |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
@@ -95,7 +96,7 @@ tiko-lsp/
                 parser.bi/.bas        block structure and symbols, with recovery
                 symbols.bi/.bas       the symbol table, scope resolution, hover text
                 completion.bi/.bas    what could be typed here
-                includes.bi/.bas      the #include directives in a file
+                includes.bi/.bas      the #include and #import directives in a file
                 diagnostics.bi/.bas   the problem model, in byte offsets
                 signature.bi/.bas     calls, and the parameters being filled in
                 semantic.bi/.bas      semantic tokens and their encoding
@@ -268,7 +269,7 @@ build\_run_tests.bat
   through a declared type, a pointer, `this.`, an enum and a namespace, the
   scope list with its group ordering, the fixed-width type names (and a file's
   own `float32` replacing tiko's), and case-insensitive de-duplication.
-- **workspace** — 128 assertions over discovery rules, the include graph
+- **workspace** — 157 assertions over discovery rules, the include graph
   (a chain, a cycle, an edge to nowhere, a wrong-case forward-slash path, and
   two files declaring one name where only one is visible, and a `.tko` that
   includes a `.ti` and a legacy `.bi`), indexing and
@@ -312,7 +313,12 @@ build\_run_tests.bat
   read keep the symbols the index already had. And the **include graph**: a
   click on an `#include` path opens that file, the completion list carries what
   the included header declares, and `w.` offers the fields of a type declared in
-  another file.
+  another file. And **modules** (tiko-lang ADR 0017): `#import` lines and their
+  `as` aliases are read, `public` is recorded on declarations, an import resolves
+  to its module's files -- a two-file module, a module under another name, a
+  `tiko.toml` package's own module and its path dependency, and `std` from a
+  toolchain `pkg/` no workspace folder holds, indexed on demand -- and `http.`
+  offers the module's public names and not its private ones.
 
 ## Licence
 

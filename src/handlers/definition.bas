@@ -80,6 +80,93 @@ private function OnDefinition( byref srv as Server, _
         next
     end if
 
+    '' -- and so is an #import line, and a name reached through its alias ------------
+    ''
+    '' tiko-lang's modules (ADR 0017): `#import "acme/net/http"` opens the module's first
+    '' file, and `http.Fetch` goes to Fetch in the module's files -- whatever its visibility,
+    '' since going to a definition is not naming it.
+    dim importRefs as ImportRefArray
+    FindImports( doc->Text( ), doc->Tokens( ), importRefs )
+    if( importRefs.Count( ) > 0 ) then
+        dim as long onPath = -1
+        for i as long = 0 to importRefs.Count( ) - 1
+            if( offset >= importRefs[i].Start_ andalso offset <= importRefs[i].Start_ + importRefs[i].Length_ ) then onPath = i
+        next
+
+        dim as string lowerName = "", alias_ = ""
+        if( onPath < 0 ) then
+            dim as long ti = TokenIndexAt( doc->Tokens( ), offset )
+            if( ti >= 2 ) then
+                dim as Token nameTok = doc->Tokens( )[ti]
+                dim as Token dotTok  = doc->Tokens( )[ti - 1]
+                dim as Token baseTok = doc->Tokens( )[ti - 2]
+                dim as boolean shaped = (nameTok.Kind = TK_IDENT) andalso (dotTok.Kind = TK_OP) andalso _
+                                        (baseTok.Kind = TK_IDENT)
+                if( shaped ) then shaped = ( TokenText( doc->Text( ), dotTok ) = "." )
+                if( shaped ) then
+                    dim as string b = lcase( TokenText( doc->Text( ), baseTok ) )
+                    for i as long = 0 to importRefs.Count( ) - 1
+                        if( importRefs[i].Alias_ = b ) then
+                            alias_ = b
+                            lowerName = lcase( TokenText( doc->Text( ), nameTok ) )
+                        end if
+                    next
+                end if
+            end if
+        end if
+
+        if( onPath >= 0 orelse len(alias_) > 0 ) then
+            EnsureWorkspaceIndex( srv )
+            dim as long here = srv.Index->IndexOfUri( uriText )
+            dim files_ as FB.Array( of long )
+            dim as string wantAlias = iif( onPath >= 0, importRefs[iif( onPath >= 0, onPath, 0 )].Alias_, alias_ )
+            if( srv.Index->ModuleFilesOf( here, wantAlias, files_ ) = false orelse files_.Count( ) = 0 ) then
+                LogDebug( "import '" & wantAlias & "' is not a module in the workspace" )
+                return rb.NewNull( )
+            end if
+
+            dim as long hitFile = files_[0], hitSym = -1
+            if( len(lowerName) > 0 ) then
+                hitFile = -1
+                for each f as long in files_
+                    for s as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+                        dim as SymbolInfo sym = srv.Index->SymbolAt( f, s )
+                        if( sym.Parent <> -1 orelse sym.LowerName <> lowerName ) then continue for
+                        hitFile = f
+                        hitSym = s
+                        exit for
+                    next
+                    if( hitFile >= 0 ) then exit for
+                next
+                if( hitFile < 0 ) then return rb.NewNull( )
+            end if
+
+            dim as JsonNode start_ = rb.NewObject( )
+            dim as JsonNode end_ = rb.NewObject( )
+            if( hitSym >= 0 ) then
+                dim as IndexedRange r = srv.Index->RangeAt( hitFile, hitSym )
+                rb.SetInt( start_, "line", r.StartLine )
+                rb.SetInt( start_, "character", r.StartChar )
+                rb.SetInt( end_, "line", r.EndLine )
+                rb.SetInt( end_, "character", r.EndChar )
+            else
+                rb.SetInt( start_, "line", 0 )
+                rb.SetInt( start_, "character", 0 )
+                rb.SetInt( end_, "line", 0 )
+                rb.SetInt( end_, "character", 0 )
+            end if
+            dim as JsonNode range_ = rb.NewObject( )
+            rb.SetNode( range_, "start", start_ )
+            rb.SetNode( range_, "end", end_ )
+            dim as JsonNode locNode = rb.NewObject( )
+            rb.SetStr ( locNode, "uri", srv.Index->FileUri( hitFile ) )
+            rb.SetNode( locNode, "range", range_ )
+            LogDebug( "definition (module " & wantAlias & "): " & lowerName & " in " & _
+                      UriFileName( srv.Index->FileUri( hitFile ) ) )
+            return locNode
+        end if
+    end if
+
     dim as long wordStart, wordEnd
     dim as long symIndex = ResolveAtOffset( doc, offset, wordStart, wordEnd )
 
