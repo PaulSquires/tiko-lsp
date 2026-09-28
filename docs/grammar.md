@@ -69,8 +69,17 @@ Corpus-driven means judged by whether it parses real code:
 | `PsControls` (FreeBASIC) | 572 | 0 |
 | `AfxNova/src` (FreeBASIC) | 179 | 7 |
 
-`tree-sitter test` runs 19 corpus cases covering declarations, statements, the
+`tree-sitter test` runs 20 corpus cases covering declarations, statements, the
 preprocessor and the lexical corners; all pass.
+
+tiko's module directives (tiko-lang ADR 0017) are structural nodes of their own:
+`preproc_module` (`#module "name"`), `preproc_import` (`#import "path"`, its
+`as` alias and `public`) and `preproc_export` (`#export A, B`), coloured and
+listed in the outline in both query sets. Measured over the 96 `.bas` files of
+tiko-lang's module tests, fixtures and `pkg/std`: 3 with an ERROR -- one a
+deliberately malformed `#import` from its diagnostics tests, and two the grammar
+already missed (`sub f( ) constructor 101`, `public union`), which the module
+rules did not change.
 
 ## Not verified
 

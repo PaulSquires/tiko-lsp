@@ -170,9 +170,38 @@ module.exports = grammar({
     // in an #include, which is worth colouring as one.
     preproc: $ => choice(
       $.preproc_include,
+      $.preproc_module,
+      $.preproc_import,
+      $.preproc_export,
       $.preproc_define,
       $.preproc_macro,
       $.preproc_other,
+    ),
+
+    // TIKO'S MODULES (tiko-lang ADR 0017): three directives with a shape worth
+    // colouring, where every other directive is a name and the rest of its line.
+    //
+    //   #module "http"                      the module a file belongs to
+    //   #import "acme/net/http" as h public the path, an alias, a re-export
+    //   #export CHECK, TWICE                the macros a module lets out
+    preproc_module: $ => seq(
+      alias(token(prec(3, seq('#', /[ \t]*/, ciAlt(['module'])))), '#module'),
+      field('name', $.string),
+      $._line_end,
+    ),
+
+    preproc_import: $ => seq(
+      alias(token(prec(3, seq('#', /[ \t]*/, ciAlt(['import'])))), '#import'),
+      field('path', $.string),
+      optional(seq(kw('as'), field('alias', $.identifier))),
+      optional(kw('public')),
+      $._line_end,
+    ),
+
+    preproc_export: $ => seq(
+      alias(token(prec(3, seq('#', /[ \t]*/, ciAlt(['export'])))), '#export'),
+      commaSep1(field('name', $.identifier)),
+      $._line_end,
     ),
 
     preproc_include: $ => seq(

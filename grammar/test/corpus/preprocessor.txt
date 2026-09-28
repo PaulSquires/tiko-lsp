@@ -60,3 +60,34 @@ Conditional directives are opaque lines
   (preproc
     (preproc_other
       directive: (preproc_directive))))
+
+================================================================================
+A module file's directives: #module, #import with an alias and public, #export
+================================================================================
+
+#module "http"
+#import "acme/text/esc"
+#import "acme/core" as c public
+#define CHECK 1
+#export CHECK, OTHER
+--------------------------------------------------------------------------------
+
+(source_file
+  (preproc
+    (preproc_module
+      name: (string)))
+  (preproc
+    (preproc_import
+      path: (string)))
+  (preproc
+    (preproc_import
+      path: (string)
+      alias: (identifier)))
+  (preproc
+    (preproc_define
+      name: (identifier)
+      (number)))
+  (preproc
+    (preproc_export
+      name: (identifier)
+      name: (identifier))))

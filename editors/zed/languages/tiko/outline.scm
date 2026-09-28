@@ -24,5 +24,7 @@
 (namespace_definition "namespace" @context name: (qualified_name) @name) @item
 (type_alias       "type"      @context name: (identifier) @name) @item
 
+(preproc_module "#module" @context name: (string) @name) @item
+(preproc_import "#import" @context path: (string) @name) @item
 (preproc_macro  "#macro"  @context name: (identifier) @name) @item
 (preproc_define "#define" @context name: (identifier) @name) @item
