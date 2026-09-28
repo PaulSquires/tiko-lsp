@@ -46,8 +46,12 @@
 (access_specifier) @keyword
 
 (preproc_directive) @preproc
-[ "#include" "#define" "#macro" "#endmacro" ] @preproc
+[ "#include" "#module" "#import" "#export" "#define" "#macro" "#endmacro" ] @preproc
 (preproc_include path: (string) @string.special)
+(preproc_import path: (string) @string.special)
+(preproc_import alias: (identifier) @namespace)
+(preproc_module name: (string) @namespace)
+(preproc_export name: (identifier) @constant)
 (preproc_define name: (identifier) @constant)
 (preproc_macro name: (identifier) @function)
 

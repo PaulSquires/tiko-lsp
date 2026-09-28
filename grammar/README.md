@@ -11,7 +11,8 @@ whole design.
 
 **Exactly: block structure.** Procedures, types, unions, enums, namespaces,
 `extern`, `scope`, `with`, `asm`, `if`/`elseif`/`else`, `select case`, all
-three loops, labels, and the preprocessor. Every one of those has its opener,
+three loops, labels, and the preprocessor -- tiko's `#module`, `#import` and
+`#export` included. Every one of those has its opener,
 its body and its closer in the tree, which is what folding, indentation and the
 outline are built from.
 

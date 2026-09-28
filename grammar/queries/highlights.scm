@@ -63,6 +63,10 @@
 (preproc_directive) @keyword.directive
 [ "#include" "#define" "#macro" "#endmacro" ] @keyword.directive
 (preproc_include path: (string) @string.special.path)
+(preproc_import path: (string) @string.special.path)
+(preproc_import alias: (identifier) @module)
+(preproc_module name: (string) @module)
+(preproc_export name: (identifier) @constant.macro)
 (preproc_define name: (identifier) @constant.macro)
 (preproc_macro name: (identifier) @function.macro)
 (macro_text) @none

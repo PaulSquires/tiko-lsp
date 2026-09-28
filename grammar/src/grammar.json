@@ -136,6 +136,18 @@
         },
         {
           "type": "SYMBOL",
+          "name": "preproc_module"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "preproc_import"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "preproc_export"
+        },
+        {
+          "type": "SYMBOL",
           "name": "preproc_define"
         },
         {
@@ -145,6 +157,230 @@
         {
           "type": "SYMBOL",
           "name": "preproc_other"
+        }
+      ]
+    },
+    "preproc_module": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "#"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "[ \\t]*"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "([mM][oO][dD][uU][lL][eE])"
+                  }
+                ]
+              }
+            }
+          },
+          "named": false,
+          "value": "#module"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "string"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
+    "preproc_import": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "#"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "[ \\t]*"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "([iI][mM][pP][oO][rR][tT])"
+                  }
+                ]
+              }
+            }
+          },
+          "named": false,
+          "value": "#import"
+        },
+        {
+          "type": "FIELD",
+          "name": "path",
+          "content": {
+            "type": "SYMBOL",
+            "name": "string"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "TOKEN",
+                    "content": {
+                      "type": "PREC",
+                      "value": 2,
+                      "content": {
+                        "type": "PATTERN",
+                        "value": "[aA][sS]"
+                      }
+                    }
+                  },
+                  "named": false,
+                  "value": "as"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "alias",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "TOKEN",
+                "content": {
+                  "type": "PREC",
+                  "value": 2,
+                  "content": {
+                    "type": "PATTERN",
+                    "value": "[pP][uU][bB][lL][iI][cC]"
+                  }
+                }
+              },
+              "named": false,
+              "value": "public"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
+    "preproc_export": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "#"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "[ \\t]*"
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "([eE][xX][pP][oO][rR][tT])"
+                  }
+                ]
+              }
+            }
+          },
+          "named": false,
+          "value": "#export"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "name",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "name",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "identifier"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
         }
       ]
     },
