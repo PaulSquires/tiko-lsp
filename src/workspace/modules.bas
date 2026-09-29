@@ -129,6 +129,31 @@ function ToolchainPkgDir( ) as string
     return ""
 end function
 
+function ToolchainIncDir( ) as string
+    dim as string env_ = environ( "TKO_INCLUDE" )
+    if( len(env_) > 0 ) then return NormalizePath( env_ )
+    dim as string p = environ( "PATH" )
+#ifdef __FB_WIN32__
+    dim as string sep = ";", exe = "\tiko.exe"
+#else
+    dim as string sep = ":", exe = "/tiko"
+#endif
+    dim as long st = 1
+    while( st <= len(p) )
+        dim as long en = instr( st, p, sep )
+        if( en = 0 ) then en = len(p) + 1
+        dim as string d = trim( mid( p, st, en - st ), any chr(34) )
+        st = en + 1
+        if( len(d) = 0 ) then continue while
+        if( FB.IsFile( d & exe ) = false ) then continue while
+        dim as string cand = JoinNative( d, "inc" )
+        if( FB.IsDir( cand ) ) then return cand
+        cand = JoinNative( d, "../inc" )
+        if( FB.IsDir( cand ) ) then return cand
+    wend
+    return ""
+end function
+
 sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
                       byref roots as PathArray, byref outDirs as PathArray )
     outDirs.Clear( )

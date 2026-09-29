@@ -32,3 +32,8 @@ declare sub ModuleCandidates( byref importerPath as string, byref importPath as 
 
 '' The toolchain's package tree, or "" when none can be found.
 declare function ToolchainPkgDir( ) as string
+
+'' THE TOOLCHAIN'S HEADER DIRECTORY, as the compiler finds it (tiko-lang cmdline.bas,
+'' AppendDefaultIncludeDir): TKO_INCLUDE, else <dir>/inc or <dir>/../inc beside a `tiko` on
+'' PATH; "" when there is none. A std facade includes `fb/...` headers from here.
+declare function ToolchainIncDir( ) as string

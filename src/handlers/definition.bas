@@ -126,6 +126,7 @@ private function OnDefinition( byref srv as Server, _
             end if
 
             dim as long hitFile = files_[0], hitSym = -1
+            dim as long expLine = -1, expStart = 0, expEnd = 0
             if( len(lowerName) > 0 ) then
                 hitFile = -1
                 for each f as long in files_
@@ -138,12 +139,35 @@ private function OnDefinition( byref srv as Server, _
                     next
                     if( hitFile >= 0 ) then exit for
                 next
+                '' An EXPORTED MACRO, which is no symbol: what it names when that is found --
+                '' a std facade's `FB.PathJoin`, in the header -- else its `#define`.
+                if( hitFile < 0 ) then
+                    dim as IndexHit t
+                    dim as ExportHit x
+                    if( srv.Index->ModuleMemberAt( here, wantAlias, lowerName, t, x ) = 2 ) then
+                        if( t.FileIndex >= 0 ) then
+                            hitFile = t.FileIndex
+                            hitSym = t.SymIndex
+                        else
+                            dim as ExportEdge e = srv.Index->ExportAt( x.FileIndex, x.ExportIndex )
+                            hitFile = x.FileIndex
+                            expLine = e.Line
+                            expStart = e.StartChar
+                            expEnd = e.EndChar
+                        end if
+                    end if
+                end if
                 if( hitFile < 0 ) then return rb.NewNull( )
             end if
 
             dim as JsonNode start_ = rb.NewObject( )
             dim as JsonNode end_ = rb.NewObject( )
-            if( hitSym >= 0 ) then
+            if( expLine >= 0 ) then
+                rb.SetInt( start_, "line", expLine )
+                rb.SetInt( start_, "character", expStart )
+                rb.SetInt( end_, "line", expLine )
+                rb.SetInt( end_, "character", expEnd )
+            elseif( hitSym >= 0 ) then
                 dim as IndexedRange r = srv.Index->RangeAt( hitFile, hitSym )
                 rb.SetInt( start_, "line", r.StartLine )
                 rb.SetInt( start_, "character", r.StartChar )

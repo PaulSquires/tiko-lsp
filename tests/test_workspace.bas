@@ -607,6 +607,111 @@ end scope
 
 setenviron "TKO_PKG="
 
+'' EXPORTED MACROS: a facade (tiko-lang RFC-0009) is `#define N FB.N` + `#export N`. Its
+'' names are offered after `fs.` as what they name -- FB.PathJoin, in a header found through
+'' the toolchain's include directory (TKO_INCLUDE here) -- and are never symbols.
+dim shared as string g_incEnv
+g_incEnv = "TKO_INCLUDE=" & g_Root & "\tests\fixtures\modinc"
+setenviron g_incEnv
+setenviron g_pkgEnv
+
+scope
+    dim as string fx = g_Root & "\tests\fixtures\modules"
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long fac = -1, app = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        dim as string p = lcase( idx.FilePath( i ) )
+        if( instr( p, "facade\main.bas" ) > 0 ) then fac = i
+        if( instr( p, "app\main.bas" ) > 0 ) then app = i
+    next
+    AssertTrue( fac >= 0, "the facade's importer is indexed" )
+    AssertEqInt( idx.ImportCount( app ), 3, "app/main.bas still imports three modules" )
+
+    dim xs as ExportHitArray
+    idx.ModuleExports( fac, "fs", xs )
+    dim as string xnames = ""
+    for each x as ExportHit in xs
+        xnames &= " " & idx.ExportAt( x.FileIndex, x.ExportIndex ).LowerName
+    next
+    AssertEqInt( xs.Count( ), 3, "fs. has three exported macros" )
+    AssertTrue ( instr( xnames, " pathjoin" ) > 0 andalso instr( xnames, " isdir" ) > 0 andalso _
+                 instr( xnames, " twice" ) > 0, "PathJoin, IsDir and Twice" )
+    AssertFalse( instr( xnames, " hidden" ) > 0, "but not Hidden, defined and never exported" )
+
+    dim hits as IndexHitArray
+    idx.ModuleMembers( fac, "fs", hits )
+    AssertEqInt( hits.Count( ), 1, "its public symbols are still offered: Version" )
+
+    '' The whole module at once, as completion asks: targets aligned with the exports.
+    dim txs as ExportHitArray
+    dim tts as IndexHitArray
+    idx.ModuleExportTargets( fac, "fs", txs, tts )
+    AssertEqInt( tts.Count( ), txs.Count( ), "one target per export" )
+    dim as long resolved = 0
+    for ti as long = 0 to txs.Count( ) - 1
+        dim as string nm = idx.ExportAt( txs[ti].FileIndex, txs[ti].ExportIndex ).LowerName
+        if( tts[ti].FileIndex >= 0 ) then
+            resolved += 1
+            AssertEqStr( nm, "pathjoin", "only PathJoin names a declaration" )
+            AssertEqStr( idx.SymbolAt( tts[ti].FileIndex, tts[ti].SymIndex ).LowerName, "pathjoin", _
+                         "and it is FB.PathJoin" )
+        end if
+    next
+    AssertEqInt( resolved, 1, "IsDir and Twice name nothing found" )
+
+    '' What each names.
+    dim as IndexHit t
+    dim as ExportHit x
+    AssertEqInt( idx.ModuleMemberAt( fac, "fs", "pathjoin", t, x ), 2, "fs.PathJoin is an exported macro" )
+    AssertTrue ( t.FileIndex >= 0, "that names a declaration" )
+    if( t.FileIndex >= 0 ) then
+        AssertTrue ( instr( lcase( idx.FilePath( t.FileIndex ) ), "modinc\fb\fakefs.bi" ) > 0, _
+                     "in the header, read in from the toolchain's include directory" )
+        dim as SymbolInfo ts = idx.SymbolAt( t.FileIndex, t.SymIndex )
+        AssertEqStr( ts.LowerName, "pathjoin", "FB.PathJoin itself" )
+        AssertContains( ts.Doc_, "Joins two paths", "with the header's doc comment" )
+    end if
+    dim as ExportEdge e = idx.ExportAt( x.FileIndex, x.ExportIndex )
+    AssertEqStr( e.Body, "FB.PathJoin", "the body as written" )
+    AssertEqInt( e.Line, 4, "at its #define, zero-based line 4" )
+
+    AssertEqInt( idx.ModuleMemberAt( fac, "fs", "isdir", t, x ), 2, "fs.IsDir is exported" )
+    AssertEqInt( t.FileIndex, -1, "but the header declares no IsDir: nothing to name" )
+    AssertEqInt( idx.ModuleMemberAt( fac, "fs", "twice", t, x ), 2, "fs.Twice, function-like" )
+    AssertEqStr( idx.ExportAt( x.FileIndex, x.ExportIndex ).Body, "( ( x ) * 2 )", "its body without its parameters" )
+    AssertEqInt( idx.ModuleMemberAt( fac, "fs", "version", t, x ), 1, "fs.Version is a public symbol" )
+    AssertEqInt( idx.ModuleMemberAt( fac, "fs", "hidden", t, x ), 0, "fs.Hidden is neither" )
+
+    '' Qualified only: an exported macro is no symbol, so nothing bare -- workspace/symbol,
+    '' the outline, a bare name's definition -- ever finds the facade's #define.
+    dim as long facFile = x.FileIndex
+    dim as boolean asSymbol = false
+    for s as long = 0 to idx.FileSymbolCount( facFile ) - 1
+        if( idx.SymbolAt( facFile, s ).LowerName = "pathjoin" ) then asSymbol = true
+    next
+    AssertFalse( asSymbol, "the facade file declares no symbol PathJoin" )
+    dim qh as IndexHitArray
+    idx.Query( "pathjoin", 50, qh )
+    dim as boolean inFacade = false
+    for each q as IndexHit in qh
+        if( q.FileIndex = facFile ) then inFacade = true
+    next
+    AssertFalse( inFacade, "workspace/symbol finds only the header's PathJoin" )
+end scope
+
+setenviron "TKO_INCLUDE="
+setenviron "TKO_PKG="
+
 '' ############################################################################
 ''  The background build
 ''

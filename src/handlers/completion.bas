@@ -114,8 +114,10 @@ private function IsImportAlias_( byval doc as TextDocumentPtr, byref name_ as st
 end function
 
 '' `http.` WHERE http IS AN IMPORT'S ALIAS (tiko-lang ADR 0017): what the module lets out --
-'' its file-level declarations marked `public` -- and nothing else. The file-wide member
-'' guess CollectCompletions offers for an unknown base is dropped: the base is known.
+'' its file-level declarations marked `public`, and the macros it `#export`s -- and nothing
+'' else. The file-wide member guess CollectCompletions offers for an unknown base is
+'' dropped: the base is known. An exported macro that names a declaration -- a std facade's
+'' `#define PathJoin FB.PathJoin` (tiko-lang RFC-0009) -- is offered as what it names.
 private sub AddModuleMembers( byref srv as Server, byval doc as TextDocumentPtr, _
                               byref alias_ as string, byref items as CompletionItemArray )
     items.Clear( )
@@ -134,6 +136,29 @@ private sub AddModuleMembers( byref srv as Server, byval doc as TextDocumentPtr,
         it.Kind_      = CompletionKindOf( sym.Kind_ )
         it.Detail_    = sym.Detail_
         it.Doc_       = sym.Doc_
+        it.SortGroup  = CMPGROUP_INCLUDE
+        items.Push( it )
+    next
+    dim xs as ExportHitArray
+    dim ts_ as IndexHitArray
+    srv.Index->ModuleExportTargets( here, lcase( alias_ ), xs, ts_ )
+    for xi as long = 0 to xs.Count( ) - 1
+        dim as ExportEdge e = srv.Index->ExportAt( xs[xi].FileIndex, xs[xi].ExportIndex )
+        if( seen_.Contains( e.LowerName ) ) then continue for
+        seen_.Put( e.LowerName, true )
+        dim as CompletionItem it
+        it.Label      = e.Name_
+        it.LowerLabel = e.LowerName
+        dim as IndexHit t = ts_[xi]
+        if( t.FileIndex >= 0 ) then
+            dim as SymbolInfo ts = srv.Index->SymbolAt( t.FileIndex, t.SymIndex )
+            it.Kind_   = CompletionKindOf( ts.Kind_ )
+            it.Detail_ = ts.Detail_
+            it.Doc_    = ts.Doc_
+        else
+            it.Kind_   = CMP_CONSTANT
+            it.Detail_ = "#define " & e.Name_ & iif( len(e.Body) > 0, " " & e.Body, "" )
+        end if
         it.SortGroup  = CMPGROUP_INCLUDE
         items.Push( it )
     next

@@ -140,6 +140,25 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
         imports.Push( e )
     next
 
+    '' ...and the macros it exports, the same way.
+    dim xrefs as ExportRefArray
+    FindExports( text_, tokens, xrefs )
+    dim exports_ as ExportEdgeArray
+    for i as long = 0 to xrefs.Count( ) - 1
+        dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, xrefs[i].Start_ )
+        dim as SourcePosition b = OffsetToSourcePosition( text_, lines_, xrefs[i].Start_ + xrefs[i].Length_ )
+        dim as ExportEdge e
+        e.Name_      = xrefs[i].Name_
+        e.LowerName  = xrefs[i].LowerName
+        e.Body       = xrefs[i].Body
+        e.TargetNs   = xrefs[i].TargetNs
+        e.TargetName = xrefs[i].TargetName
+        e.Line       = a.Line
+        e.StartChar  = a.Column
+        e.EndChar    = b.Column
+        exports_.Push( e )
+    next
+
     dim edges as IncludeEdgeArray
     for i as long = 0 to refs.Count( ) - 1
         dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, refs[i].Start_ )
@@ -177,6 +196,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
         this.m_files[existing].Ranges     = ranges
         this.m_files[existing].Includes   = edges
         this.m_files[existing].Imports    = imports
+        this.m_files[existing].Exports    = exports_
         this.m_files[existing].FromBuffer = fromBuffer
         exit sub
     end if
@@ -189,6 +209,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
     entry.Ranges     = ranges
     entry.Includes   = edges
     entry.Imports    = imports
+    entry.Exports    = exports_
     entry.FromBuffer = fromBuffer
     this.m_files.Push( entry )
 end sub
@@ -305,9 +326,68 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
     next
 end sub
 
+'' THE HEADERS A MODULE'S FILES INCLUDE FROM THE TOOLCHAIN -- a std facade's `fb/...`
+'' (tiko-lang RFC-0009) -- read and indexed, transitively, so what an exported macro names
+'' has a declaration to find. No workspace folder holds them, and include resolution is
+'' lexical, so they would otherwise never be in the index. Only for module files: a
+'' workspace's own includes are left to its folders, as before. Bounded, since a header
+'' tree can be large; a header already indexed is not read again.
+'' CandidateKey's path, as written: the file is read from it, and its URI is made from it.
+private function CandidatePath_( byref baseDir as string, byref target as string ) as string
+    if( len(baseDir) = 0 orelse len(target) = 0 ) then return ""
+    dim as string t = target
+#ifdef __FB_WIN32__
+    for i as long = 0 to len(t) - 1
+        if( t[i] = asc( "/" ) ) then t[i] = 92
+    next
+    return NormalizePath( baseDir + chr( 92 ) + t )
+#else
+    return NormalizePath( baseDir + "/" + t )
+#endif
+end function
+
+private sub IndexModuleHeaders_( byref files_ as IndexedFileArray, byref idx as SymbolIndex, _
+                                 byref incDir as string )
+    if( len(incDir) = 0 ) then exit sub
+    dim seen as FB.Map( of string, boolean )
+    for i as long = 0 to files_.Count( ) - 1
+        seen.Put( files_[i].Key_, true )
+    next
+    dim work as FB.Array( of long )
+    for i as long = 0 to files_.Count( ) - 1
+        for k as long = 0 to files_[i].Imports.Count( ) - 1
+            for each f as long in files_[i].Imports[k].Files
+                work.Push( f )
+            next
+        next
+    next
+    dim as long budget = 512
+    dim as long w = 0
+    while( w < work.Count( ) andalso budget > 0 )
+        dim as long f = work[w]
+        w += 1
+        dim as string here = DirOf( files_[f].Path_ )
+        for k as long = 0 to files_[f].Includes.Count( ) - 1
+            dim as string tgt = files_[f].Includes[k].Target
+            dim as string cand = CandidatePath_( here, tgt )
+            if( FB.IsFile( cand ) = false ) then cand = CandidatePath_( incDir, tgt )
+            if( FB.IsFile( cand ) = false ) then continue for
+            dim as string key_ = lcase( cand )
+            if( seen.Contains( key_ ) ) then continue for
+            seen.Put( key_, true )
+            if( idx.IndexPath( cand ) ) then
+                work.Push( files_.Count( ) - 1 )
+                budget -= 1
+            end if
+        next
+    wend
+end sub
+
 sub SymbolIndex.ResolveIncludes( )
     if( this.m_files.IsEmpty( ) ) then exit sub
     ResolveImports_( this.m_files, this.m_searchPaths, this )
+    dim as string incDir = ToolchainIncDir( )
+    IndexModuleHeaders_( this.m_files, this, incDir )
 
     '' One pass to know what exists, so the resolution below is a probe rather
     '' than a scan. Without this a workspace of n files with e includes each
@@ -355,6 +435,14 @@ sub SymbolIndex.ResolveIncludes( )
                     if( byKey.TryGet( cand, found ) ) then exit for
                     found = -1
                 next
+            end if
+
+            '' Then the toolchain's headers, which IndexModuleHeaders_ read in.
+            if( found < 0 andalso len(incDir) > 0 ) then
+                cand = CandidateKey( incDir, this.m_files[i].Includes[k].Target )
+                if( len(cand) > 0 ) then
+                    if( byKey.TryGet( cand, found ) = false ) then found = -1
+                end if
             end if
 
             '' LAST RESORT: the file NAME, and only when the workspace holds
@@ -432,6 +520,128 @@ sub SymbolIndex.ModuleMembers( byval fileIndex as long, byref lowerAlias as stri
         next
     next
 end sub
+
+sub SymbolIndex.ModuleExports( byval fileIndex as long, byref lowerAlias as string, _
+                               byref out_ as ExportHitArray )
+    out_.Clear( )
+    dim files_ as FB.Array( of long )
+    if( this.ModuleFilesOf( fileIndex, lowerAlias, files_ ) = false ) then exit sub
+    for each f as long in files_
+        for x as long = 0 to this.m_files[f].Exports.Count( ) - 1
+            dim as ExportHit h
+            h.FileIndex = f
+            h.ExportIndex = x
+            out_.Push( h )
+        next
+    next
+end sub
+
+function SymbolIndex.ExportAt( byval fileIndex as long, byval i as long ) as ExportEdge
+    dim as ExportEdge none_
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return none_
+    if( i < 0 orelse i >= this.m_files[fileIndex].Exports.Count( ) ) then return none_
+    return this.m_files[fileIndex].Exports[i]
+end function
+
+function SymbolIndex.ExportTarget( byval exportFile as long, byref e as ExportEdge, _
+                                   byref out_ as IndexHit ) as boolean
+    out_.FileIndex = -1
+    out_.SymIndex = -1
+    if( len(e.TargetNs) = 0 orelse len(e.TargetName) = 0 ) then return false
+    dim vis as FB.Array( of long )
+    this.VisibleFrom( exportFile, vis )
+    '' A declaration first: a header declares, and may define further down.
+    for pass as long = 0 to 1
+        for each f as long in vis
+            dim byref as SymbolTable st = this.m_files[f].Symbols
+            for s as long = 0 to st.Count( ) - 1
+                if( st.Items[s].LowerName <> e.TargetName ) then continue for
+                dim as long pa = st.Items[s].Parent
+                if( pa < 0 ) then continue for
+                if( st.Items[pa].Kind_ <> SYM_NAMESPACE orelse st.Items[pa].LowerName <> e.TargetNs ) then continue for
+                if( pass = 0 andalso st.Items[s].IsDeclaration = false ) then continue for
+                out_.FileIndex = f
+                out_.SymIndex = s
+                return true
+            next
+        next
+    next
+    return false
+end function
+
+sub SymbolIndex.ModuleExportTargets( byval fileIndex as long, byref lowerAlias as string, _
+                                     byref exports as ExportHitArray, _
+                                     byref targets as IndexHitArray )
+    targets.Clear( )
+    this.ModuleExports( fileIndex, lowerAlias, exports )
+    '' One map per module file: `ns.name` -> a declaration, else any definition.
+    dim as long mapFile = -1
+    dim byName as FB.Map( of string, long )
+    dim hitFile as FB.Array( of long )
+    dim hitSym as FB.Array( of long )
+    for each x as ExportHit in exports
+        if( x.FileIndex <> mapFile ) then
+            mapFile = x.FileIndex
+            byName.Clear( )
+            hitFile.Clear( )
+            hitSym.Clear( )
+            dim vis as FB.Array( of long )
+            this.VisibleFrom( mapFile, vis )
+            for pass as long = 0 to 1
+                for each f as long in vis
+                    dim byref as SymbolTable st = this.m_files[f].Symbols
+                    for s as long = 0 to st.Count( ) - 1
+                        dim as long pa = st.Items[s].Parent
+                        if( pa < 0 ) then continue for
+                        if( st.Items[pa].Kind_ <> SYM_NAMESPACE ) then continue for
+                        if( pass = 0 andalso st.Items[s].IsDeclaration = false ) then continue for
+                        dim as string key_ = st.Items[pa].LowerName & "." & st.Items[s].LowerName
+                        if( byName.Contains( key_ ) ) then continue for
+                        byName.Put( key_, hitFile.Count( ) )
+                        hitFile.Push( f )
+                        hitSym.Push( s )
+                    next
+                next
+            next
+        end if
+        dim as IndexHit h
+        h.FileIndex = -1
+        h.SymIndex = -1
+        dim byref as ExportEdge e = this.m_files[x.FileIndex].Exports[x.ExportIndex]
+        dim as long at_ = -1
+        if( len(e.TargetNs) > 0 andalso byName.TryGet( e.TargetNs & "." & e.TargetName, at_ ) ) then
+            h.FileIndex = hitFile[at_]
+            h.SymIndex = hitSym[at_]
+        end if
+        targets.Push( h )
+    next
+end sub
+
+function SymbolIndex.ModuleMemberAt( byval fileIndex as long, byref lowerAlias as string, _
+                                     byref lowerName as string, byref sym as IndexHit, _
+                                     byref exp_ as ExportHit ) as long
+    sym.FileIndex = -1
+    sym.SymIndex = -1
+    exp_.FileIndex = -1
+    exp_.ExportIndex = -1
+    dim hits as IndexHitArray
+    this.ModuleMembers( fileIndex, lowerAlias, hits )
+    for each h as IndexHit in hits
+        if( this.m_files[h.FileIndex].Symbols.Items[h.SymIndex].LowerName = lowerName ) then
+            sym = h
+            return 1
+        end if
+    next
+    dim xs as ExportHitArray
+    this.ModuleExports( fileIndex, lowerAlias, xs )
+    for each x as ExportHit in xs
+        if( this.m_files[x.FileIndex].Exports[x.ExportIndex].LowerName <> lowerName ) then continue for
+        exp_ = x
+        this.ExportTarget( x.FileIndex, this.m_files[x.FileIndex].Exports[x.ExportIndex], sym )
+        return 2
+    next
+    return 0
+end function
 
 function SymbolIndex.IncludeAt( byval fileIndex as long, byval i as long ) as IncludeEdge
     dim as IncludeEdge none_

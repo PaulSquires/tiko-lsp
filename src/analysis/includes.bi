@@ -53,6 +53,26 @@ type ImportRefArray as FB.Array( of ImportRef )
 declare sub FindImports( byref text_ as string, byref tokens as TokenArray, _
                          byref out_ as ImportRefArray )
 
+'' ONE NAME A MODULE FILE `#export`s (tiko-lang RFC-0004 §6): a macro an importer writes as
+'' `alias.NAME`, and never bare. Joined to the same file's `#define NAME body`, when there is
+'' one: a std facade (RFC-0009) is `#define PathJoin FB.PathJoin` + `#export PathJoin`, and
+'' the body is what hover and go-to-definition follow.
+type ExportRef
+    Name_      as string    '' as the `#define` writes it, else as `#export` does
+    LowerName  as string
+    Body       as string    '' the `#define`'s body as written, "" when there is none
+    '' When the body is nothing but `A.B` -- a facade's every body -- A and B, lower-cased.
+    TargetNs   as string
+    TargetName as string
+    Start_     as long      '' byte offset of the name in its `#define`, else in `#export`
+    Length_    as long
+end type
+
+type ExportRefArray as FB.Array( of ExportRef )
+
+declare sub FindExports( byref text_ as string, byref tokens as TokenArray, _
+                         byref out_ as ExportRefArray )
+
 '' Every include directive in the token stream, in source order.
 declare sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
                           byref out_ as IncludeRefArray )

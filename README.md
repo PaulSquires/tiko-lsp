@@ -237,7 +237,7 @@ Nothing in the server depends on its own path, so any location works.
 build\_run_tests.bat
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 1,056 assertions:
+(or `sh build/_run_tests.sh`). Twelve suites, 1,130 assertions:
 
 - **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
   time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
@@ -269,13 +269,15 @@ build\_run_tests.bat
   through a declared type, a pointer, `this.`, an enum and a namespace, the
   scope list with its group ordering, the fixed-width type names (and a file's
   own `float32` replacing tiko's), and case-insensitive de-duplication.
-- **workspace** — 157 assertions over discovery rules, the include graph
+- **workspace** — 182 assertions over discovery rules, the include graph
   (a chain, a cycle, an edge to nowhere, a wrong-case forward-slash path, and
   two files declaring one name where only one is visible, and a `.tko` that
   includes a `.ti` and a legacy `.bi`), indexing and
   re-indexing, the one-file-one-entry rule (a path through `build/..` is the
   same file), buffer-beats-disk, query scoring, and identifier scanning —
-  including the strings and comments a reference search must NOT match.
+  including the strings and comments a reference search must NOT match — and
+  modules: `alias.` members, and a facade's `#export`ed macros (tiko-lang RFC-0009)
+  resolved to the header declaration they name, never offered bare.
 - **signature** — 53 assertions over splitting a recorded signature (a comma
   inside a default value does not split it; a function-pointer parameter counts
   as one), finding which call the caret is in (the INNER one, when they nest),

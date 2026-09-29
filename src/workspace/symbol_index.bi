@@ -98,6 +98,31 @@ end type
 
 type ImportEdgeArray as FB.Array( of ImportEdge )
 
+'' ONE `#export`ed MACRO of a module file (analysis/includes.bi, ExportRef), its name's
+'' range converted as the symbols' are. NOT A SYMBOL, and kept apart from them on purpose:
+'' an exported macro is written `alias.NAME` and never bare, so it must not reach the
+'' outline, workspace/symbol, or a bare name's definition -- only `alias.`.
+type ExportEdge
+    Name_      as string
+    LowerName  as string
+    Body       as string    '' the `#define` body as written, or ""
+    TargetNs   as string    '' `FB` of `FB.PathJoin`, lower-cased; "" when not `A.B`
+    TargetName as string
+    Line       as long
+    StartChar  as long
+    EndChar    as long
+end type
+
+type ExportEdgeArray as FB.Array( of ExportEdge )
+
+'' An exported macro, by file and entry.
+type ExportHit
+    FileIndex   as long
+    ExportIndex as long
+end type
+
+type ExportHitArray as FB.Array( of ExportHit )
+
 type IndexedFile
     Uri        as string
     Path_      as string
@@ -111,6 +136,7 @@ type IndexedFile
     Ranges     as IndexedRangeArray   '' one per symbol, aligned by index
     Includes   as IncludeEdgeArray    '' what this file pulls in
     Imports    as ImportEdgeArray     '' the modules it imports
+    Exports    as ExportEdgeArray     '' the macros it `#export`s
     FromBuffer as boolean    '' indexed from an open document, not from disk
 end type
 
@@ -175,6 +201,33 @@ type SymbolIndex
         '' WHAT `alias.` MAY NAME: the module's file-level declarations marked `public`.
         declare sub ModuleMembers( byval fileIndex as long, byref lowerAlias as string, _
                                    byref out_ as IndexHitArray )
+
+        '' ...AND ITS `#export`ED MACROS, which are not symbols: a std facade (tiko-lang
+        '' RFC-0009) is nothing else, so `fs.` would otherwise offer nothing.
+        declare sub ModuleExports( byval fileIndex as long, byref lowerAlias as string, _
+                                   byref out_ as ExportHitArray )
+        declare function ExportAt( byval fileIndex as long, byval i as long ) as ExportEdge
+
+        '' WHAT AN EXPORTED MACRO NAMES, when its body is `A.B` -- a facade's `FB.PathJoin`:
+        '' a declaration of B inside a namespace A, among the files its module file can see
+        '' (the header it includes). False when the body names nothing found.
+        declare function ExportTarget( byval exportFile as long, byref e as ExportEdge, _
+                                       byref out_ as IndexHit ) as boolean
+
+        '' ModuleExports and ExportTarget together, for a whole module at once: `targets`
+        '' aligned with `exports`, FileIndex -1 where nothing is named. One pass over what
+        '' each module file can see, not one per name -- std/tui exports 352, and completion
+        '' runs on every keystroke.
+        declare sub ModuleExportTargets( byval fileIndex as long, byref lowerAlias as string, _
+                                         byref exports as ExportHitArray, _
+                                         byref targets as IndexHitArray )
+
+        '' `alias.name` AS ONE ANSWER, for hover and definition: a public declaration of the
+        '' module (returns 1, `sym` set), else an exported macro (returns 2, `exp` set, and
+        '' `sym` set to what it names when that is found, else FileIndex -1); 0 for neither.
+        declare function ModuleMemberAt( byval fileIndex as long, byref lowerAlias as string, _
+                                         byref lowerName as string, byref sym as IndexHit, _
+                                         byref exp_ as ExportHit ) as long
 
         '' The files `fileIndex` can see: itself, what it includes, and what
         '' those include, transitively. Cycles terminate -- a file already
