@@ -924,6 +924,20 @@ module.exports = grammar({
     )),
 
     string: _ => token(choice(
+      // A BLOCK STRING, tiko's multi-line literal (tiko-lang 5ad570ba): '"""' that
+      // ENDS ITS LINE, then every line up to the first that starts, after blanks,
+      // with '"""'. A body line is blank, or its first non-blank text is anything
+      // but three quotes. '"""abc"""' never matches the opener, so it stays the
+      // ordinary string it is in fbc. An unterminated block matches nothing here
+      // and lexes as before -- the compiler reports it (TKO0207), and the lines
+      // below a half-typed block stay code until the closer is written.
+      seq(
+        optional(/[!$]/),
+        /"""[ \t\r]*\n/,
+        repeat(/[ \t]*([^ \t\n"][^\n]*|"[^"\n][^\n]*|""[^"\n][^\n]*|""?)?\n/),
+        /[ \t]*"""/,
+      ),
+
       seq(
         optional(/[!$]/),
         '"',

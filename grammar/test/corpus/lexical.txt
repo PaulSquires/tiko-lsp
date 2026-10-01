@@ -93,3 +93,49 @@ dim as long i : i = 0 : print i
   (number)
   (identifier)
   (identifier))
+
+================================================================================
+Block strings: three quotes ending a line, to the first line starting with three
+================================================================================
+
+dim as string s = """
+    select id
+      from t
+
+    """
+dim as string q = """abc"""
+print len( !"""
+  a\tb
+  """ & "x" )
+sub F( )
+    dim as string body = """
+        end sub
+        """
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (string)
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (string)
+  (identifier)
+  (identifier)
+  (string)
+  (operator)
+  (string)
+  (procedure_definition
+    name: (qualified_name
+      (identifier))
+    (parameter_list)
+    (identifier)
+    (type_annotation
+      (identifier)
+      (identifier))
+    (string)))

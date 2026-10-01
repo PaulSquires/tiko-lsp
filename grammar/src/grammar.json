@@ -5949,6 +5949,38 @@
                 ]
               },
               {
+                "type": "PATTERN",
+                "value": "\"\"\"[ \\t\\r]*\\n"
+              },
+              {
+                "type": "REPEAT",
+                "content": {
+                  "type": "PATTERN",
+                  "value": "[ \\t]*([^ \\t\\n\"][^\\n]*|\"[^\"\\n][^\\n]*|\"\"[^\"\\n][^\\n]*|\"\"?)?\\n"
+                }
+              },
+              {
+                "type": "PATTERN",
+                "value": "[ \\t]*\"\"\""
+              }
+            ]
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[!$]"
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
+              },
+              {
                 "type": "STRING",
                 "value": "\""
               },
