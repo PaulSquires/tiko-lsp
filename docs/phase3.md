@@ -20,7 +20,10 @@ is a separate feature, and is not claimed.
 
 From the lexer:
 
-- unterminated string literals (a string never spans a line in tiko);
+- unterminated string literals (an ordinary string never spans a line in tiko);
+- block strings — `"""` ending its line, closed by the first line that starts with `"""` — with
+  no closing line (`unterminated-block-string`, the compiler's TKO0207), or with a non-blank line
+  that does not start with the closing line's indentation (`block-string-margin`, TKO0208);
 - unterminated block comments — which **nest**, so `/' a /' b '/ c '/` is one;
 - malformed numbers: `1.2.3`, `&hzz`, `12abc`;
 - bytes that cannot begin a token.

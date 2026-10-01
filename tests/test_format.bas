@@ -169,6 +169,25 @@ private sub TestLeavesAlone( )
                            "#endmacro" & LF & _
                            "dim as long n = 1" & LF
     AssertEqStr( Fmt( macro_ ), macro_, "a #macro body is left as written" )
+
+    '' A BLOCK STRING'S BODY IS ITS VALUE. Re-indenting a body line, trimming its
+    '' trailing spaces or moving the closing line would change the string -- the
+    '' closing line's indentation is the margin -- so only the opener's line moves.
+    dim as string Q3 = chr(34) & chr(34) & chr(34)
+    dim as string blk = "sub Go_( )" & LF & _
+                        "dim as string s = " & Q3 & LF & _
+                        "  first   " & LF & _
+                        "      second" & LF & _
+                        "  " & Q3 & LF & _
+                        "end sub" & LF
+    AssertEqStr( Fmt( blk ), _
+                 "sub Go_( )" & LF & _
+                 "    dim as string s = " & Q3 & LF & _
+                 "  first   " & LF & _
+                 "      second" & LF & _
+                 "  " & Q3 & LF & _
+                 "end sub" & LF, _
+                 "a block string's body and closing line are left as written" )
 end sub
 
 '' ############################################################################
