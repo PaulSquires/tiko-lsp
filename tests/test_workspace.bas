@@ -32,6 +32,9 @@ g_Fixture = g_Root & "\tests\fixtures\workspace"
 '' ----------------------------------------------------------------------------
 TestGroup( "file discovery" )
 
+AssertTrue ( IsSourceFileName( "main.tiko" ), ".tiko is source" )
+AssertTrue ( IsSourceFileName( "MAIN.TIKO" ), ".tiko is matched case-insensitively" )
+AssertFalse( IsSourceFileName( "main.tikox" ), "but not a longer extension that starts with it" )
 AssertTrue ( IsSourceFileName( "main.tko" ), ".tko is source" )
 AssertTrue ( IsSourceFileName( "shared.ti" ), ".ti is source" )
 AssertTrue ( IsSourceFileName( "MAIN.TKO" ), ".tko is matched case-insensitively" )
@@ -464,8 +467,9 @@ end scope
 scope
     '' THE .tko / .ti SPELLINGS, through the REAL scan rather than Fake( ): it
     '' is the scan's extension filter that decides what gets indexed at all.
-    '' gadgets.tko includes parts.ti and the legacy legacy.bi; notes.txt is not
-    '' source and must stay out.
+    '' gadgets.tko includes parts.ti and the legacy legacy.bi; assembly.tiko, in
+    '' tiko's current extension, includes parts.ti too; notes.txt is not source
+    '' and must stay out.
     dim as string tkoFixture = g_Root & "\tests\fixtures\tko"
     dim as SymbolIndex idx
     dim roots as PathArray
@@ -474,18 +478,19 @@ scope
 
     dim as WorkspaceScan scan
     ScanFolder( tkoFixture, scan )
-    AssertEqInt( scan.Files.Count( ), 3, "the scan finds the .tko, the .ti and the .bi, and not the .txt" )
+    AssertEqInt( scan.Files.Count( ), 4, "the scan finds the .tiko, the .tko, the .ti and the .bi, and not the .txt" )
     for i as long = 0 to scan.Files.Count( ) - 1
         idx.IndexPath( scan.Files[i] )
     next
     idx.ResolveIncludes( )
 
-    dim as long gadgets = -1, parts = -1, legacy = -1
+    dim as long gadgets = -1, parts = -1, legacy = -1, assembly = -1
     for i as long = 0 to idx.FileCount( ) - 1
         dim as string p = lcase( idx.FilePath( i ) )
         if( instr( p, "gadgets.tko" ) > 0 ) then gadgets = i
         if( instr( p, "parts.ti" ) > 0 ) then parts = i
         if( instr( p, "legacy.bi" ) > 0 ) then legacy = i
+        if( instr( p, "assembly.tiko" ) > 0 ) then assembly = i
     next
 
     AssertTrue( gadgets >= 0 andalso parts >= 0 andalso legacy >= 0, "all three files are indexed" )
@@ -501,6 +506,11 @@ scope
     AssertEqInt( hit.FileIndex, parts, "to its declaration in parts.ti" )
     AssertTrue( idx.FindDefinitionFrom( gadgets, "legacy_parts", hit ), "and `LEGACY_PARTS` resolves" )
     AssertEqInt( hit.FileIndex, legacy, "to legacy.bi" )
+
+    AssertTrue( assembly >= 0, "the .tiko file is indexed" )
+    AssertEqInt( idx.IncludeAt( assembly, 0 ).ToFile, parts, "its include resolves to parts.ti" )
+    AssertTrue( idx.FindDefinitionFrom( assembly, "gadget", hit ), "`Gadget` resolves from assembly.tiko" )
+    AssertEqInt( hit.FileIndex, parts, "to parts.ti" )
 end scope
 
 '' ############################################################################

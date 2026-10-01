@@ -24,7 +24,7 @@ type WorkspaceScan
     Truncated as boolean     '' the file cap was reached and the walk stopped
 end type
 
-'' .tko and .ti, plus the legacy .bas, .bi and .inc, case-insensitively.
+'' .tiko, .tko and .ti, plus the legacy .bas, .bi and .inc, case-insensitively.
 '' Nothing else is tiko source, and guessing wider means indexing build output.
 declare function IsSourceFileName( byref name_ as string ) as boolean
 

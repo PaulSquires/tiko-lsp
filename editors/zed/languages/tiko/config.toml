@@ -1,6 +1,6 @@
 name = "Tiko"
 grammar = "tiko"
-path_suffixes = ["tko", "ti", "bas", "bi", "inc"]
+path_suffixes = ["tiko", "tko", "ti", "bas", "bi", "inc"]
 line_comments = ["' ", "'' "]
 block_comment = { start = "/'", prefix = "", end = "'/", tab_size = 0 }
 autoclose_before = ",)]}"

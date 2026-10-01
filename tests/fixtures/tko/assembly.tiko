@@ -1,0 +1,6 @@
+'' A .tiko source -- tiko's current extension -- that uses the .ti header's type.
+#include once "parts.ti"
+
+function Assemble( byref g as Gadget ) as long
+    return g.Parts_
+end function
