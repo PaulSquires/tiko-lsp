@@ -35,6 +35,9 @@ const DIAGCODE_UNEXPECTED_END       = "unexpected-end"
 const DIAGCODE_MISMATCHED_END       = "mismatched-end"
 const DIAGCODE_UNBALANCED_PAREN     = "unbalanced-parenthesis"
 const DIAGCODE_ORPHAN_CLAUSE        = "clause-outside-block"
+'' tiko's block strings: TKO0207 and TKO0208 in the compiler.
+const DIAGCODE_UNTERMINATED_BLOCK_STRING = "unterminated-block-string"
+const DIAGCODE_BLOCK_STRING_MARGIN       = "block-string-margin"
 
 type Diagnostic
     Severity    as DiagSeverity

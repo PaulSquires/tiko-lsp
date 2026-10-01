@@ -142,6 +142,19 @@ private sub TestLineSplitting( )
         end if
     next
     TestPass( "no token runs past the end of its line" )
+
+    '' A tiko block string crosses lines the same way, and is split the same way.
+    dim as string Q3 = chr(34) & chr(34) & chr(34)
+    Analyse( "dim as string s = " & Q3 & LF & _
+             "    one" & LF & _
+             "    " & Q3 & LF )
+
+    dim as long strings_ = 0
+    for i as long = 0 to g_Toks.Count( ) - 1
+        if( g_Toks[i].Type_ = SEMTYPE_STRING ) then strings_ += 1
+    next
+    AssertEqInt( strings_, 3, "a three-line block string is three string tokens" )
+    AssertEqInt( TypeAt( 1, 0 ), SEMTYPE_STRING, "its body line is a string, not code" )
 end sub
 
 '' ############################################################################

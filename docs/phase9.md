@@ -60,7 +60,7 @@ server can act on, rather than falling into the gap between "scanned" and
 | --- | --- |
 | Created, Changed | re-index the file from disk |
 | Deleted | drop it from the index |
-| anything that is not `.tko`, `.ti`, `.bas`, `.bi`, `.inc` | ignore |
+| anything that is not `.tiko`, `.tko`, `.ti`, `.bas`, `.bi`, `.inc` | ignore |
 | a path under `.git` and friends | ignore |
 | **a file the editor has open** | **ignore** |
 
@@ -89,7 +89,7 @@ about a second per thousand files** — which is the very thing phase 8 was abou
 
 So a notification is now planned before it is acted on:
 
-1. **Filter**, as before: only `.tko`/`.ti`/`.bas`/`.bi`/`.inc`, nothing under `.git`, and
+1. **Filter**, as before: only `.tiko`/`.tko`/`.ti`/`.bas`/`.bi`/`.inc`, nothing under `.git`, and
    nothing the editor has open.
 2. **Collapse.** One checkout reports the same file more than once — deleted
    then created, changed twice — and only the last word about it matters. Files

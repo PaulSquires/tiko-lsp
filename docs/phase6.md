@@ -24,7 +24,8 @@ and cannot be nested at all, which is why this could not be hand-rolled.
 
 - `.tko` and `.ti`, and the legacy `.bas`, `.bi` and `.inc`, case-insensitively. Nothing
   else is tiko source. (`.tko` for sources and `.ti` for headers were added 2026-09-26, when
-  tiko adopted them; the older three stay recognised.)
+  tiko adopted them; the older three stay recognised. `.tiko`, the source extension tiko settled
+  on 2026-09-28, was added 2026-10-01.)
 - `.git`, `.svn`, `.hg`, `.vs`, `.vscode`, `.idea`, `node_modules` and
   `__pycache__` are skipped anywhere in the path. **`bin` and `obj` are not** —
   the extension filter already excludes build output, and a project that keeps

@@ -191,10 +191,10 @@ desynchronises the framing.
 
 ### Editor configuration
 
-tiko source files are `.tko` and headers are `.ti`; the legacy `.bas`, `.bi` and `.inc`
-are still tiko source. The workspace scan indexes all five, case-insensitively, and
-the server asks the client to watch the same set. Map all five to the language in
-your editor.
+tiko source files are `.tiko` (and the earlier `.tko`) and headers are `.ti`; the legacy
+`.bas`, `.bi` and `.inc` are still tiko source. The workspace scan indexes all six,
+case-insensitively, and the server asks the client to watch the same set. Map all six to
+the language in your editor.
 
 Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
 

@@ -140,6 +140,63 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "lexer: block strings" )
+
+scope
+    '' tiko's '"""' literal. The rules are the compiler's (lexer.bas
+    '' ScanBlockString); each assertion below is one of them.
+    dim as string Q3 = DQ & DQ & DQ
+
+    dim as string blk = "s = " & Q3 & LF & _
+                        "    print x" & LF & _
+                        "    end sub" & LF & _
+                        "    " & Q3 & LF
+    AssertEqInt( CountKind( blk, TK_STRING ), 1, "a block string is ONE string token" )
+    AssertEqInt( CountKind( blk, TK_KEYWORD ), 0, "words in its body are not keywords" )
+    AssertEqInt( CountKind( blk, TK_IDENT ), 1, "nor identifiers -- only 's' is" )
+    AssertEqInt( DiagCount( blk ), 0, "and an 'end sub' in the body is not an orphan closer" )
+
+    AssertEqInt( CountKind( "s = " & Q3 & "abc" & Q3 & LF & "x = 1", TK_IDENT ), 2, _
+                 "'" & Q3 & "abc" & Q3 & "' is the ordinary string " & DQ & "abc" & DQ & ", ended on its line" )
+    AssertEqInt( DiagCount( "s = " & Q3 & "abc" & Q3 ), 0, "and is clean" )
+
+    AssertEqInt( CountKind( "s = " & Q3 & "   " & LF & "  a" & LF & "  " & Q3, TK_STRING ), 1, _
+                 "spaces after the opener still open one" )
+    AssertEqInt( CountKind( "s = !" & Q3 & LF & "  a\t" & LF & "  " & Q3, TK_STRING ), 1, _
+                 "and so does !" & Q3 )
+    AssertEqInt( CountKind( "s = $" & Q3 & LF & "  a" & LF & "  " & Q3, TK_STRING ), 1, _
+                 "and $" & Q3 )
+
+    '' What follows the closing quotes is code.
+    dim as string tail_ = "print len( " & Q3 & LF & "  a" & LF & "  " & Q3 & " & " & DQ & "b" & DQ & " )"
+    AssertEqInt( DiagCount( tail_ ), 0, "the parenthesis after the closer balances" )
+    AssertEqInt( CountKind( tail_, TK_STRING ), 2, "and the string after it is its own token" )
+
+    '' A body line that starts with "" but not """ does not close it.
+    AssertEqInt( CountKind( "s = " & Q3 & LF & "  " & DQ & DQ & " two" & LF & "  " & Q3, TK_STRING ), 1, _
+                 "a body line starting with two quotes does not close it" )
+
+    '' CRLF files: the CR is not part of any line's content.
+    AssertEqInt( DiagCount( "s = " & Q3 & CR & LF & "    a" & CR & LF & "    " & Q3 & CR & LF ), 0, _
+                 "a CRLF block string is clean" )
+
+    '' A blank line, whatever it holds, is exempt from the margin.
+    AssertEqInt( DiagCount( "s = " & Q3 & LF & "    a" & LF & "  " & LF & LF & "    b" & LF & "    " & Q3 ), 0, _
+                 "blank lines are exempt from the margin" )
+
+    AssertOneCode( "s = " & Q3 & LF & "    ok" & LF & "  shallow" & LF & "    " & Q3, _
+                   DIAGCODE_BLOCK_STRING_MARGIN, "a line left of the margin is reported" )
+    AssertOneCode( "s = " & Q3 & LF & chr(9) & "tab" & LF & "    " & Q3, _
+                   DIAGCODE_BLOCK_STRING_MARGIN, "a tab is never counted as spaces" )
+    AssertOneCode( "s = " & Q3 & LF & "    never closed" & LF & "x = 1", _
+                   DIAGCODE_UNTERMINATED_BLOCK_STRING, "a block string with no closing line is reported" )
+
+    '' An unterminated block swallows the rest of the file, as the compiler's does.
+    AssertEqInt( CountKind( "s = " & Q3 & LF & "x = 1" & LF & "sub F( )", TK_KEYWORD ), 0, _
+                 "and swallows the rest of the file" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "lexer: numbers" )
 
 AssertEqInt( CountKind( "x = 123", TK_NUMBER ), 1, "a decimal integer" )

@@ -13,7 +13,7 @@ function IsSourceFileName( byref name_ as string ) as boolean
     if( dotAt = 0 ) then return false
 
     select case lcase( mid( name_, dotAt ) )
-        case ".tko", ".ti", ".bas", ".bi", ".inc" : return true
+        case ".tiko", ".tko", ".ti", ".bas", ".bi", ".inc" : return true
     end select
     return false
 end function

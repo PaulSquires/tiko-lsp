@@ -7,6 +7,7 @@
     {
       "scope": "source.tiko",
       "file-types": [
+        "tiko",
         "tko",
         "ti",
         "bas",

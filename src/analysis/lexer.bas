@@ -265,6 +265,111 @@ private sub Emit( byref tokens as TokenArray, byval kind as TokenKind, _
     tokens.Push( t )
 end sub
 
+'' -- block strings -------------------------------------------------------------
+''
+'' The compiler's rules, tiko-lang src/lexer/lexer.bas ScanBlockString, which
+'' this must agree with exactly or the editor and the build disagree about
+'' where a literal ends:
+''
+''   - '"""' (after an optional ! or $) OPENS one only when nothing but spaces,
+''     tabs or a CR follows it before the newline. '"""abc"""' is the ordinary
+''     string '"abc"', and stays one.
+''   - It CLOSES at the first line that starts, after spaces and tabs, with '"""'.
+''     What follows on that line is ordinary code.
+''   - That line's leading whitespace is the MARGIN. A non-blank body line that
+''     does not start with it, byte for byte, is the compiler's TKO0208.
+''   - No closing line is TKO0207, and the literal runs to the end of the file.
+
+'' 'q' is the first quote.
+private function IsBlockOpener( byref text_ as string, byval q as long ) as boolean
+    dim as long n = len(text_)
+    if( q + 2 >= n ) then return false
+    if( text_[q + 1] <> asc("""") orelse text_[q + 2] <> asc("""") ) then return false
+    dim as long j = q + 3
+    while( j < n andalso (text_[j] = asc(" ") orelse text_[j] = 9 orelse text_[j] = 13) )
+        j += 1
+    wend
+    return ( j < n andalso text_[j] = 10 )
+end function
+
+'' Returns the offset just past the closing '"""', or the end of the text.
+private function LexBlockString( byref text_ as string, byval start_ as long, _
+                                 byval q as long, byref diags as DiagnosticArray ) as long
+    dim as long n = len(text_)
+    dim as long j = q + 3
+    while( text_[j] <> 10 )                 '' IsBlockOpener found it
+        j += 1
+    wend
+    dim as long bodyFirst = j + 1
+
+    dim as long closerLine = -1, closerQuote = -1
+    dim as long ln = bodyFirst
+    while( ln < n )
+        dim as long k = ln
+        while( k < n andalso (text_[k] = asc(" ") orelse text_[k] = 9) )
+            k += 1
+        wend
+        if( k + 2 < n ) then
+            if( text_[k] = asc("""") andalso text_[k + 1] = asc("""") andalso text_[k + 2] = asc("""") ) then
+                closerLine = ln
+                closerQuote = k
+                exit while
+            end if
+        end if
+        while( k < n andalso text_[k] <> 10 )
+            k += 1
+        wend
+        ln = k + 1
+    wend
+
+    if( closerLine < 0 ) then
+        AddDiagnostic( diags, DIAG_ERROR, start_, j, _
+                       DIAGCODE_UNTERMINATED_BLOCK_STRING, _
+                       "block string has no closing line; one must start with three quotes" )
+        return n
+    end if
+
+    '' The margin check, one body line at a time. Blank lines are exempt.
+    dim as long margin = closerQuote - closerLine
+    dim as long ls = bodyFirst
+    while( ls < closerLine )
+        dim as long le = ls
+        while( le < closerLine andalso text_[le] <> 10 )
+            le += 1
+        wend
+        dim as long ce = le
+        if( ce > ls andalso text_[ce - 1] = 13 ) then ce -= 1
+
+        dim as boolean blank = true
+        for b as long = ls to ce - 1
+            if( text_[b] <> asc(" ") andalso text_[b] <> 9 ) then
+                blank = false
+                exit for
+            end if
+        next
+
+        if( blank = false ) then
+            dim as boolean indented = ( ce - ls >= margin )
+            if( indented ) then
+                for m as long = 0 to margin - 1
+                    if( text_[ls + m] <> text_[closerLine + m] ) then
+                        indented = false
+                        exit for
+                    end if
+                next
+            end if
+            if( indented = false ) then
+                AddDiagnostic( diags, DIAG_ERROR, ls, ce, _
+                               DIAGCODE_BLOCK_STRING_MARGIN, _
+                               "block string line does not start with the closing line's indentation" )
+            end if
+        end if
+        ls = le + 1
+    wend
+
+    return closerQuote + 3
+end function
+
 sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as DiagnosticArray )
     EnsureKeywords( )
     tokens.Clear( )
@@ -416,6 +521,18 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
                     quoteAt = i + 1
                 end if
             end if
+        end if
+
+        '' A BLOCK STRING: '"""' that ends its line. One token from the opener to
+        '' the closing '"""', so everything downstream -- the formatter's
+        '' protected lines, the per-line split of semantic tokens -- treats it the
+        '' way it already treats a block comment.
+        if( isString andalso IsBlockOpener( text_, quoteAt ) ) then
+            dim as long start_ = i
+            i = LexBlockString( text_, start_, quoteAt, diags )
+            Emit( tokens, TK_STRING, start_, i - start_ )
+            atLineStart = false
+            continue while
         end if
 
         if( isString ) then

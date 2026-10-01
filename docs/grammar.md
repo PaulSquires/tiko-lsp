@@ -55,6 +55,7 @@ reference lists it.
 | `type as integer rev1, rev2` | The reversed type-alias list. |
 | a file with no trailing newline | Every buffer being typed into. An external scanner contributes one zero-width token: **end of file ends a line**. |
 | an unterminated `"` | fbc accepts it, this project's corpus contains one, and an editor sees one on every keystroke while a string is typed. |
+| `s = """` … `"""` | tiko's block string: `"""` that ends its line opens one, the first line starting (after blanks) with `"""` closes it. One `string` token, a regular expression with no scanner. `"""abc"""` never matches the opener, so it stays fbc's 5-character string. An unterminated block matches nothing and lexes as before, so the lines under a half-typed block stay code until its closer is written. |
 
 ## Measured
 
