@@ -4,6 +4,8 @@
 
 #include once "hover.bi"
 #include once "workspace_symbols.bi"
+#include once "completion.bi"
+#include once "../analysis/completion.bi"
 #include once "../analysis/includes.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"
@@ -44,12 +46,61 @@ end function
 '' go-to-definition makes. "" when the caret is on no name, on a member
 '' (`obj.Method` needs the type before the dot), or on a name nothing declares.
 '' Never waits for the index: hover is asked for as the mouse moves.
+'' A MEMBER: `lg.MinLevel` where `dim shared as Logger lg`. The base's declared
+'' type is read from its declaration in this file, followed through aliases to the
+'' type that has the members -- searching includes AND #imports, the lookup member
+'' completion makes -- and the member is that type's child of that name. A base
+'' this file does not declare is taken as a type or namespace named directly
+'' (`FB.Something`). Chains (`a.b.c`) and expressions (`f( ).x`) are not resolved.
+private function MemberHover_( byref srv as Server, byval doc as TextDocumentPtr, _
+                               byval ti as long ) as string
+    if( ti < 2 ) then return ""
+    dim as Token baseTok = doc->Tokens( )[ti - 2]
+    if( baseTok.Kind <> TK_IDENT ) then return ""
+
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then return ""
+
+    dim as string member_  = lcase( TokenText( doc->Text( ), doc->Tokens( )[ti] ) )
+    dim as string baseName = lcase( TokenText( doc->Text( ), baseTok ) )
+    dim as string typeName = baseName
+    dim as long b = doc->Symbols( ).Resolve( baseName, baseTok.Start_ )
+    if( b >= 0 ) then
+        typeName = DeclaredTypeName( doc->Symbols( ).Items[b] )
+        if( len(typeName) = 0 ) then return ""
+    end if
+
+    dim visible as FB.Array( of long )
+    VisibleWithImports( srv, here, visible )
+    dim as string want = FinalTypeName( srv, visible, typeName )
+
+    for v as long = 0 to visible.Count( ) - 1
+        dim as long f = visible[v]
+        for t as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            dim as SymbolInfo owner = srv.Index->SymbolAt( f, t )
+            if( owner.LowerName <> want ) then continue for
+            select case owner.Kind_
+                case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_NAMESPACE, SYM_INTERFACE
+                case else
+                    continue for
+            end select
+            if( lcase( left( owner.Detail_, 3 ) ) = "as " ) then continue for
+
+            for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+                dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
+                if( m.Parent = t andalso m.LowerName = member_ ) then return SymbolHoverMarkdown( m )
+            next
+        next
+    next
+    return ""
+end function
+
 private function IndexHover_( byref srv as Server, byval doc as TextDocumentPtr, _
                               byval offset as long ) as string
     dim as long ti = TokenIndexAt( doc->Tokens( ), offset )
     if( ti < 0 ) then return ""
     if( doc->Tokens( )[ti].Kind <> TK_IDENT ) then return ""
-    if( IsMemberAccess( doc->Text( ), doc->Tokens( ), ti ) ) then return ""
+    if( IsMemberAccess( doc->Text( ), doc->Tokens( ), ti ) ) then return MemberHover_( srv, doc, ti )
 
     dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[ti] ) )
     dim as IndexHit hit

@@ -1280,6 +1280,10 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
     ''     the header demo.bas includes. imp.bas #includes nothing.
     s &= Req_( 15, "textDocument/completion", At_( impUri, 6, 6 ) )
 
+    '' 16. hover on the MEMBER `g.Spin` (line 7): Gadget_'s declaration, reached the
+    ''     same way -- through the import, the re-export and the forward alias.
+    s &= Req_( 16, "textDocument/hover", At_( impUri, 7, 7 ) )
+
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
     s &= Note_( "exit", "null" )
@@ -1337,7 +1341,7 @@ private function CheckIncSession( byref path as string ) as long
     loop
     AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary" )
 
-    for id as long = 1 to 15
+    for id as long = 1 to 16
         if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
     next
 
@@ -1458,6 +1462,13 @@ private function CheckIncSession( byref path as string ) as long
         AssertFalse   ( instr( labels, " constructor " ) > 0 orelse instr( labels, " destructor " ) > 0, _
                         "but not its constructor or destructor" )
         AssertFalse   ( instr( labels, " let " ) > 0, "nor its operators" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 16 ) )
+        AssertContains( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( ), _
+                        "Spin", "hover on the member g.Spin: Gadget_'s declaration" )
     end scope
 
     return TestSummary( "toolchain-header session" )

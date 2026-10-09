@@ -5,4 +5,5 @@ sub UseDemo( )
     dim as string s = demo.Shout( "a", 2 )
     dim as Gadget g
     g.
+    g.Spin( )
 end sub

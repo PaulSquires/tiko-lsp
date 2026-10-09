@@ -171,8 +171,8 @@ end sub
 '' this file through the module (std/logs re-exports FB.Logger, declared in
 '' fb/logger.bi, which logs.bas includes) and through nothing this file
 '' #includes, so a type search over its includes alone finds nothing.
-private sub VisibleWithImports_( byref srv as Server, byval here as long, _
-                                 byref out_ as FB.Array( of long ) )
+sub VisibleWithImports( byref srv as Server, byval here as long, _
+                        byref out_ as FB.Array( of long ) )
     srv.Index->VisibleFrom( here, out_ )
     dim seen_ as FB.Map( of long, boolean )
     for i as long = 0 to out_.Count( ) - 1
@@ -192,30 +192,15 @@ private sub VisibleWithImports_( byref srv as Server, byval here as long, _
     next
 end sub
 
-'' The members of a type declared in an INCLUDED file.
-''
-'' `w.` where `w as Widget` and Widget lives in a header was the case that made
-'' member completion look broken: the type is in scope, its fields are in
-'' scope, and the server offered nothing at all.
-private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPtr, _
-                                byref typeName as string, byref items as CompletionItemArray )
-
-    if( len(typeName) = 0 ) then exit sub
-
-    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
-    if( here < 0 ) then exit sub
-
-    dim visible as FB.Array( of long )
-    VisibleWithImports_( srv, here, visible )
-
+'' AN ALIAS IS FOLLOWED to what it names, as many hops as there are:
+''     dim as TrkVoidResult cfg              cfg's type is TrkVoidResult,
+''     type TrkVoidResult as FB.Result( of boolean, TrkError )
+'' and the members are Result's, in the toolchain's fb/result.bi. Looked for in
+'' the asking file as well -- an alias is often declared beside its use.
+'' Bounded, so `type A as B` / `type B as A` cannot loop.
+function FinalTypeName( byref srv as Server, byref visible as FB.Array( of long ), _
+                        byref typeName as string ) as string
     dim as string want = lcase( typeName )
-
-    '' AN ALIAS IS FOLLOWED to what it names, as many hops as there are:
-    ''     dim as TrkVoidResult cfg              cfg's type is TrkVoidResult,
-    ''     type TrkVoidResult as FB.Result( of boolean, TrkError )
-    '' and the members are Result's, in the toolchain's fb/result.bi. Looked
-    '' for in THIS file as well -- an alias is often declared beside its use.
-    '' Bounded, so `type A as B` / `type B as A` cannot loop.
     for hop as long = 1 to 8
         dim as string target = ""
         for v as long = 0 to visible.Count( ) - 1
@@ -232,6 +217,26 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
         if( len(target) = 0 orelse target = want ) then exit for
         want = target
     next
+    return want
+end function
+
+'' The members of a type declared in an INCLUDED file.
+''
+'' `w.` where `w as Widget` and Widget lives in a header was the case that made
+'' member completion look broken: the type is in scope, its fields are in
+'' scope, and the server offered nothing at all.
+private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPtr, _
+                                byref typeName as string, byref items as CompletionItemArray )
+
+    if( len(typeName) = 0 ) then exit sub
+
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then exit sub
+
+    dim visible as FB.Array( of long )
+    VisibleWithImports( srv, here, visible )
+
+    dim as string want = FinalTypeName( srv, visible, typeName )
 
     dim seen_ as FB.Map( of string, boolean )
     for i as long = 0 to items.Count( ) - 1
