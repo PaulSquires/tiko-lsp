@@ -38,6 +38,27 @@ function ResolveAtOffset( byval doc as TextDocumentPtr, byval offset as long, _
     return doc->Symbols( ).Resolve( word_, offset )
 end function
 
+'' A NAME THIS FILE DOES NOT DECLARE: a sub in another workspace file, or a
+'' toolchain header's -- MessageBoxW from windows.bi. Answered from the index
+'' through the files this one can see first (FindDefinitionFrom), the lookup
+'' go-to-definition makes. "" when the caret is on no name, on a member
+'' (`obj.Method` needs the type before the dot), or on a name nothing declares.
+'' Never waits for the index: hover is asked for as the mouse moves.
+private function IndexHover_( byref srv as Server, byval doc as TextDocumentPtr, _
+                              byval offset as long ) as string
+    dim as long ti = TokenIndexAt( doc->Tokens( ), offset )
+    if( ti < 0 ) then return ""
+    if( doc->Tokens( )[ti].Kind <> TK_IDENT ) then return ""
+    if( IsMemberAccess( doc->Text( ), doc->Tokens( ), ti ) ) then return ""
+
+    dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[ti] ) )
+    dim as IndexHit hit
+    if( srv.Index->FindDefinitionFrom( srv.Index->IndexOfUri( doc->Uri( ) ), lowerName, hit ) = false ) then
+        return ""
+    end if
+    return SymbolHoverMarkdown( srv.Index->SymbolAt( hit.FileIndex, hit.SymIndex ) )
+end function
+
 '' `alias.name` WHERE alias IS ONE OF THE DOCUMENT'S IMPORTS (tiko-lang ADR 0017): the
 '' module's public declaration, or the macro it `#export`s -- shown as its `#define` and,
 '' when that names a declaration (a std facade's `FB.PathJoin`), as that declaration too.
@@ -106,7 +127,10 @@ private function OnHover( byref srv as Server, _
     elseif( symIndex >= 0 ) then
         markdown = SymbolHoverMarkdown( doc->Symbols( ).Items[symIndex] )
     else
-        markdown = BuiltinTypedefHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
+        markdown = IndexHover_( srv, doc, offset )
+        if( len(markdown) = 0 ) then
+            markdown = BuiltinTypedefHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
+        end if
     end if
 
     '' A null result is the correct answer for "nothing to say here", and is

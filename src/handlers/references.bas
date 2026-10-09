@@ -121,6 +121,11 @@ private function OnReferences( byref srv as Server, _
     for f as long = 0 to srv.Index->FileCount( ) - 1
         if( total >= MAX_REFERENCES ) then exit for
 
+        '' Not the toolchain's headers: re-lexing windows.bi and its two hundred
+        '' companions on every request would cost seconds to report one
+        '' declaration nobody asked about. Uses are in the workspace.
+        if( srv.Index->IsExternal( f ) ) then continue for
+
         dim as string fileUri = srv.Index->FileUri( f )
 
         '' The buffer when the editor has this file open -- it is the truth,

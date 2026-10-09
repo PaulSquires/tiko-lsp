@@ -147,6 +147,12 @@ if not "!SERVER_EXIT!"=="0" (
 
 "%ROOT%\bin\session_tool.exe" --check "%ROOT%\bin\captured.bin" || set FAILED=1
 
+rem The toolchain-header session: a second, smaller workspace whose includes
+rem reach a stand-in toolchain inc through initializationOptions.includePaths.
+"%ROOT%\bin\session_tool.exe" --write-inc "%ROOT%\bin\session-inc.bin" "%ROOT%\tests\fixtures\incws" "%ROOT%\tests\fixtures\toolinc" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-inc.bin" > "%ROOT%\bin\captured-inc.bin" 2>"%ROOT%\bin\server-inc.log"
+"%ROOT%\bin\session_tool.exe" --check-inc "%ROOT%\bin\captured-inc.bin" || set FAILED=1
+
 echo.
 if "!FAILED!"=="0" (
     echo ALL SUITES PASSED

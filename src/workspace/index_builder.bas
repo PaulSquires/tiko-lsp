@@ -119,8 +119,21 @@ private sub IndexBuildWorker( byval param as any ptr )
         exit sub
     end if
 
+    '' The include graph is pointed at real files once, here, rather than as
+    '' each file is read: an include can name a file that has not been scanned
+    '' yet, and resolving it early would only have to be undone. This is also
+    '' the ONE place the toolchain headers the workspace includes are read --
+    '' seconds of parsing for a Win32 project, so off the message loop.
+    idx->ResolveIncludes( true )
+
+    dim as long headers = 0
+    for f as long = 0 to idx->FileCount( ) - 1
+        if( idx->IsExternal( f ) ) then headers += 1
+    next
+
     dim as double elapsed = timer( ) - started
-    dim as string summary = "indexed " & idx->FileCount( ) & " file(s), " & _
+    dim as string summary = "indexed " & idx->FileCount( ) & " file(s)" & _
+                            iif( headers > 0, " (" & headers & " toolchain header(s))", "" ) & ", " & _
                             idx->SymbolCount( ) & " symbol(s) in " & _
                             int( elapsed * 1000 ) & " ms"
 
@@ -130,10 +143,6 @@ private sub IndexBuildWorker( byval param as any ptr )
         summary &= " -- STOPPED at the " & WS_MAX_FILES & " file limit"
     end if
 
-    '' The include graph is pointed at real files once, here, rather than as
-    '' each file is read: an include can name a file that has not been scanned
-    '' yet, and resolving it early would only have to be undone.
-    idx->ResolveIncludes( )
 
     g_idxResult  = idx
     g_idxSummary = summary

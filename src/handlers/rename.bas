@@ -177,11 +177,23 @@ function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
     '' early would be the worst bug this server could have.
     EnsureWorkspaceIndex( srv )
 
+    '' A name the TOOLCHAIN declares -- MessageBoxW, a CWindow method -- is not
+    '' this workspace's to rename: the edit would land in windows.bi.
+    dim as IndexHit defHit
+    if( srv.Index->FindDefinitionFrom( srv.Index->IndexOfUri( doc->Uri( ) ), lowerName, defHit ) ) then
+        if( srv.Index->IsExternal( defHit.FileIndex ) ) then
+            return "'" & lowerName & "' is declared in a toolchain header (" & _
+                   UriFileName( srv.Index->FileUri( defHit.FileIndex ) ) & _
+                   ") -- renaming it would mean editing the toolchain"
+        end if
+    end if
+
     dim scopeFiles as FB.Array( of long )
     dim as boolean scoped = BuildRenameScope( srv, doc, lowerName, scopeFiles )
 
     for k as long = 0 to iif( scoped, scopeFiles.Count( ), srv.Index->FileCount( ) ) - 1
         dim as long f = iif( scoped, scopeFiles[k], k )
+        if( srv.Index->IsExternal( f ) ) then continue for
 
         for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
             if( srv.Index->SymbolAt( f, i ).LowerName <> lowerName ) then continue for
@@ -388,6 +400,11 @@ private function OnRename( byref srv as Server, _
 
         for k as long = 0 to iif( scoped, scopeFiles.Count( ), srv.Index->FileCount( ) ) - 1
             dim as long f = iif( scoped, scopeFiles[k], k )
+
+            '' NEVER a toolchain header, whatever the scope says: a workspace
+            '' name that a header happens to share must not rewrite the header.
+            if( srv.Index->IsExternal( f ) ) then continue for
+
             dim as string fileUri = srv.Index->FileUri( f )
 
             '' The open buffer, when there is one: it is the truth, and its

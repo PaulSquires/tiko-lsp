@@ -37,3 +37,14 @@ declare function ToolchainPkgDir( ) as string
 '' AppendDefaultIncludeDir): TKO_INCLUDE, else <dir>/inc or <dir>/../inc beside a `tiko` on
 '' PATH; "" when there is none. A std facade includes `fb/...` headers from here.
 declare function ToolchainIncDir( ) as string
+
+'' THE DIRECTORIES A WORKSPACE'S INCLUDES ARE LOOKED UP IN after the includer's own
+'' directory and the workspace folders, first choice first: what the client configured
+'' (initializationOptions.includePaths -- SetConfiguredIncludeDirs), else ToolchainIncDir.
+'' Empty when there is neither. Only directories that exist are returned.
+declare function ToolchainIncDirs( ) as PathArray
+
+'' Records the client's `includePaths`. Called once, from `initialize` -- BEFORE the index
+'' worker is started, so the thread start orders the write before every read and the worker
+'' needs no lock. A later call would race the worker; there is none.
+declare sub SetConfiguredIncludeDirs( byref dirs as PathArray )

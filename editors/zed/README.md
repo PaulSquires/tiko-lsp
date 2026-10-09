@@ -50,6 +50,29 @@ Add `"--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"` to
 `arguments` when you want to see what the server is doing. It never writes to
 stdout — that channel belongs to the protocol.
 
+## Toolchain headers (Win32, AfxNova)
+
+For `windows.bi`, AfxNova and the runtime headers to complete, hover and show
+signatures, tell the server where the toolchain's `inc` is. Zed passes
+`initialization_options` straight through to the server:
+
+```json
+{
+  "lsp": {
+    "tiko-lsp": {
+      "initialization_options": {
+        "includePaths": ["C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc"]
+      }
+    }
+  }
+}
+```
+
+Verified in Zed 1.23.2: the `initialize` request carries it and the server
+reports `toolchain headers from ...`. The headers are read on the server's
+worker thread, so the server starts as fast as before; Win32 names appear a
+couple of seconds later.
+
 ## What works
 
 Verified by running Zed **1.16.1** against this extension with a real

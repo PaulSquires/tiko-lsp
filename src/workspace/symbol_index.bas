@@ -40,6 +40,11 @@ function SymbolIndex.IsFromBuffer( byval fileIndex as long ) as boolean
     return this.m_files[fileIndex].FromBuffer
 end function
 
+function SymbolIndex.IsExternal( byval fileIndex as long ) as boolean
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return false
+    return this.m_files[fileIndex].External_
+end function
+
 '' The directory part of a path, without its trailing separator. "" when the
 '' path has none, which is what a bare file name looks like.
 private function DirOf( byref path_ as string ) as string
@@ -326,12 +331,6 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
     next
 end sub
 
-'' THE HEADERS A MODULE'S FILES INCLUDE FROM THE TOOLCHAIN -- a std facade's `fb/...`
-'' (tiko-lang RFC-0009) -- read and indexed, transitively, so what an exported macro names
-'' has a declaration to find. No workspace folder holds them, and include resolution is
-'' lexical, so they would otherwise never be in the index. Only for module files: a
-'' workspace's own includes are left to its folders, as before. Bounded, since a header
-'' tree can be large; a header already indexed is not read again.
 '' CandidateKey's path, as written: the file is read from it, and its URI is made from it.
 private function CandidatePath_( byref baseDir as string, byref target as string ) as string
     if( len(baseDir) = 0 orelse len(target) = 0 ) then return ""
@@ -346,22 +345,43 @@ private function CandidatePath_( byref baseDir as string, byref target as string
 #endif
 end function
 
-private sub IndexModuleHeaders_( byref files_ as IndexedFileArray, byref idx as SymbolIndex, _
-                                 byref incDir as string )
-    if( len(incDir) = 0 ) then exit sub
+'' THE TOOLCHAIN HEADERS THE INDEX'S FILES INCLUDE, read and indexed transitively and
+'' marked External_. Two seeds:
+''
+''   * module files (#import), always -- a std facade's exported macro needs the header
+''     it names, and that was the only seed before;
+''   * EVERY file, when `everyFile` -- `#include once "windows.bi"` in a workspace file.
+''     Hundreds of headers and seconds of parsing for a Win32 project, so only the
+''     worker's full build asks for it (ResolveIncludes' readHeaders).
+''
+'' Each include is looked up relative to its includer, then in each include directory in
+'' order -- the order ResolveIncludes resolves in. A candidate already in the index is a
+'' hash probe, not a stat: on the second pass over a workspace almost every include is one.
+'' Bounded, since a header tree can be large.
+private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as SymbolIndex, _
+                           byref incDirs as PathArray, byval everyFile as boolean )
+    if( incDirs.IsEmpty( ) ) then exit sub
     dim seen as FB.Map( of string, boolean )
     for i as long = 0 to files_.Count( ) - 1
         seen.Put( files_[i].Key_, true )
     next
+
     dim work as FB.Array( of long )
-    for i as long = 0 to files_.Count( ) - 1
-        for k as long = 0 to files_[i].Imports.Count( ) - 1
-            for each f as long in files_[i].Imports[k].Files
-                work.Push( f )
+    if( everyFile ) then
+        for i as long = 0 to files_.Count( ) - 1
+            work.Push( i )
+        next
+    else
+        for i as long = 0 to files_.Count( ) - 1
+            for k as long = 0 to files_[i].Imports.Count( ) - 1
+                for each f as long in files_[i].Imports[k].Files
+                    work.Push( f )
+                next
             next
         next
-    next
-    dim as long budget = 512
+    end if
+
+    dim as long budget = 2048
     dim as long w = 0
     while( w < work.Count( ) andalso budget > 0 )
         dim as long f = work[w]
@@ -369,13 +389,33 @@ private sub IndexModuleHeaders_( byref files_ as IndexedFileArray, byref idx as 
         dim as string here = DirOf( files_[f].Path_ )
         for k as long = 0 to files_[f].Includes.Count( ) - 1
             dim as string tgt = files_[f].Includes[k].Target
+
+            '' Already indexed under any candidate spelling: nothing to read.
+            dim as boolean known = seen.Contains( lcase( CandidatePath_( here, tgt ) ) )
+            for d as long = 0 to incDirs.Count( ) - 1
+                if( known ) then exit for
+                known = seen.Contains( lcase( CandidatePath_( incDirs[d], tgt ) ) )
+            next
+            if( known ) then continue for
+
             dim as string cand = CandidatePath_( here, tgt )
-            if( FB.IsFile( cand ) = false ) then cand = CandidatePath_( incDir, tgt )
-            if( FB.IsFile( cand ) = false ) then continue for
+            if( FB.IsFile( cand ) = false ) then
+                cand = ""
+                for d as long = 0 to incDirs.Count( ) - 1
+                    dim as string c2 = CandidatePath_( incDirs[d], tgt )
+                    if( FB.IsFile( c2 ) ) then
+                        cand = c2
+                        exit for
+                    end if
+                next
+            end if
+            if( len(cand) = 0 ) then continue for
+
             dim as string key_ = lcase( cand )
             if( seen.Contains( key_ ) ) then continue for
             seen.Put( key_, true )
             if( idx.IndexPath( cand ) ) then
+                files_[files_.Count( ) - 1].External_ = true
                 work.Push( files_.Count( ) - 1 )
                 budget -= 1
             end if
@@ -383,11 +423,11 @@ private sub IndexModuleHeaders_( byref files_ as IndexedFileArray, byref idx as 
     wend
 end sub
 
-sub SymbolIndex.ResolveIncludes( )
+sub SymbolIndex.ResolveIncludes( byval readHeaders as boolean = false )
     if( this.m_files.IsEmpty( ) ) then exit sub
     ResolveImports_( this.m_files, this.m_searchPaths, this )
-    dim as string incDir = ToolchainIncDir( )
-    IndexModuleHeaders_( this.m_files, this, incDir )
+    dim incDirs as PathArray = ToolchainIncDirs( )
+    IndexHeaders_( this.m_files, this, incDirs, readHeaders )
 
     '' One pass to know what exists, so the resolution below is a probe rather
     '' than a scan. Without this a workspace of n files with e includes each
@@ -437,12 +477,15 @@ sub SymbolIndex.ResolveIncludes( )
                 next
             end if
 
-            '' Then the toolchain's headers, which IndexModuleHeaders_ read in.
-            if( found < 0 andalso len(incDir) > 0 ) then
-                cand = CandidateKey( incDir, this.m_files[i].Includes[k].Target )
-                if( len(cand) > 0 ) then
-                    if( byKey.TryGet( cand, found ) = false ) then found = -1
-                end if
+            '' Then the toolchain's headers, which IndexHeaders_ read in -- each
+            '' include directory in order, as the compiler searches them.
+            if( found < 0 ) then
+                for d as long = 0 to incDirs.Count( ) - 1
+                    cand = CandidateKey( incDirs[d], this.m_files[i].Includes[k].Target )
+                    if( len(cand) = 0 ) then continue for
+                    if( byKey.TryGet( cand, found ) ) then exit for
+                    found = -1
+                next
             end if
 
             '' LAST RESORT: the file NAME, and only when the workspace holds
@@ -767,6 +810,10 @@ sub SymbolIndex.Query( byref queryText as string, byval limit as long, byref hit
     if( cap_ <= 0 ) then cap_ = 200
 
     for f as long = 0 to this.m_files.Count( ) - 1
+        '' Toolchain headers are not the workspace: thirty thousand Win32 names
+        '' would bury every match the user was looking for.
+        if( this.m_files[f].External_ ) then continue for
+
         for i as long = 0 to this.m_files[f].Symbols.Count( ) - 1
             dim as SymbolInfo s = this.m_files[f].Symbols.Items[i]
 

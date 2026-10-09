@@ -138,6 +138,13 @@ type IndexedFile
     Imports    as ImportEdgeArray     '' the modules it imports
     Exports    as ExportEdgeArray     '' the macros it `#export`s
     FromBuffer as boolean    '' indexed from an open document, not from disk
+
+    '' A TOOLCHAIN HEADER -- windows.bi, AfxNova -- read in because a workspace
+    '' file includes it. It is visible to completion, hover, definition and
+    '' signature help, which is why it is read at all; it is never edited by a
+    '' rename, never searched for references, and never offered by
+    '' workspace/symbol, whose picker thirty thousand Win32 names would swamp.
+    External_  as boolean
 end type
 
 type IndexedFileArray as FB.Array( of IndexedFile )
@@ -155,6 +162,7 @@ type SymbolIndex
         declare function FileUri ( byval fileIndex as long ) as string
         declare function FilePath( byval fileIndex as long ) as string
         declare function IsFromBuffer( byval fileIndex as long ) as boolean
+        declare function IsExternal  ( byval fileIndex as long ) as boolean
 
         '' -1 when that file is not indexed.
         declare function IndexOfUri( byref uri as string ) as long
@@ -179,7 +187,13 @@ type SymbolIndex
         '' Points every include edge at the file it names, or at -1. Cheap
         '' (one hash probe per edge) and must be re-run after anything that
         '' adds, removes or replaces a file -- a scan, a merge, a buffer.
-        declare sub ResolveIncludes( )
+        ''
+        '' `readHeaders` also READS the toolchain headers the workspace's
+        '' includes reach (ToolchainIncDirs) and indexes them as External_ --
+        '' hundreds of files and seconds of work for a Win32 project, so only
+        '' the worker's full build passes it. Lexical resolution afterwards
+        '' still finds them: they are in the index.
+        declare sub ResolveIncludes( byval readHeaders as boolean = false )
 
         declare function IncludeCount( byval fileIndex as long ) as long
         declare function IncludeAt   ( byval fileIndex as long, byval i as long ) as IncludeEdge

@@ -14,6 +14,7 @@
 #include once "../src/workspace/index_builder.bi"
 #include once "../src/utils/uri.bi"
 #include once "../src/analysis/includes.bi"
+#include once "../src/workspace/modules.bi"
 
 const LF = chr(10)
 
@@ -721,6 +722,108 @@ end scope
 
 setenviron "TKO_INCLUDE="
 setenviron "TKO_PKG="
+
+'' ############################################################################
+''  Toolchain headers
+''
+''  `#include once "windows.bi"` names a file in the TOOLCHAIN's include
+''  directory, which no workspace folder holds. With include directories
+''  configured (initializationOptions.includePaths), the full build reads the
+''  headers the workspace reaches -- transitively -- and marks them external:
+''  visible to completion, hover, definition and signature help; never in
+''  workspace/symbol, never searched for references, never renamed.
+''
+''  tests/fixtures/incws is the workspace (app.bas includes fakewin.bi and its
+''  own helper.bi); tests/fixtures/toolinc stands in for the toolchain's inc,
+''  where fakewin.bi includes win/fakeuser.bi, which declares MessageBoxW.
+'' ############################################################################
+TestGroup( "toolchain headers" )
+
+dim shared as string g_incWs
+g_incWs = g_Root & "\tests\fixtures\incws"
+
+'' Builds an index of the incws workspace the way the worker does -- every file,
+'' then the graph -- reading headers only when `readHeaders` says so.
+private sub BuildIncWs( byref idx as SymbolIndex, byval readHeaders as boolean )
+    dim roots as PathArray
+    roots.Push( g_incWs )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( g_incWs, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( readHeaders )
+end sub
+
+private function FileEndingIn( byref idx as SymbolIndex, byref tail_ as string ) as long
+    for i as long = 0 to idx.FileCount( ) - 1
+        dim as string p = lcase( idx.FilePath( i ) )
+        if( right( p, len(tail_) ) = lcase( tail_ ) ) then return i
+    next
+    return -1
+end function
+
+dim shared as PathArray g_noIncDirs
+
+'' WITHOUT include directories: the include is an edge to nowhere, as before,
+'' and nothing outside the workspace is read.
+scope
+    SetConfiguredIncludeDirs( g_noIncDirs )
+    dim as SymbolIndex idx
+    BuildIncWs( idx, true )
+    AssertEqInt( idx.FileCount( ), 2, "no include directory: only the workspace's two files" )
+    dim as long app = FileEndingIn( idx, "incws\app.bas" )
+    AssertTrue ( idx.HasUnresolvedIncludes( app ), "and fakewin.bi is an edge to nowhere" )
+    dim as IndexHit hit
+    AssertFalse( idx.FindDefinitionFrom( app, "messageboxw", hit ), "MessageBoxW is unknown" )
+end scope
+
+scope
+    dim dirs as PathArray
+    dirs.Push( g_Root & "\tests\fixtures\toolinc" )
+    SetConfiguredIncludeDirs( dirs )
+
+    '' The message loop's resolution stays lexical: it does not read headers.
+    dim as SymbolIndex lexical_
+    BuildIncWs( lexical_, false )
+    AssertEqInt( lexical_.FileCount( ), 2, "a lexical resolve reads no header" )
+
+    '' The worker's full build does.
+    dim as SymbolIndex idx
+    BuildIncWs( idx, true )
+    AssertEqInt( idx.FileCount( ), 4, "a full build reads fakewin.bi AND what it includes" )
+
+    dim as long app  = FileEndingIn( idx, "incws\app.bas" )
+    dim as long help = FileEndingIn( idx, "incws\helper.bi" )
+    dim as long win_ = FileEndingIn( idx, "toolinc\fakewin.bi" )
+    dim as long user = FileEndingIn( idx, "toolinc\win\fakeuser.bi" )
+    AssertTrue ( win_ >= 0 andalso user >= 0, "both toolchain headers are indexed" )
+    AssertTrue ( idx.IsExternal( win_ ) andalso idx.IsExternal( user ), "and marked external" )
+    AssertFalse( idx.IsExternal( app ) orelse idx.IsExternal( help ), "the workspace's own files are not" )
+
+    AssertFalse( idx.HasUnresolvedIncludes( app ), "app.bas's includes all resolve" )
+    AssertTrue ( idx.CanSee( app, user ), "app.bas sees win/fakeuser.bi, through fakewin.bi" )
+
+    dim as IndexHit hit
+    AssertTrue ( idx.FindDefinitionFrom( app, "messageboxw", hit ), "MessageBoxW is found from app.bas" )
+    AssertEqInt( hit.FileIndex, user, "in the toolchain header" )
+    AssertContains( idx.SymbolAt( hit.FileIndex, hit.SymIndex ).Detail_, "byval uType as ulong", _
+                    "with its whole parameter list, continuation line included" )
+
+    '' Not the workspace's: workspace/symbol does not offer it.
+    dim qh as IndexHitArray
+    idx.Query( "onlyinthetoolchain", 50, qh )
+    AssertEqInt( qh.Count( ), 0, "workspace/symbol skips toolchain headers" )
+    idx.Query( "helper", 50, qh )
+    AssertEqInt( qh.Count( ), 1, "but still finds the workspace's own names" )
+
+    '' A second full build over the same files reads nothing twice.
+    idx.ResolveIncludes( true )
+    AssertEqInt( idx.FileCount( ), 4, "re-resolving does not index a header twice" )
+end scope
+
+SetConfiguredIncludeDirs( g_noIncDirs )
 
 '' ############################################################################
 ''  The background build

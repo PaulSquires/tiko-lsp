@@ -41,6 +41,30 @@ private function ResolveCallee( byval doc as TextDocumentPtr, byref ctx as CallC
     return FindCallable( doc->Symbols( ), lowerName, ctx.NameTok, alternatives )
 end function
 
+'' A CALLEE THIS FILE DOES NOT DECLARE: a sub in another workspace file, or a
+'' toolchain header's -- MessageBoxW from windows.bi. Answered from the index,
+'' through the files this one can see first (FindDefinitionFrom), the same
+'' lookup hover uses. Member calls stay file-local, as ResolveCallee has them:
+'' which type's method is meant needs the type of the expression before the dot.
+''
+'' Never waits for the index: a popup is typed against, and the first keystroke
+'' after opening a workspace must not block on a scan. Before the scan lands,
+'' this simply finds nothing.
+private function ResolveCalleeInIndex( byref srv as Server, byval doc as TextDocumentPtr, _
+                                       byref ctx as CallContext, byref sym as SymbolInfo ) as boolean
+    dim as string body = doc->Text( )
+    if( IsMemberAccess( body, doc->Tokens( ), ctx.NameTok ) ) then return false
+
+    dim as string lowerName = lcase( TokenText( body, doc->Tokens( )[ctx.NameTok] ) )
+    dim as IndexHit hit
+    if( srv.Index->FindDefinitionFrom( srv.Index->IndexOfUri( doc->Uri( ) ), lowerName, hit ) = false ) then
+        return false
+    end if
+
+    sym = srv.Index->SymbolAt( hit.FileIndex, hit.SymIndex )
+    return IsCallableKind( sym.Kind_ )
+end function
+
 private function OnSignatureHelp( byref srv as Server, _
                                   byref req as RpcMessage, _
                                   byref rb as JsonBuilder, _
@@ -60,9 +84,14 @@ private function OnSignatureHelp( byref srv as Server, _
 
     dim as long alternatives = 0
     dim as long symIndex = ResolveCallee( doc, ctx, alternatives )
-    if( symIndex < 0 ) then return rb.NewNull( )
 
-    dim as SymbolInfo sym = doc->Symbols( ).Items[symIndex]
+    dim as SymbolInfo sym
+    if( symIndex >= 0 ) then
+        sym = doc->Symbols( ).Items[symIndex]
+    else
+        if( ResolveCalleeInIndex( srv, doc, ctx, sym ) = false ) then return rb.NewNull( )
+        alternatives = 1
+    end if
 
     dim as string label
     dim params as SigParamArray

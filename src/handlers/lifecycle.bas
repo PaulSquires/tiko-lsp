@@ -6,6 +6,7 @@
 #include once "workspace_symbols.bi"
 #include once "watched_files.bi"
 #include once "../workspace/index_builder.bi"
+#include once "../workspace/modules.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -58,6 +59,45 @@ private function OnInitialize( byref srv as Server, _
         wf.Label = ""
         srv.WorkspaceFolders.Push( wf )
     end if
+
+    '' -- where the toolchain's headers are ----------------------------------
+    ''
+    '' `initializationOptions.includePaths`: the directories a workspace's
+    '' `#include "windows.bi"` is found in -- the compiler's -i paths, which
+    '' live in a build configuration this server never reads. A string is
+    '' taken as a one-element list. Without it the server falls back to
+    '' TKO_INCLUDE, then to `inc` beside a `tiko` on PATH (ToolchainIncDir).
+    ''
+    '' Read HERE because the index worker starts on `initialized`, after this
+    '' response: the directories are fixed before any thread can read them.
+    dim as JsonValue incOpt = params.Member( "initializationOptions" ).Member( "includePaths" )
+    dim incPaths as PathArray
+    if( incOpt.IsString( ) ) then
+        incPaths.Push( incOpt.AsString( "" ) )
+    else
+        for each incVal in ArrayOf( incOpt )
+            dim as string d = incVal.AsString( "" )
+            if( len(d) > 0 ) then incPaths.Push( d )
+        next
+    end if
+    SetConfiguredIncludeDirs( incPaths )
+
+    dim incDirs as PathArray = ToolchainIncDirs( )
+    if( incDirs.IsEmpty( ) ) then
+        LogInfo( "toolchain headers: none configured (initializationOptions.includePaths, " & _
+                 "TKO_INCLUDE, or a tiko on PATH) -- Win32 and library names will be unknown" )
+    else
+        for i as long = 0 to incDirs.Count( ) - 1
+            LogInfo( "toolchain headers from " & incDirs[i] )
+        next
+    end if
+    for i as long = 0 to incPaths.Count( ) - 1
+        dim as boolean used = false
+        for k as long = 0 to incDirs.Count( ) - 1
+            if( lcase( incDirs[k] ) = lcase( NormalizePath( incPaths[i] ) ) ) then used = true
+        next
+        if( used = false ) then LogWarn( "includePaths entry is not a directory: " & incPaths[i] )
+    next
 
     '' -- what the client can accept back ------------------------------------
     ''

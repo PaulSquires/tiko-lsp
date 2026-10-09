@@ -1148,6 +1148,226 @@ private function CheckSession( byref path as string ) as long
     return TestSummary( "piped session" )
 end function
 
+'' ############################################################################
+''  The TOOLCHAIN-HEADER session -- --write-inc / --check-inc
+''
+''      session_tool --write-inc session-inc.bin <incws-root> <toolinc-dir>
+''      tiko-lsp < session-inc.bin > captured-inc.bin
+''      session_tool --check-inc captured-inc.bin
+''
+''  A second, smaller session against tests/fixtures/incws, with
+''  `initializationOptions.includePaths` naming tests/fixtures/toolinc -- the
+''  stand-in for a toolchain's inc. app.bas includes fakewin.bi (only in the
+''  toolchain) and helper.bi (in the workspace), and calls one sub from each:
+''
+''      line 4:    MessageBoxW( 0, "hi", "app", 0 )
+''      line 5:    Helper( 1, "x" )
+''
+''  Checked BY ID, not by position: the scan's log message lands wherever a
+''  thread finishes, and nothing here depends on the order of anything else.
+'' ############################################################################
+
+'' One request, framed.
+private function Req_( byval id as long, byref method_ as string, byref params as string ) as string
+    return Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":" & id & "," & _
+                  Q & "method" & Q & ":" & Q & method_ & Q & "," & Q & "params" & Q & ":" & params & "}" )
+end function
+
+'' One notification, framed.
+private function Note_( byref method_ as string, byref params as string ) as string
+    return Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & _
+                  Q & "method" & Q & ":" & Q & method_ & Q & "," & Q & "params" & Q & ":" & params & "}" )
+end function
+
+'' `{"textDocument":{"uri":...},"position":{"line":l,"character":c}}`
+private function At_( byref uri as string, byval l as long, byval c as long ) as string
+    return "{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & Q & uri & Q & "}," & _
+           Q & "position" & Q & ":{" & Q & "line" & Q & ":" & l & "," & Q & "character" & Q & ":" & c & "}}"
+end function
+
+private function IncSessionBytes( byref wsRoot as string, byref incDir as string ) as string
+    dim as string s
+    dim as string wsUri  = PathToUri( wsRoot )
+    dim as string appPath = wsRoot & "\app.bas"
+    dim as string appUri = PathToUri( appPath )
+
+    dim as string appText
+    if( ReadWholeFile( appPath, appText ) = false ) then
+        print "session_tool: cannot read " & appPath
+        end 1
+    end if
+
+    '' 1. initialize, naming the toolchain's include directory.
+    s &= Req_( 1, "initialize", "{" & Q & "processId" & Q & ":4242," & _
+               Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "capabilities" & Q & ":{}," & _
+               Q & "initializationOptions" & Q & ":{" & Q & "includePaths" & Q & ":[" & JsonQuote( incDir ) & "]}," & _
+               Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "name" & Q & ":" & Q & "incws" & Q & "}]}" )
+    s &= Note_( "initialized", "{}" )
+
+    '' 2. workspace/symbol WAITS for the scan (EnsureWorkspaceIndex), so every
+    ''    request after it sees the headers the full build read in.
+    s &= Req_( 2, "workspace/symbol", "{" & Q & "query" & Q & ":" & Q & "helper" & Q & "}" )
+
+    s &= Note_( "textDocument/didOpen", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & appUri & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( appText ) & "}}" )
+
+    '' 3. signature help after `MessageBoxW( 0, ` -- a toolchain header's -- and
+    '' 4. after `Helper( ` -- another workspace file's.
+    s &= Req_( 3, "textDocument/signatureHelp", At_( appUri, 4, 20 ) )
+    s &= Req_( 4, "textDocument/signatureHelp", At_( appUri, 5, 12 ) )
+
+    '' 5, 6. hover on each name.
+    s &= Req_( 5, "textDocument/hover", At_( appUri, 4, 6 ) )
+    s &= Req_( 6, "textDocument/hover", At_( appUri, 5, 6 ) )
+
+    '' 7. completion after typing `Messa` on a new line inside Main.
+    dim as string typed = appText
+    dim as long endAt = instr( typed, "end sub" )
+    typed = left( typed, endAt - 1 ) & "    Messa" & LF & mid( typed, endAt )
+    s &= Note_( "textDocument/didChange", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & appUri & Q & "," & Q & "version" & Q & ":2}," & _
+                Q & "contentChanges" & Q & ":[{" & Q & "text" & Q & ":" & JsonQuote( typed ) & "}]}" )
+    s &= Req_( 7, "textDocument/completion", At_( appUri, 6, 9 ) )
+
+    '' 8. rename MessageBoxW -- refused: the edit would land in the toolchain.
+    s &= Req_( 8, "textDocument/rename", "{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & _
+               Q & appUri & Q & "}," & Q & "position" & Q & ":{" & Q & "line" & Q & ":4," & _
+               Q & "character" & Q & ":6}," & Q & "newName" & Q & ":" & Q & "Foo" & Q & "}" )
+
+    '' 9. workspace/symbol does not offer a toolchain header's names.
+    s &= Req_( 9, "workspace/symbol", "{" & Q & "query" & Q & ":" & Q & "onlyinthetoolchain" & Q & "}" )
+
+    s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
+                Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
+    s &= Note_( "exit", "null" )
+    return s
+end function
+
+private function WriteIncSession( byref path as string, byref wsRoot as string, _
+                                  byref incDir as string ) as long
+    dim as long f = freefile( )
+    if( open( path for binary access write as #f ) <> 0 ) then
+        print "session_tool: cannot write " & path
+        return 1
+    end if
+    dim as string bytes_ = IncSessionBytes( wsRoot, incDir )
+    put #f, , bytes_
+    close #f
+    print "wrote " & len(bytes_) & " bytes to " & path
+    return 0
+end function
+
+'' The answer to request `id`, or "" when the server sent none.
+private function ResponseFor_( byref messages as FB.Array( of string ), byval id as long ) as string
+    for i as long = 0 to messages.Count( ) - 1
+        dim as JsonDoc d
+        if( d.Parse( messages[i] ) = false ) then continue for
+        dim as JsonValue r = d.Root( )
+        if( r.Has( "method" ) ) then continue for
+        if( r.Member( "id" ).IsNumber( ) = false ) then continue for
+        if( r.Member( "id" ).AsLongInt( ) = id ) then return messages[i]
+    next
+    return ""
+end function
+
+private function CheckIncSession( byref path as string ) as long
+    dim as string captured
+    if( ReadWholeFile( path, captured ) = false ) then
+        print "session_tool: cannot read " & path
+        return 1
+    end if
+
+    TestGroup( "toolchain headers, over the wire" )
+
+    dim as MessageFramer f
+    dim messages as FB.Array( of string )
+    f.Feed( captured )
+    do
+        dim as string payload
+        dim as FrameStatus st = f.NextMessage( payload )
+        if( st = FRAME_ERROR ) then
+            TestFail( "the server's output is well framed", f.ErrorText( ) )
+            exit do
+        end if
+        if( st = FRAME_NEED_MORE ) then exit do
+        messages.Push( payload )
+    loop
+    AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary" )
+
+    for id as long = 1 to 10
+        if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
+    next
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 2 ) )
+        AssertEqInt( d.Root( ).Member( "result" ).Count( ), 1, "workspace/symbol 'helper': the workspace's one" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 3 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue ( r.IsObject( ), "signature help for a toolchain header's MessageBoxW" )
+        AssertContains( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                        "byval lpText as const wstring ptr", "with the header's parameter list" )
+        AssertEqInt( r.Member( "activeParameter" ).AsLongInt( -1 ), 1, "and the second parameter active" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 4 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue ( r.IsObject( ), "signature help for Helper, declared in ANOTHER workspace file" )
+        AssertContains( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                        "byref label as string", "with helper.bi's parameter list" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 5 ) )
+        AssertContains( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( ), _
+                        "Shows a message box.", "hover on MessageBoxW: the header's declare and doc comment" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 6 ) )
+        AssertContains( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( ), _
+                        "byval count as long", "hover on Helper: another workspace file's declare" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 7 ) )
+        dim as boolean found = false
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            if( it.Member( "label" ).AsString( ) = "MessageBoxW" ) then found = true
+        next
+        AssertTrue( found, "completion after 'Messa' offers MessageBoxW" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 8 ) )
+        AssertTrue    ( d.Root( ).Has( "error" ), "rename of MessageBoxW is refused" )
+        AssertContains( d.Root( ).Member( "error" ).Member( "message" ).AsString( ), _
+                        "toolchain header", "because the toolchain declares it" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 9 ) )
+        AssertEqInt( d.Root( ).Member( "result" ).Count( ), 0, "workspace/symbol skips toolchain headers" )
+    end scope
+
+    return TestSummary( "toolchain-header session" )
+end function
+
 '' ----------------------------------------------------------------------------
 ''  Entry point
 '' ----------------------------------------------------------------------------
@@ -1170,6 +1390,16 @@ select case lcase( mode_ )
 
     case "--check"
         end CheckSession( path_ )
+
+    case "--write-inc"
+        if( len(root_) = 0 orelse len( command( 4 ) ) = 0 ) then
+            print "session_tool --write-inc needs the workspace root and the include directory"
+            end 2
+        end if
+        end WriteIncSession( path_, root_, command( 4 ) )
+
+    case "--check-inc"
+        end CheckIncSession( path_ )
 
     case else
         print "usage: session_tool --write <file> <workspace-root> | --check <file>"

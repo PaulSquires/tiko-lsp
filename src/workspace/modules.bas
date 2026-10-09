@@ -154,6 +154,29 @@ function ToolchainIncDir( ) as string
     return ""
 end function
 
+'' What `initialize` was told. Written once, before the index worker starts.
+dim shared as PathArray g_configuredIncludeDirs
+
+sub SetConfiguredIncludeDirs( byref dirs as PathArray )
+    g_configuredIncludeDirs.Clear( )
+    for i as long = 0 to dirs.Count( ) - 1
+        dim as string d = NormalizePath( dirs[i] )
+        if( len(d) > 0 ) then g_configuredIncludeDirs.Push( d )
+    next
+end sub
+
+function ToolchainIncDirs( ) as PathArray
+    dim out_ as PathArray
+    for i as long = 0 to g_configuredIncludeDirs.Count( ) - 1
+        if( FB.IsDir( g_configuredIncludeDirs[i] ) ) then out_.Push( g_configuredIncludeDirs[i] )
+    next
+    if( out_.IsEmpty( ) ) then
+        dim as string d = ToolchainIncDir( )
+        if( len(d) > 0 ) then out_.Push( d )
+    end if
+    return out_
+end function
+
 sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
                       byref roots as PathArray, byref outDirs as PathArray )
     outDirs.Clear( )

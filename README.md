@@ -231,6 +231,30 @@ args = ["--stdio"]
 
 Nothing in the server depends on its own path, so any location works.
 
+### Toolchain headers -- Win32, AfxNova, the runtime
+
+`#include once "windows.bi"` names a file in the TOOLCHAIN's `inc`, which no workspace
+folder holds. Tell the server where it is and the full workspace build reads every header
+the workspace's includes reach -- transitively, in the background -- so Win32, AfxNova
+and runtime names complete, hover, jump to their declaration and show their signature:
+
+```json
+"initializationOptions": { "includePaths": ["C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc"] }
+```
+
+Without it the server falls back to `TKO_INCLUDE`, then to `inc` beside a `tiko` on PATH.
+Directories are searched in order, after the includer's own directory and the workspace
+folders -- the order the compiler uses.
+
+Toolchain headers are read-only to the server: never renamed into, never searched for
+references, and kept out of `workspace/symbol`. Measured on tracks (122 files): 248
+headers, 192,697 symbols, a 2.0 s full build on the worker thread; completion then costs
+~57 ms a keystroke instead of ~6.
+
+Not handled: `#if` is not evaluated, so `MessageBoxA` and `MessageBoxW` are both
+offered, and `MessageBox` -- a `#define` -- gets no signature. A header a buffer starts
+including is read at the next full build, not as it is typed.
+
 ## Tests
 
 ```bash
