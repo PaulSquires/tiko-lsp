@@ -7,6 +7,7 @@
 #include once "completion.bi"
 #include once "../analysis/completion.bi"
 #include once "../analysis/includes.bi"
+#include once "../workspace/index_builder.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"
 
@@ -51,10 +52,45 @@ end function
 '' type that has the members -- searching includes AND #imports, the lookup member
 '' completion makes -- and the member is that type's child of that name. A base
 '' this file does not declare is taken as a type or namespace named directly
-'' (`FB.Something`). Chains (`a.b.c`) and expressions (`f( ).x`) are not resolved.
+'' (`FB.Something`).
+''
+'' A CHAIN LINK -- `Str` in `lg.Warn( ).Str( k, v )` -- is the member of the type
+'' the chain has reached (ResolveChainMember, member completion's walk). Of an
+'' overload set, a link the chain continues past is the one with a type: `Warn`
+'' in `lg.Warn( ).Str(` is `function Warn( ) as LogEvent`, not `sub Warn( m )`.
+private function ContinuesChain_( byval doc as TextDocumentPtr, byval ti as long ) as boolean
+    dim as long j = ti + 1
+    dim as long n = doc->Tokens( ).Count( )
+    if( j < n andalso doc->Tokens( )[j].Kind = TK_LPAREN ) then
+        dim as long depth = 0
+        while( j < n )
+            dim as TokenKind k = doc->Tokens( )[j].Kind
+            if( k = TK_EOL orelse k = TK_EOF ) then return false
+            if( k = TK_LPAREN ) then depth += 1
+            if( k = TK_RPAREN ) then
+                depth -= 1
+                if( depth = 0 ) then exit while
+            end if
+            j += 1
+        wend
+        j += 1
+    end if
+    if( j >= n ) then return false
+    dim as Token t = doc->Tokens( )[j]
+    return t.Kind = TK_OP andalso TokenText( doc->Text( ), t ) = "."
+end function
+
 private function MemberHover_( byref srv as Server, byval doc as TextDocumentPtr, _
                                byval ti as long ) as string
     if( ti < 2 ) then return ""
+
+    dim as SymbolInfo link_
+    dim as long overloads
+    if( ResolveChainMember( srv, doc, ti - 1, lcase( TokenText( doc->Text( ), doc->Tokens( )[ti] ) ), _
+                            ContinuesChain_( doc, ti ), link_, overloads ) ) then
+        return SymbolHoverMarkdown( link_ )
+    end if
+
     dim as Token baseTok = doc->Tokens( )[ti - 2]
     if( baseTok.Kind <> TK_IDENT ) then return ""
 
@@ -170,6 +206,28 @@ private function OnHover( byref srv as Server, _
 
     dim as long wordStart, wordEnd
     dim as string markdown = ModuleMemberHover_( srv, doc, offset, wordStart, wordEnd )
+
+    '' A MEMBER is answered by its type before by its name: ResolveAtOffset's
+    '' member lookup takes ANY member of that name in this file, which in
+    '' `lg.Warn( ).Str(` is whichever `Str` the file happens to declare. Only
+    '' when the index is there -- hover never waits for a scan.
+    if( len(markdown) = 0 andalso ( IndexBuildPending( ) = false orelse IndexBuildReady( ) ) ) then
+        dim as long ti = TokenIndexAt( doc->Tokens( ), offset )
+        if( ti >= 0 ) then
+            dim as Token tok = doc->Tokens( )[ti]
+            '' A member may be spelled like a keyword: `.Str` of LogEvent.
+            dim as boolean named = ( tok.Kind = TK_IDENT orelse tok.Kind = TK_KEYWORD )
+            if( named andalso IsMemberAccess( doc->Text( ), doc->Tokens( ), ti ) ) then
+                EnsureWorkspaceIndex( srv )
+                markdown = MemberHover_( srv, doc, ti )
+                if( len(markdown) > 0 ) then
+                    wordStart = tok.Start_
+                    wordEnd   = tok.Start_ + tok.Length_
+                end if
+            end if
+        end if
+    end if
+
     dim as long symIndex = -1
     if( len(markdown) = 0 ) then symIndex = ResolveAtOffset( doc, offset, wordStart, wordEnd )
 

@@ -388,6 +388,68 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "member completion: chained calls" )
+
+scope
+    '' The std/logs shape, in one file: Logger_.Warn( ) returns a LogEvent and
+    '' each LogEvent method returns `byref as LogEvent`. `sub Warn( m )` is an
+    '' overload with no type -- the chain must take the function.
+    Analyse( "type LogEvent" & LF & _
+             "    declare function Str( byref k as string, byref v as string ) byref as LogEvent" & LF & _
+             "    declare function Int_( byref k as string, byval v as longint ) byref as LogEvent" & LF & _
+             "    declare sub Msg( byref m as string )" & LF & _
+             "end type" & LF & _
+             "type Logger_" & LF & _
+             "    declare sub Warn( byref m as string )" & LF & _
+             "    declare function Warn( ) as LogEvent" & LF & _
+             "    declare property MinLevel( ) as long" & LF & _
+             "end type" & LF & _
+             "type Logger as Logger_" & LF & _
+             "function MakeLogger( ) as Logger" & LF & _
+             "end function" & LF & _
+             "dim shared as Logger lg" & LF & _
+             "lg.Warn( ).Str( " & chr(34) & "user" & chr(34) & ", " & chr(34) & "Paul (P.) Squires" & chr(34) & " ).Int_( " & chr(34) & "n" & chr(34) & ", 4 ).Msg( " & chr(34) & "x" & chr(34) & " )" & LF & _
+             "MakeLogger( ).Warn( ).Ms" & LF )
+
+    '' The context: base, chain, and the arguments skipped -- including a
+    '' string holding a parenthesis and a dot.
+    dim as long msgAt = instr( g_Src, ".Msg(" )
+    dim as CompletionContext cc = CompletionContextAt( g_Src, g_Tokens, msgAt + 1 )
+    AssertEqInt( cc.Kind_, CMPCTX_MEMBER, "after `).` is a member context" )
+    AssertEqStr( cc.BaseName, "lg", "the base is the chain's leftmost name" )
+    AssertEqInt( cc.Chain.Count( ), 3, "with three links between it and the dot" )
+    if( cc.Chain.Count( ) = 3 ) then
+        AssertEqStr( cc.Chain[0] & "," & cc.Chain[1] & "," & cc.Chain[2], "warn,str,int_", "in order, lower-cased" )
+    end if
+
+    dim as CompletionContext c0 = CompletionContextAt( g_Src, g_Tokens, instr( g_Src, "lg.Warn" ) + 2 )
+    AssertEqInt( c0.Chain.Count( ), 0, "a plain `lg.` has no chain" )
+
+    '' The list after `.Int_( "n", 4 ).` is LogEvent's.
+    CollectCompletions( g_Src, g_Tokens, g_Syms, msgAt + 1, g_Items )
+    AssertTrue ( Has( "Msg" ), "a chained call offers its return type's members" )
+    AssertTrue ( Has( "Str" ), "every one of them" )
+    AssertFalse( Has( "MinLevel" ), "and not the base's" )
+
+    '' Partway down the chain: `lg.Warn( ).` -- the link's return type.
+    CollectCompletions( g_Src, g_Tokens, g_Syms, instr( g_Src, ".Str(" ), g_Items )
+    AssertTrue ( Has( "Int_" ), "after the first call, its return type's members" )
+    AssertFalse( Has( "Warn" ), "not Logger_'s" )
+
+    '' A function's result as the base, and a partial word after the chain.
+    CompleteAfter( "MakeLogger( ).Warn( ).Ms" )
+    AssertTrue ( Has( "Msg" ), "a function call as the base resolves to its return type" )
+    AssertFalse( Has( "MinLevel" ), "through the alias, then the chain" )
+end scope
+
+scope
+    Analyse( "type Pt" & LF & "    x as long" & LF & "end type" & LF & _
+             "dim as Pt p" & LF & "( p ).x" & LF )
+    dim as CompletionContext cp = CompletionContextAt( g_Src, g_Tokens, instr( g_Src, ").x" ) + 1 )
+    AssertEqStr( cp.BaseName, "", "a parenthesised expression has no base" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 
 scope

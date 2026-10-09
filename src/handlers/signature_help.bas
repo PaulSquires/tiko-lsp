@@ -15,6 +15,9 @@
 
 #include once "signature_help.bi"
 #include once "hover.bi"
+#include once "completion.bi"
+#include once "workspace_symbols.bi"
+#include once "../workspace/index_builder.bi"
 #include once "../analysis/signature.bi"
 #include once "../utils/logging.bi"
 
@@ -99,14 +102,31 @@ private function OnSignatureHelp( byref srv as Server, _
     if( FindCallContext( doc->Text( ), doc->Tokens( ), offset, ctx ) = false ) then return rb.NewNull( )
 
     dim as long alternatives = 0
-    dim as long symIndex = ResolveCallee( doc, ctx, alternatives )
-
     dim as SymbolInfo sym
-    if( symIndex >= 0 ) then
-        sym = doc->Symbols( ).Items[symIndex]
-    else
-        if( ResolveCalleeInIndex( srv, doc, ctx, sym ) = false ) then return rb.NewNull( )
-        alternatives = 1
+    dim as boolean viaChain = false
+
+    '' `obj.Method(` and `lg.Warn( ).Str(` -- a member call is the member of the
+    '' TYPE before the dot, walked as member completion walks it. ResolveCallee
+    '' matches the name alone, so it is the fallback, not the first answer. Only
+    '' when the index is there: a popup is typed against, and never waits.
+    if( IsMemberAccess( doc->Text( ), doc->Tokens( ), ctx.NameTok ) andalso _
+        ( IndexBuildPending( ) = false orelse IndexBuildReady( ) ) ) then
+        EnsureWorkspaceIndex( srv )
+        dim as string lowerName = lcase( TokenText( doc->Text( ), doc->Tokens( )[ctx.NameTok] ) )
+        if( ResolveChainMember( srv, doc, ctx.NameTok - 1, lowerName, false, sym, alternatives ) ) then
+            viaChain = IsCallableKind( sym.Kind_ )
+        end if
+    end if
+
+    if( viaChain = false ) then
+        alternatives = 0
+        dim as long symIndex = ResolveCallee( doc, ctx, alternatives )
+        if( symIndex >= 0 ) then
+            sym = doc->Symbols( ).Items[symIndex]
+        else
+            if( ResolveCalleeInIndex( srv, doc, ctx, sym ) = false ) then return rb.NewNull( )
+            alternatives = 1
+        end if
     end if
 
     dim as string label

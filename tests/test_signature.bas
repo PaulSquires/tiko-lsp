@@ -197,6 +197,14 @@ private sub TestCallContext( )
     Analyse( "dim as long a = (1 + 2" & LF & _
              "dim as long b = 3" & LF )
     AssertFalse( ContextAfter( "b = 3", ctx ), "the search stops at the end of the logical line" )
+
+    '' A member spelled like a keyword -- LogEvent.Str -- is a callee after a
+    '' dot, and only there: `print(` stays no call.
+    Analyse( "lg.Warn( ).Str( k, " & LF & "print( 1, " & LF )
+    AssertTrue( ContextAfter( ".Str( k, ", ctx ), "a keyword-named member call is found" )
+    AssertEqStr( CalleeName( ctx ), "Str", "and named" )
+    AssertEqInt( ctx.ActiveArg, 1, "with its argument index" )
+    AssertFalse( ContextAfter( "print( 1, ", ctx ), "a keyword with no dot before it is no callee" )
 end sub
 
 '' ############################################################################

@@ -257,6 +257,8 @@ function FindCallContext( byref text_ as string, byref tokens as TokenArray, _
     for i as long = openTok - 1 to 0 step -1
         if( tokens[i].Kind = TK_COMMENT ) then continue for
         if( tokens[i].Kind = TK_IDENT ) then nameTok = i
+        '' After a dot a member may be spelled like a keyword: LogEvent.Str(.
+        if( tokens[i].Kind = TK_KEYWORD andalso IsMemberAccess( text_, tokens, i ) ) then nameTok = i
         exit for
     next
 

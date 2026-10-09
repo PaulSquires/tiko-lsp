@@ -84,11 +84,18 @@ enum CompletionContextKind
     CMPCTX_NONE   = 2   '' inside a comment or a string: nothing to offer
 end enum
 
+'' A generic does not instantiate as a TYPE field; its alias does.
+type CompletionChain as FB.Array( of string )
+
 type CompletionContext
     Kind_      as CompletionContextKind
     Prefix     as string   '' the partial word already typed, lower-cased
-    BaseName   as string   '' for a member context: the text left of the dot
+    BaseName   as string   '' for a member context: the FIRST name of the chain left of the dot
     BaseOffset as long     '' where that base token starts, for resolution
+    '' The names between the base and the last dot, lower-cased, in order:
+    '' `lg.Warn( ).Str( "k", v ).` has base `lg` and chain warn, str. Empty
+    '' for a plain `cfg.`. A call's arguments are skipped, not read.
+    Chain      as CompletionChain
 end type
 
 '' Works out the context at `offset`. Never fails: a position in the middle of
@@ -96,6 +103,12 @@ end type
 '' empty prefix.
 declare function CompletionContextAt( byref text_ as string, byref tokens as TokenArray, _
                                       byval offset as long ) as CompletionContext
+
+'' The member chain ending at the dot token `dotIdx` -- `lg.Warn( ).Str( k, v ).`
+'' -- into ctx.BaseName, BaseOffset and Chain. Arguments are skipped, not read.
+'' False when no name stands left of the dot: `(a + b).`.
+declare function ReadMemberChain( byref text_ as string, byref tokens as TokenArray, _
+                                  byval dotIdx as long, byref ctx as CompletionContext ) as boolean
 
 '' The candidates at `offset`. `keywords` may be false to leave the reserved
 '' words out, which is what a member context wants.
@@ -111,6 +124,17 @@ declare sub CollectCompletions( byref text_ as string, byref tokens as TokenArra
 declare function IsOfferedMember( byref sym as SymbolInfo ) as boolean
 
 declare function DeclaredTypeName( byref sym as SymbolInfo ) as string
+
+'' The type NAME a procedure returns, from its signature: `( k as ustring )
+'' byref as LogEvent` yields `LogEvent`. "" for a sub, or no procedure.
+declare function ReturnTypeName( byref sym as SymbolInfo ) as string
+
+'' The type an expression ending in this symbol has: a procedure's return type,
+'' anything else's declared type. What a member chain is walked by.
+declare function MemberTypeName( byref sym as SymbolInfo ) as string
+
+'' Inside a method, the container it belongs to (inline or `sub T.M`); -1.
+declare function EnclosingTypeIndex( byref syms as SymbolTable, byval offset as long ) as long
 
 '' SymbolKind -> CompletionItemKind.
 declare function CompletionKindOf( byval kind as SymbolKind ) as CompletionKind

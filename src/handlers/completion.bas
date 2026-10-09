@@ -220,18 +220,20 @@ function FinalTypeName( byref srv as Server, byref visible as FB.Array( of long 
     return want
 end function
 
-'' The members of a type declared in an INCLUDED file.
+'' The members of a type, wherever among the visible files it is declared --
+'' this one included. True when the type was found, so the caller can tell
+'' "these are its members" from "nothing is known".
 ''
 '' `w.` where `w as Widget` and Widget lives in a header was the case that made
 '' member completion look broken: the type is in scope, its fields are in
 '' scope, and the server offered nothing at all.
-private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPtr, _
-                                byref typeName as string, byref items as CompletionItemArray )
+private function AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPtr, _
+                                     byref typeName as string, byref items as CompletionItemArray ) as boolean
 
-    if( len(typeName) = 0 ) then exit sub
+    if( len(typeName) = 0 ) then return false
 
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
-    if( here < 0 ) then exit sub
+    if( here < 0 ) then return false
 
     dim visible as FB.Array( of long )
     VisibleWithImports( srv, here, visible )
@@ -243,9 +245,9 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
         seen_.Put( items[i].LowerLabel, true )
     next
 
+    dim as boolean found = false
     for v as long = 0 to visible.Count( ) - 1
         dim as long f = visible[v]
-        if( f = here ) then continue for
 
         '' Find the type, then everything whose parent it is. The table is
         '' flat with parent INDICES, so its members are one pass away.
@@ -261,6 +263,7 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
 
             '' An alias declares no members of its own.
             if( lcase( left( owner.Detail_, 3 ) ) = "as " ) then continue for
+            found = true
 
             for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
                 dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
@@ -283,7 +286,137 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
             exit for
         next
     next
-end sub
+    return found
+end function
+
+'' The member `lowerName` of the type `typeName`, among the visible files;
+'' `count` is how many declarations share the name -- an overload set. Of
+'' those, `preferTyped` takes the first that HAS a type -- `Warn( ) as
+'' LogEvent` over `sub Warn( m )` -- since only that one continues a chain;
+'' otherwise the first declared.
+private function IndexMemberOf_( byref srv as Server, byref visible as FB.Array( of long ), _
+                                 byref typeName as string, byref lowerName as string, _
+                                 byval preferTyped as boolean, byref out_ as SymbolInfo, _
+                                 byref count as long ) as boolean
+    dim as string want = FinalTypeName( srv, visible, typeName )
+    dim as boolean found = false
+    dim as boolean typed = false
+    count = 0
+    for v as long = 0 to visible.Count( ) - 1
+        dim as long f = visible[v]
+        for t as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+            dim as SymbolInfo owner = srv.Index->SymbolAt( f, t )
+            if( owner.LowerName <> want ) then continue for
+            select case owner.Kind_
+                case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_NAMESPACE, SYM_INTERFACE
+                case else
+                    continue for
+            end select
+            if( lcase( left( owner.Detail_, 3 ) ) = "as " ) then continue for
+
+            for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+                dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
+                if( m.Parent <> t orelse m.LowerName <> lowerName ) then continue for
+                count += 1
+                if( preferTyped andalso typed = false andalso len( MemberTypeName( m ) ) > 0 ) then
+                    out_  = m
+                    found = true
+                    typed = true
+                end if
+                if( found = false ) then
+                    out_  = m
+                    found = true
+                end if
+            next
+            '' One declaration of the type is enough; a header seen twice is not two.
+            if( count > 0 ) then return found
+        next
+    next
+    return found
+end function
+
+'' The type NAME a member expression ends in, or "".
+''
+''     lg.Warn( ).Str( "user", name ).Int_( "n", 4 ).
+''
+'' lg is a Logger (an alias of FB.Logger_), Logger_.Warn( ) returns LogEvent,
+'' and LogEvent.Str and .Int_ return `byref as LogEvent` -- so the list is
+'' LogEvent's. The base is found in this file (a local, a parameter, a type
+'' named directly, `this`), else among what it includes, else it is an
+'' import's alias and its first link is the module's member. Every later link
+'' is the previous type's member, by its declared or return type.
+private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
+                                 byref ctx as CompletionContext, _
+                                 byref visible as FB.Array( of long ) ) as string
+    if( len(ctx.BaseName) = 0 ) then return ""
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then return ""
+
+    dim as string typeName
+    dim as long first_ = 0
+
+    if( ctx.BaseName = "this" ) then
+        dim as long c = EnclosingTypeIndex( doc->Symbols( ), ctx.BaseOffset )
+        if( c < 0 ) then return ""
+        typeName = doc->Symbols( ).Items[c].LowerName
+
+    elseif( IsImportAlias_( doc, ctx.BaseName ) ) then
+        '' `logs.DefaultLogger( ).` -- the module's member is the first link.
+        if( ctx.Chain.Count( ) = 0 ) then return ""
+        dim as IndexHit target
+        dim as ExportHit xh
+        if( srv.Index->ModuleMemberAt( here, ctx.BaseName, ctx.Chain[0], target, xh ) = 0 ) then return ""
+        if( target.FileIndex < 0 ) then return ""
+        typeName = MemberTypeName( srv.Index->SymbolAt( target.FileIndex, target.SymIndex ) )
+        first_ = 1
+
+    else
+        dim as long b = doc->Symbols( ).Resolve( ctx.BaseName, ctx.BaseOffset )
+        if( b >= 0 ) then
+            if( doc->Symbols( ).IsContainer( b ) ) then
+                typeName = ctx.BaseName
+            else
+                typeName = MemberTypeName( doc->Symbols( ).Items[b] )
+            end if
+        else
+            dim as IndexHit hit
+            if( srv.Index->FindDefinitionFrom( here, ctx.BaseName, hit ) = false ) then return ""
+            dim as SymbolInfo bs = srv.Index->SymbolAt( hit.FileIndex, hit.SymIndex )
+            select case bs.Kind_
+                case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_NAMESPACE, SYM_INTERFACE
+                    typeName = ctx.BaseName
+                case else
+                    typeName = MemberTypeName( bs )
+            end select
+        end if
+    end if
+
+    for k as long = first_ to ctx.Chain.Count( ) - 1
+        if( len(typeName) = 0 ) then return ""
+        dim as SymbolInfo m
+        dim as long n
+        if( IndexMemberOf_( srv, visible, typeName, ctx.Chain[k], true, m, n ) = false ) then return ""
+        typeName = MemberTypeName( m )
+    next
+    return typeName
+end function
+
+function ResolveChainMember( byref srv as Server, byval doc as TextDocumentPtr, _
+                             byval dotIdx as long, byref lowerName as string, _
+                             byval preferTyped as boolean, byref sym as SymbolInfo, _
+                             byref count as long ) as boolean
+    count = 0
+    dim as CompletionContext ctx
+    if( ReadMemberChain( doc->Text( ), doc->Tokens( ), dotIdx, ctx ) = false ) then return false
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then return false
+
+    dim visible as FB.Array( of long )
+    VisibleWithImports( srv, here, visible )
+    dim as string typeName = ChainTypeName_( srv, doc, ctx, visible )
+    if( len(typeName) = 0 ) then return false
+    return IndexMemberOf_( srv, visible, typeName, lowerName, preferTyped, sym, count )
+end function
 
 private function OnCompletion( byref srv as Server, _
                                byref req as RpcMessage, _
@@ -321,7 +454,10 @@ private function OnCompletion( byref srv as Server, _
 
     '' An import's alias before a dot names a module, not a variable (tiko-lang ADR 0017).
     dim as boolean onModule = false
-    if( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable ) then onModule = IsImportAlias_( doc, ctx.BaseName )
+    '' `logs.DefaultLogger( ).` is past the module: a chain, resolved below.
+    if( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable andalso ctx.Chain.Count( ) = 0 ) then
+        onModule = IsImportAlias_( doc, ctx.BaseName )
+    end if
 
     if( ctx.Kind_ = CMPCTX_SCOPE andalso indexUsable ) then
         EnsureWorkspaceIndex( srv )
@@ -331,16 +467,25 @@ private function OnCompletion( byref srv as Server, _
         EnsureWorkspaceIndex( srv )
         AddModuleMembers( srv, doc, ctx.BaseName, items )
 
-    elseif( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable ) then
-        '' The base's type is read from ITS declaration, which is in this file
-        '' -- a variable is declared where it is used. Only the TYPE lives
-        '' somewhere else, and that is what the graph is asked about.
-        dim as long baseIdx = doc->Symbols( ).Resolve( ctx.BaseName, ctx.BaseOffset )
-        if( baseIdx >= 0 ) then
-            dim as string typeName = DeclaredTypeName( doc->Symbols( ).Items[baseIdx] )
-            if( len(typeName) > 0 ) then
-                EnsureWorkspaceIndex( srv )
-                AddIncludedMembers( srv, doc, typeName, items )
+    elseif( ctx.Kind_ = CMPCTX_MEMBER andalso indexUsable andalso len(ctx.BaseName) > 0 ) then
+        '' The base's type is read from its declaration -- in this file, or in
+        '' one it includes -- and a chain is walked from there (ChainTypeName_).
+        '' Only the TYPE lives somewhere else, and that is what the graph is
+        '' asked about. When it is found, its members REPLACE what
+        '' CollectCompletions offered: that saw this file alone, and for a type
+        '' it could not resolve, guessed every member in the file.
+        EnsureWorkspaceIndex( srv )
+        dim visible as FB.Array( of long )
+        dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+        if( here >= 0 ) then VisibleWithImports( srv, here, visible )
+        dim as string typeName = ChainTypeName_( srv, doc, ctx, visible )
+        if( len(typeName) > 0 ) then
+            dim as CompletionItemArray members
+            if( AddIncludedMembers( srv, doc, typeName, members ) ) then
+                items.Clear( )
+                for i as long = 0 to members.Count( ) - 1
+                    items.Push( members[i] )
+                next
             end if
         end if
     end if

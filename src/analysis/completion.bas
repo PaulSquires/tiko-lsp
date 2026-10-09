@@ -31,6 +31,61 @@ private function IsDot( byref text_ as string, byref t as Token ) as boolean
     return TokenText( text_, t ) = "."
 end function
 
+'' Reads the member chain that ends at the dot `dotIdx`, right to left:
+''
+''     lg.Warn( ).Str( "user", name ).Int_( "n", 4 ).
+''
+'' is base `lg`, chain warn, str, int_. A call's or an index's parentheses,
+'' and a pointer index's brackets, are skipped as one balanced group -- the
+'' arguments are not read, only the name before them. The chain stops at the first thing that is not `name`,
+'' `name( ... )` or a dot between them, and at a line end. False when there is
+'' no name at all left of the dot -- `(a + b).` -- so nothing is resolved.
+function ReadMemberChain( byref text_ as string, byref tokens as TokenArray, _
+                             byval dotIdx as long, byref ctx as CompletionContext ) as boolean
+    dim names as CompletionChain
+    dim as long nameAt = -1
+    dim as long j = dotIdx - 1
+
+    do while( j >= 0 )
+        if( tokens[j].Kind = TK_RPAREN orelse tokens[j].Kind = TK_RBRACKET ) then
+            dim as long depth = 0
+            while( j >= 0 )
+                dim as TokenKind k = tokens[j].Kind
+                if( k = TK_EOL ) then return false
+                if( k = TK_RPAREN orelse k = TK_RBRACKET ) then depth += 1
+                if( k = TK_LPAREN orelse k = TK_LBRACKET ) then
+                    depth -= 1
+                    if( depth = 0 ) then exit while
+                end if
+                j -= 1
+            wend
+            j -= 1
+            if( j < 0 ) then return false
+        end if
+
+        dim as Token nm = tokens[j]
+        if( nm.Kind <> TK_IDENT andalso nm.Kind <> TK_KEYWORD ) then return false
+        names.Push( lcase( TokenText( text_, nm ) ) )
+        nameAt = nm.Start_
+
+        if( j >= 2 andalso IsDot( text_, tokens[j - 1] ) ) then
+            j -= 2
+        else
+            exit do
+        end if
+    loop
+    if( names.Count( ) = 0 ) then return false
+
+    '' Collected last-first; the base is the leftmost name.
+    ctx.BaseName   = names[names.Count( ) - 1]
+    ctx.BaseOffset = nameAt
+    ctx.Chain.Clear( )
+    for k as long = names.Count( ) - 2 to 0 step -1
+        ctx.Chain.Push( names[k] )
+    next
+    return true
+end function
+
 function CompletionContextAt( byref text_ as string, byref tokens as TokenArray, _
                               byval offset as long ) as CompletionContext
     dim as CompletionContext ctx
@@ -55,13 +110,7 @@ function CompletionContextAt( byref text_ as string, byref tokens as TokenArray,
     '' `something.` -- the cursor is right after the dot.
     if( IsDot( text_, last_ ) ) then
         ctx.Kind_ = CMPCTX_MEMBER
-        if( i > 0 ) then
-            dim as Token base_ = tokens[i - 1]
-            if( base_.Kind = TK_IDENT orelse base_.Kind = TK_KEYWORD ) then
-                ctx.BaseName   = lcase( TokenText( text_, base_ ) )
-                ctx.BaseOffset = base_.Start_
-            end if
-        end if
+        ReadMemberChain( text_, tokens, i, ctx )
         return ctx
     end if
 
@@ -72,12 +121,7 @@ function CompletionContextAt( byref text_ as string, byref tokens as TokenArray,
 
             if( i >= 2 ) then
                 if( IsDot( text_, tokens[i - 1] ) ) then
-                    dim as Token base_ = tokens[i - 2]
-                    if( base_.Kind = TK_IDENT orelse base_.Kind = TK_KEYWORD ) then
-                        ctx.Kind_      = CMPCTX_MEMBER
-                        ctx.BaseName   = lcase( TokenText( text_, base_ ) )
-                        ctx.BaseOffset = base_.Start_
-                    end if
+                    if( ReadMemberChain( text_, tokens, i - 1, ctx ) ) then ctx.Kind_ = CMPCTX_MEMBER
                 end if
             end if
         end if
@@ -115,12 +159,11 @@ function IsOfferedMember( byref sym as SymbolInfo ) as boolean
     return true
 end function
 
-function DeclaredTypeName( byref sym as SymbolInfo ) as string
-    '' The detail of a variable or field is `as <type>`; of a procedure, its
-    '' signature. Only the first form names a type.
-    if( lcase( left( sym.Detail_, 3 ) ) <> "as " ) then return ""
+'' The type name in `as <type>...`.
+private function TypeNameAfterAs_( byref detail as string ) as string
+    if( lcase( left( detail, 3 ) ) <> "as " ) then return ""
 
-    dim as string rest = trim( mid( sym.Detail_, 4 ) )
+    dim as string rest = trim( mid( detail, 4 ) )
     if( len(rest) = 0 ) then return ""
 
     '' Take the first name, and stop at anything that is not part of one --
@@ -145,6 +188,53 @@ function DeclaredTypeName( byref sym as SymbolInfo ) as string
     return word_
 end function
 
+function DeclaredTypeName( byref sym as SymbolInfo ) as string
+    '' The detail of a variable or field is `as <type>`; of a procedure, its
+    '' signature. Only the first form names a type.
+    return TypeNameAfterAs_( sym.Detail_ )
+end function
+
+function ReturnTypeName( byref sym as SymbolInfo ) as string
+    select case sym.Kind_
+        case SYM_FUNCTION, SYM_METHOD, SYM_PROPERTY
+        case else
+            return ""
+    end select
+
+    '' The return type follows the parameter list: the first `(` outside a
+    '' string -- `overload alias "x" ( ... )` has one first -- to its match.
+    '' No list at all (`function Now as double`) leaves the detail whole.
+    dim as string d = sym.Detail_
+    dim as long depth = 0
+    dim as long closeAt = -1
+    dim as boolean quoted = false
+    for i as long = 0 to len(d) - 1
+        dim as ubyte c = d[i]
+        if( c = 34 ) then quoted = ( quoted = false )
+        if( quoted ) then continue for
+        if( c = asc("(") ) then depth += 1
+        if( c = asc(")") ) then
+            depth -= 1
+            if( depth = 0 ) then
+                closeAt = i
+                exit for
+            end if
+        end if
+    next
+
+    dim as string rest = trim( iif( closeAt >= 0, mid( d, closeAt + 2 ), d ) )
+    if( lcase( left( rest, 6 ) ) = "byref " ) then rest = trim( mid( rest, 7 ) )
+    return TypeNameAfterAs_( rest )
+end function
+
+function MemberTypeName( byref sym as SymbolInfo ) as string
+    select case sym.Kind_
+        case SYM_FUNCTION, SYM_METHOD, SYM_PROPERTY
+            return ReturnTypeName( sym )
+    end select
+    return DeclaredTypeName( sym )
+end function
+
 '' The name of the symbol a member expression is reaching into, resolved to a
 '' CONTAINER symbol index, or -1.
 ''
@@ -156,9 +246,11 @@ end function
 ''     customer.     a variable, whose DECLARED TYPE is the container
 ''
 '' That last one is the whole of phase 5's type knowledge: the type NAME is
-'' read out of the declaration and looked up. It is not inference -- an
-'' expression like `arr(0).` or `GetCustomer().` is not resolved, and falls
-'' back to the file-wide member list.
+'' read out of the declaration and looked up. A CHAIN -- `GetCustomer( ).`,
+'' `lg.Warn( ).Str( "k", v ).` -- is walked a link at a time, each member's
+'' declared or return type naming the next container. It is not inference:
+'' `(a + b).` and a generic's `E` are not resolved, and fall back to the
+'' file-wide member list.
 '' The container a TYPE NAME stands for in this file, following aliases --
 '' `type CustAlias as Customer` -- as many hops as there are, bounded so a
 '' cycle cannot loop. -1 when the name, or what it finally names, is not a
@@ -183,47 +275,85 @@ private function ContainerNamed_( byref syms as SymbolTable, byref typeName as s
     return -1
 end function
 
+function EnclosingTypeIndex( byref syms as SymbolTable, byval offset as long ) as long
+    dim as long scope_ = syms.InnermostAt( offset )
+    while( scope_ >= 0 )
+        if( syms.IsContainer( scope_ ) ) then return scope_
+
+        '' An out-of-line member -- `sub Customer.SetName` -- is parented
+        '' to the file, so its type is found through its own name.
+        dim as string nm = syms.Items[scope_].Name_
+        dim as long dotAt = instr( nm, "." )
+        if( dotAt > 0 ) then
+            dim as string typeName = lcase( left( nm, dotAt - 1 ) )
+            for i as long = 0 to syms.Count( ) - 1
+                if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = typeName ) then return i
+            next
+        end if
+
+        scope_ = syms.Items[scope_].Parent
+    wend
+    return -1
+end function
+
+'' The member `lowerName` of the container `parent`: declared inside it, or
+'' defined out of line as `T.name`. Of an overload set -- `Warn( ) as LogEvent`
+'' beside `sub Warn( m )` -- the first that HAS a type wins, since only that
+'' one can continue a chain.
+private function MemberChild_( byref syms as SymbolTable, byval parent as long, _
+                               byref lowerName as string ) as long
+    dim as long fallback = -1
+    dim as string dotted = lcase( syms.Items[parent].Name_ ) & "." & lowerName
+    for i as long = 0 to syms.Count( ) - 1
+        if( syms.Items[i].IsLocal ) then continue for
+        if( syms.Items[i].LowerName <> lowerName ) then continue for
+        if( syms.Items[i].Parent <> parent andalso lcase( syms.Items[i].Name_ ) <> dotted ) then continue for
+        if( len( MemberTypeName( syms.Items[i] ) ) > 0 ) then return i
+        if( fallback < 0 ) then fallback = i
+    next
+    return fallback
+end function
+
 private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as CompletionContext ) as long
     if( len(ctx.BaseName) = 0 ) then return -1
 
-    '' `this` means the type whose method we are inside.
+    dim as long c = -1
+
     if( ctx.BaseName = "this" ) then
-        dim as long scope_ = syms.InnermostAt( ctx.BaseOffset )
-        while( scope_ >= 0 )
-            if( syms.IsContainer( scope_ ) ) then return scope_
-
-            '' An out-of-line member -- `sub Customer.SetName` -- is parented
-            '' to the file, so its type is found through its own name.
-            dim as string nm = syms.Items[scope_].Name_
-            dim as long dotAt = instr( nm, "." )
-            if( dotAt > 0 ) then
-                dim as string typeName = lcase( left( nm, dotAt - 1 ) )
-                for i as long = 0 to syms.Count( ) - 1
-                    if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = typeName ) then return i
-                next
+        '' `this` means the type whose method we are inside.
+        c = EnclosingTypeIndex( syms, ctx.BaseOffset )
+    else
+        '' A container named directly: `Colour.`, `App.`
+        for i as long = 0 to syms.Count( ) - 1
+            if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = ctx.BaseName ) then
+                c = ContainerNamed_( syms, ctx.BaseName )
+                exit for
             end if
+        next
 
-            scope_ = syms.Items[scope_].Parent
-        wend
-        return -1
+        '' A variable, field or parameter: follow its declared type -- a
+        '' function, its return type -- and through any alias to the type
+        '' that has the members.
+        if( c < 0 ) then
+            dim as long v = syms.Resolve( ctx.BaseName, ctx.BaseOffset )
+            if( v >= 0 ) then
+                dim as string typeName = lcase( MemberTypeName( syms.Items[v] ) )
+                if( len(typeName) > 0 ) then c = ContainerNamed_( syms, typeName )
+            end if
+        end if
     end if
 
-    '' A container named directly: `Colour.`, `App.`
-    for i as long = 0 to syms.Count( ) - 1
-        if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = ctx.BaseName ) then
-            return ContainerNamed_( syms, ctx.BaseName )
-        end if
+    '' Then each link of the chain: the member's type is the next container.
+    for k as long = 0 to ctx.Chain.Count( ) - 1
+        if( c < 0 ) then return -1
+        dim as long m = MemberChild_( syms, c, ctx.Chain[k] )
+        if( m < 0 ) then return -1
+        dim as string typeName = lcase( MemberTypeName( syms.Items[m] ) )
+        if( len(typeName) = 0 ) then return -1
+        c = ContainerNamed_( syms, typeName )
     next
 
-    '' A variable, field or parameter: follow its declared type, and through
-    '' any alias to the type that has the members.
-    dim as long v = syms.Resolve( ctx.BaseName, ctx.BaseOffset )
-    if( v >= 0 ) then
-        dim as string typeName = lcase( DeclaredTypeName( syms.Items[v] ) )
-        if( len(typeName) > 0 ) then return ContainerNamed_( syms, typeName )
-    end if
-
-    return -1
+    return c
 end function
 
 '' Appends, unless that label is already there. tiko is case-insensitive,
