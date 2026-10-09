@@ -13,7 +13,11 @@
   name: (qualified_name) @name) @item
 
 (type_definition  "type"      @context name: (identifier) @name) @item
-(union_definition "union"     @context name: (identifier) @name) @item
+; UNION, TOO: a field or keyword inside `union_definition` costs ~50s of
+; query analysis against this grammar (5,497 parse states), and Zed starts
+; the language server only after every query has compiled. Match the name
+; through the named child; it compiles in 0.3s.
+(union_definition (identifier) @name) @item
 ; ZED WILL NOT TAKE A FIELD OR A KEYWORD INSIDE `enum_definition`.
 ; `(enum_definition name: ...)` and `(enum_definition "enum" ...)` are both
 ; rejected -- silently: the language then never attaches, so the file loses

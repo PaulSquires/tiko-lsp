@@ -60,7 +60,11 @@
 (lambda kind: _ @keyword)
 
 (type_definition  name: (identifier) @type)
-(union_definition name: (identifier) @type)
+; UNION, TOO: a field or keyword inside `union_definition` costs ~50s of
+; query analysis against this grammar (5,497 parse states), and Zed starts
+; the language server only after every query has compiled. Match the name
+; through the named child; it compiles in 0.3s.
+(union_definition (identifier) @type)
 ; ZED WILL NOT TAKE A FIELD OR A KEYWORD INSIDE `enum_definition`, and it
 ; says nothing when it refuses: the language never attaches, so the file
 ; loses its highlighting AND its language server together, with no line in
