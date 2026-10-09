@@ -131,6 +131,7 @@ tiko-lsp/
   docs/         architecture.md, phase1.md .. phase10.md, grammar.md
   editors/zed/  a Zed extension: the language, and where to find the server
   editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
+  editors/sublime/ LSP-tiko, for Sublime Text's LSP package: the same, plus a sublime-syntax
   grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
                 for editors that colour and fold without a server
 ```
@@ -212,6 +213,9 @@ Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
 VS Code: install the extension in [editors/vscode](editors/vscode) (`npm install`,
 `npm run package`, `code --install-extension tiko-lsp.vsix`), then set
 `tiko.server.path` and `tiko.includePaths` -- see its README.
+
+Sublime Text: install the LSP package, then link [editors/sublime](editors/sublime)
+into Sublime's `Packages` as `LSP-tiko` -- see its README.
 
 Neovim:
 

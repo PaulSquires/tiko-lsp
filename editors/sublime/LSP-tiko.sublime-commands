@@ -1,0 +1,10 @@
+[
+    {
+        "caption": "Preferences: LSP-tiko Settings",
+        "command": "edit_settings",
+        "args": {
+            "base_file": "${packages}/LSP-tiko/LSP-tiko.sublime-settings",
+            "default": "// Settings in here override those in \"LSP-tiko/LSP-tiko.sublime-settings\"\n{\n\t$0\n}\n"
+        }
+    }
+]

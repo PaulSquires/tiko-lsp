@@ -1,0 +1,68 @@
+{
+  "contributions": {
+    "settings": [
+      {
+        "file_patterns": ["/LSP-tiko.sublime-settings"],
+        "schema": {
+          "$id": "sublime://settings/LSP-tiko",
+          "definitions": {
+            "PluginConfig": {
+              "properties": {
+                "server_path": {
+                  "type": "string",
+                  "default": "",
+                  "markdownDescription": "The `tiko-lsp` executable. Empty: `tiko-lsp` on the PATH, then `bin/tiko-lsp.exe` inside a workspace folder."
+                },
+                "server_arguments": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "default": ["--stdio"],
+                  "markdownDescription": "Arguments passed to the server. Add `--log-level`, `debug`, `--log-file`, `C:/temp/tiko-lsp.log` to see what it is doing."
+                },
+                "initializationOptions": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "includePaths": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "default": [],
+                      "markdownDescription": "The toolchain's `inc` -- where `#include \"windows.bi\"` is found. Win32, AfxNova and runtime names then complete, hover and show signatures."
+                    },
+                    "packagePaths": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "default": [],
+                      "markdownDescription": "The toolchain's `pkg` -- what `#import \"std/strings\"` names. Usually unnecessary: the `pkg` beside an include path is found on its own."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "allOf": [
+            { "$ref": "sublime://settings/LSP-plugin-base" },
+            { "$ref": "sublime://settings/LSP-tiko#/definitions/PluginConfig" }
+          ]
+        }
+      },
+      {
+        "file_patterns": ["/*.sublime-project"],
+        "schema": {
+          "properties": {
+            "settings": {
+              "properties": {
+                "LSP": {
+                  "properties": {
+                    "LSP-tiko": {
+                      "$ref": "sublime://settings/LSP-tiko#/definitions/PluginConfig"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
