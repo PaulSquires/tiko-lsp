@@ -161,6 +161,17 @@ private function RunServer( ) as long
                 '' scan -- it runs on its own thread, and only the handful of
                 '' requests that need cross-file knowledge ever wait for it.
                 '' See workspace/index_builder.bi.
+                ''
+                '' But a scan that HAS FINISHED is taken now, before the next
+                '' message, whatever that message is. Taking it only inside the
+                '' requests that wait for it left everything else -- hover,
+                '' signature help, inlay hints -- reading the empty index until
+                '' one of those happened to arrive: in VS Code, which asks for
+                '' hover and inlay hints long before any completion, the
+                '' toolchain headers were invisible for as long as nobody typed.
+                '' IndexBuildReady never blocks, so a scan still running costs
+                '' this loop nothing.
+                if( IndexBuildReady( ) ) then EnsureWorkspaceIndex( srv )
                 srv.HandleMessage( payload )
 
             case TRANSPORT_EOF
