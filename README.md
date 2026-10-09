@@ -132,6 +132,7 @@ tiko-lsp/
   editors/zed/  a Zed extension: the language, and where to find the server
   editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
   editors/sublime/ LSP-tiko, for Sublime Text's LSP package: the same, plus a sublime-syntax
+  editors/neovim/  tiko.nvim: the filetype, the client, :TikoInfo/:TikoRestart, a Vim syntax
   grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
                 for editors that colour and fold without a server
 ```
@@ -217,10 +218,11 @@ VS Code: install the extension in [editors/vscode](editors/vscode) (`npm install
 Sublime Text: install the LSP package, then link [editors/sublime](editors/sublime)
 into Sublime's `Packages` as `LSP-tiko` -- see its README.
 
-Neovim:
+Neovim: use the plugin in [editors/neovim](editors/neovim) --
+`require('tiko').setup({ include_paths = { ... } })` -- see its README. Or by hand:
 
 ```lua
-vim.filetype.add( { extension = { tko = 'tiko', ti = 'tiko', bas = 'tiko', bi = 'tiko', inc = 'tiko' } } )
+vim.filetype.add( { extension = { tiko = 'tiko', tko = 'tiko', ti = 'tiko', bas = 'tiko', bi = 'tiko', inc = 'tiko' } } )
 
 vim.lsp.config.tiko_lsp = {
   cmd = { 'C:/dev/tiko-lsp/bin/tiko-lsp.exe', '--stdio' },
