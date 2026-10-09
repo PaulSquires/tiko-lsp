@@ -165,6 +165,33 @@ private sub AddModuleMembers( byref srv as Server, byval doc as TextDocumentPtr,
     LogDebug( "completion: " & items.Count( ) & " public name(s) of module '" & alias_ & "'" )
 end sub
 
+'' What a file can see for the purpose of TYPE NAMES: its includes, transitively
+'' (VisibleFrom), and also its #imports -- each imported module's files and what
+'' THEY can see. `#import "std/logs"` then `dim as Logger lg`: Logger reaches
+'' this file through the module (std/logs re-exports FB.Logger, declared in
+'' fb/logger.bi, which logs.bas includes) and through nothing this file
+'' #includes, so a type search over its includes alone finds nothing.
+private sub VisibleWithImports_( byref srv as Server, byval here as long, _
+                                 byref out_ as FB.Array( of long ) )
+    srv.Index->VisibleFrom( here, out_ )
+    dim seen_ as FB.Map( of long, boolean )
+    for i as long = 0 to out_.Count( ) - 1
+        seen_.Put( out_[i], true )
+    next
+    for k as long = 0 to srv.Index->ImportCount( here ) - 1
+        dim as ImportEdge e = srv.Index->ImportAt( here, k )
+        for each mf as long in e.Files
+            dim more as FB.Array( of long )
+            srv.Index->VisibleFrom( mf, more )
+            for each f as long in more
+                if( seen_.Contains( f ) ) then continue for
+                seen_.Put( f, true )
+                out_.Push( f )
+            next
+        next
+    next
+end sub
+
 '' The members of a type declared in an INCLUDED file.
 ''
 '' `w.` where `w as Widget` and Widget lives in a header was the case that made
@@ -179,7 +206,7 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
     if( here < 0 ) then exit sub
 
     dim visible as FB.Array( of long )
-    srv.Index->VisibleFrom( here, visible )
+    VisibleWithImports_( srv, here, visible )
 
     dim as string want = lcase( typeName )
 
@@ -234,6 +261,7 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
                 dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
                 if( m.Parent <> t ) then continue for
                 if( len(m.Name_) = 0 ) then continue for
+                if( IsOfferedMember( m ) = false ) then continue for
                 if( seen_.Contains( m.LowerName ) ) then continue for
 
                 seen_.Put( m.LowerName, true )

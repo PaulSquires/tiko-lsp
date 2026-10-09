@@ -109,6 +109,12 @@ function CompletionKindOf( byval kind as SymbolKind ) as CompletionKind
     return CMP_TEXT
 end function
 
+function IsOfferedMember( byref sym as SymbolInfo ) as boolean
+    if( sym.Kind_ = SYM_CONSTRUCTOR orelse sym.Kind_ = SYM_OPERATOR ) then return false
+    if( sym.LowerName = "constructor" orelse sym.LowerName = "destructor" ) then return false
+    return true
+end function
+
 function DeclaredTypeName( byref sym as SymbolInfo ) as string
     '' The detail of a variable or field is `as <type>`; of a procedure, its
     '' signature. Only the first form names a type.
@@ -260,6 +266,7 @@ private sub AddMembersOf( byref syms as SymbolTable, byref items as CompletionIt
     for i as long = 0 to syms.Count( ) - 1
         if( syms.Items[i].Parent <> parent ) then continue for
         if( syms.Items[i].IsLocal ) then continue for
+        if( IsOfferedMember( syms.Items[i] ) = false ) then continue for
         AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
     next
 
@@ -269,7 +276,7 @@ private sub AddMembersOf( byref syms as SymbolTable, byref items as CompletionIt
     for i as long = 0 to syms.Count( ) - 1
         if( syms.Items[i].IsLocal ) then continue for
         if( left( lcase( syms.Items[i].Name_ ), len(typeName) ) = typeName ) then
-            AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
+            if( IsOfferedMember( syms.Items[i] ) ) then AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
         end if
     next
 end sub

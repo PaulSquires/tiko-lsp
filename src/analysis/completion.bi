@@ -105,6 +105,11 @@ declare sub CollectCompletions( byref text_ as string, byref tokens as TokenArra
 
 '' The declared type NAME of a symbol, taken from its detail: `as Customer ptr`
 '' yields `Customer`. "" when there is none to read.
+'' Whether a member of a type belongs in an `obj.` list. Not its constructor,
+'' destructor or operators: `lg.constructor` is no call anyone can write, and a
+'' type with a full set of them (FB.Logger_) put them at the top of the list.
+declare function IsOfferedMember( byref sym as SymbolInfo ) as boolean
+
 declare function DeclaredTypeName( byref sym as SymbolInfo ) as string
 
 '' SymbolKind -> CompletionItemKind.

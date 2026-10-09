@@ -1275,6 +1275,11 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
     s &= Req_( 13, "textDocument/signatureHelp", At_( impUri, 3, 32 ) )
     s &= Req_( 14, "textDocument/signatureHelp", At_( impUri, 4, 39 ) )
 
+    '' 15. `g.` where `dim as Gadget g` and Gadget reaches imp.bas ONLY through the
+    ''     import: demo re-exports FB.Gadget, a forward alias of Gadget_, declared in
+    ''     the header demo.bas includes. imp.bas #includes nothing.
+    s &= Req_( 15, "textDocument/completion", At_( impUri, 6, 6 ) )
+
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
     s &= Note_( "exit", "null" )
@@ -1332,7 +1337,7 @@ private function CheckIncSession( byref path as string ) as long
     loop
     AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary" )
 
-    for id as long = 1 to 14
+    for id as long = 1 to 15
         if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
     next
 
@@ -1439,6 +1444,20 @@ private function CheckIncSession( byref path as string ) as long
                      "Shout(byref s as const string, byval times as long) as string", _
                      "labelled without its `overload alias` prefix" )
         AssertEqInt( r.Member( "activeParameter" ).AsLongInt( -1 ), 1, "and the second argument active" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 15 ) )
+        dim as string labels = ""
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & lcase( it.Member( "label" ).AsString( ) ) & " "
+        next
+        AssertContains( labels, " spin ", "g. through an import and a forward alias: Gadget_'s Spin" )
+        AssertContains( labels, " speed ", "and its field" )
+        AssertFalse   ( instr( labels, " constructor " ) > 0 orelse instr( labels, " destructor " ) > 0, _
+                        "but not its constructor or destructor" )
+        AssertFalse   ( instr( labels, " let " ) > 0, "nor its operators" )
     end scope
 
     return TestSummary( "toolchain-header session" )

@@ -15,4 +15,14 @@ end type
 
 '' Declared the way fb/*.bi declares: modifiers BEFORE the parameter list.
 declare function Shout overload alias "fb_Shout" ( byref s as const string, byval times as long ) as string
+
+'' A type behind a FORWARD ALIAS, the shape of fb/logger.bi's `type Logger as Logger_`.
+type Gadget as Gadget_
+type Gadget_
+    Speed as long
+    declare constructor( )
+    declare destructor( )
+    declare sub Spin( )
+    declare operator let( byref other as Gadget_ )
+end type
 end namespace

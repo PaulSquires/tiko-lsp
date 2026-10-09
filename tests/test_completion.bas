@@ -348,6 +348,22 @@ scope
     AssertEqInt( CountKeywords( ), 0, "and nothing else" )
 end scope
 
+'' Constructors, destructors and operators are not offered after a dot.
+scope
+    Analyse( "type Widget" & LF & _
+             "    W as long" & LF & _
+             "    declare constructor( )" & LF & _
+             "    declare destructor( )" & LF & _
+             "    declare operator let( byref o as Widget )" & LF & _
+             "    declare sub Draw( )" & LF & _
+             "end type" & LF & _
+             "sub Use( )" & LF & "    dim as Widget w" & LF & "    w." & LF & "end sub" )
+    CompleteAfter( "    w." )
+    AssertTrue ( Has( "Draw" ) andalso Has( "W" ), "w.: the method and the field" )
+    AssertFalse( Has( "constructor" ) orelse Has( "destructor" ), "not the constructor or destructor" )
+    AssertFalse( Has( "let" ), "nor an operator" )
+end scope
+
 '' A cycle of aliases ends: nothing to offer, and no hang.
 scope
     Analyse( "type A1 as B1" & LF & "type B1 as A1" & LF & _

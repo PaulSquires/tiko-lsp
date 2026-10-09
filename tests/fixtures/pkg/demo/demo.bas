@@ -4,7 +4,8 @@
 #module "demo"
 #include once "win/fakeuser.bi"
 #define Shout FB.Shout
-#export Shout
+#define Gadget FB.Gadget
+#export Shout, Gadget
 
 public function Twice( byval n as long, byval scale as long = 2 ) as long
     return n * scale
