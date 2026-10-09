@@ -193,6 +193,30 @@ scope
     AssertEqStr( S_(v).Name_, "g_Count", "and the underscore survives" )
 end scope
 
+'' A TYPE ALIAS is a symbol, with `as <target>` as its detail -- both list
+'' forms -- and a `type<T>( ... )` temporary in an expression is not one.
+scope
+    Analyse( "type TrkVoidResult as FB.Result( of boolean, TrkError )" & LF & _
+             "type as long A1, A2" & LF & _
+             "type Pair as Foo, Other as Bar" & LF & _
+             "type Widget" & LF & "    x as long" & LF & "end type" & LF & _
+             "dim as long t = type<Widget>( 1 ).x" )
+
+    dim as long r = Expect( "TrkVoidResult", SYM_STRUCT, "an alias is a type symbol" )
+    AssertContains( S_(r).Detail_, "FB.Result", "whose detail names its target" )
+    Expect( "A1", SYM_STRUCT, "the reversed list: the first name" )
+    Expect( "A2", SYM_STRUCT, "and the second" )
+    dim as long o = Expect( "Other", SYM_STRUCT, "the forward list's second name" )
+    AssertEqStr( S_(o).Detail_, "as Bar", "with ITS target" )
+    dim as long w = Expect( "Widget", SYM_STRUCT, "a type block is still a type" )
+    AssertEqStr( S_(w).Detail_, "type", "and is not mistaken for an alias" )
+    dim as long n = 0
+    for i as long = 0 to g_Syms.Count( ) - 1
+        if( S_(i).Name_ = "Widget" ) then n += 1
+    next
+    AssertEqInt( n, 1, "type<Widget>( ... ) declares nothing" )
+end scope
+
 '' ----------------------------------------------------------------------------
 TestGroup( "extraction: locals and parameters" )
 

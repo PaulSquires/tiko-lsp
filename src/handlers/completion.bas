@@ -182,6 +182,30 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
     srv.Index->VisibleFrom( here, visible )
 
     dim as string want = lcase( typeName )
+
+    '' AN ALIAS IS FOLLOWED to what it names, as many hops as there are:
+    ''     dim as TrkVoidResult cfg              cfg's type is TrkVoidResult,
+    ''     type TrkVoidResult as FB.Result( of boolean, TrkError )
+    '' and the members are Result's, in the toolchain's fb/result.bi. Looked
+    '' for in THIS file as well -- an alias is often declared beside its use.
+    '' Bounded, so `type A as B` / `type B as A` cannot loop.
+    for hop as long = 1 to 8
+        dim as string target = ""
+        for v as long = 0 to visible.Count( ) - 1
+            dim as long f = visible[v]
+            for t as long = 0 to srv.Index->FileSymbolCount( f ) - 1
+                dim as SymbolInfo a = srv.Index->SymbolAt( f, t )
+                if( a.LowerName <> want ) then continue for
+                if( a.Kind_ <> SYM_STRUCT ) then continue for
+                target = lcase( DeclaredTypeName( a ) )
+                if( len(target) > 0 ) then exit for
+            next
+            if( len(target) > 0 ) then exit for
+        next
+        if( len(target) = 0 orelse target = want ) then exit for
+        want = target
+    next
+
     dim seen_ as FB.Map( of string, boolean )
     for i as long = 0 to items.Count( ) - 1
         seen_.Put( items[i].LowerLabel, true )
@@ -202,6 +226,9 @@ private sub AddIncludedMembers( byref srv as Server, byval doc as TextDocumentPt
                 case else
                     continue for
             end select
+
+            '' An alias declares no members of its own.
+            if( lcase( left( owner.Detail_, 3 ) ) = "as " ) then continue for
 
             for i as long = 0 to srv.Index->FileSymbolCount( f ) - 1
                 dim as SymbolInfo m = srv.Index->SymbolAt( f, i )

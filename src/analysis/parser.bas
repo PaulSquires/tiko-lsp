@@ -1547,6 +1547,20 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                                               head.Start_, tokens[lastIdx].Start_ + tokens[lastIdx].Length_ )
                     end if
                     PushBlock( st, KW_TYPE, name_, head, symIndex )
+
+                '' AN ALIAS -- `type TrkVoidResult as FB.Result( of boolean, TrkError )`,
+                '' or the reversed list `type as long A1, A2` -- declares names whose
+                '' detail is `as <target>`. Recorded as types: hover shows what the
+                '' name stands for, and member completion follows it to the target's
+                '' members (`cfg.` where cfg is a TrkVoidResult). They used to be no
+                '' symbol at all, so `cfg.` offered nothing.
+                elseif( hasNext andalso st.Symbols_ <> 0 ) then
+                    dim as boolean isAlias = false
+                    if( nextTok.Kind = TK_KEYWORD andalso nextTok.Kw = KW_AS ) then isAlias = true
+                    if( namedNext ) then isAlias = true
+                    if( isAlias ) then
+                        AddDeclarations( st, text_, tokens, stmt, first_ + 1, SYM_STRUCT, InProcedure( st ) )
+                    end if
                 end if
 
             case KW_UNION, KW_ENUM, KW_NAMESPACE

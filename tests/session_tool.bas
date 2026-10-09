@@ -1241,6 +1241,17 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
     '' 9. workspace/symbol does not offer a toolchain header's names.
     s &= Req_( 9, "workspace/symbol", "{" & Q & "query" & Q & ":" & Q & "onlyinthetoolchain" & Q & "}" )
 
+    '' 11. member completion through a workspace ALIAS of a toolchain GENERIC:
+    ''     `dim as IntBox b` / `b.`, where helper.bi says
+    ''     `type IntBox as FB.Box( of long )` and Box is in win/fakeuser.bi.
+    dim as string typed2 = appText
+    dim as long endAt2 = instr( typed2, "end sub" )
+    typed2 = left( typed2, endAt2 - 1 ) & "    dim as IntBox b" & LF & "    b." & LF & mid( typed2, endAt2 )
+    s &= Note_( "textDocument/didChange", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & appUri & Q & "," & Q & "version" & Q & ":3}," & _
+                Q & "contentChanges" & Q & ":[{" & Q & "text" & Q & ":" & JsonQuote( typed2 ) & "}]}" )
+    s &= Req_( 11, "textDocument/completion", At_( appUri, 7, 6 ) )
+
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
     s &= Note_( "exit", "null" )
@@ -1298,7 +1309,7 @@ private function CheckIncSession( byref path as string ) as long
     loop
     AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary" )
 
-    for id as long = 1 to 10
+    for id as long = 1 to 11
         if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
     next
 
@@ -1363,6 +1374,17 @@ private function CheckIncSession( byref path as string ) as long
         dim as JsonDoc d
         d.Parse( ResponseFor_( messages, 9 ) )
         AssertEqInt( d.Root( ).Member( "result" ).Count( ), 0, "workspace/symbol skips toolchain headers" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 11 ) )
+        dim as string labels = ""
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & it.Member( "label" ).AsString( )
+        next
+        AssertContains( labels, " Get", "b. where b is an alias of FB.Box( of long ): Box's Get" )
+        AssertContains( labels, " IsEmpty", "and IsEmpty" )
     end scope
 
     return TestSummary( "toolchain-header session" )

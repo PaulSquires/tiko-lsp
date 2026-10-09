@@ -324,6 +324,54 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "member completion: aliases and qualified types" )
+
+'' `type CustAlias as Customer`: the variable's type is the alias, and the
+'' members are Customer's. An alias was no symbol at all before, and once it
+'' was one it had no members of its own -- both read as "nothing after the dot".
+scope
+    Analyse( "type Customer" & LF & _
+             "    Name_ as string" & LF & _
+             "    declare sub SetName( byref v as string )" & LF & _
+             "end type" & LF & _
+             "type Unrelated" & LF & "    Zzz as long" & LF & "end type" & LF & _
+             "type CustAlias as Customer" & LF & _
+             "type AliasOfAlias as CustAlias" & LF & _
+             "sub Use( )" & LF & _
+             "    dim as AliasOfAlias c" & LF & _
+             "    c." & LF & _
+             "end sub" )
+    CompleteAfter( "    c." )
+    AssertTrue ( Has( "Name_" ), "through two aliases: the field" )
+    AssertTrue ( Has( "SetName" ), "and the method" )
+    AssertFalse( Has( "Zzz" ), "and NOT a guess from every type in the file" )
+    AssertEqInt( CountKeywords( ), 0, "and nothing else" )
+end scope
+
+'' A cycle of aliases ends: nothing to offer, and no hang.
+scope
+    Analyse( "type A1 as B1" & LF & "type B1 as A1" & LF & _
+             "sub Use( )" & LF & "    dim as A1 x" & LF & "    x." & LF & "end sub" )
+    CompleteAfter( "    x." )
+    AssertTrue( g_Items.Count( ) >= 0, "an alias cycle terminates" )
+end scope
+
+'' A QUALIFIED type names its last segment: `App.Customer` is Customer.
+scope
+    Analyse( "namespace App" & LF & _
+             "type Customer" & LF & _
+             "    Age as long" & LF & _
+             "end type" & LF & _
+             "end namespace" & LF & _
+             "sub Use( )" & LF & _
+             "    dim as App.Customer q" & LF & _
+             "    q." & LF & _
+             "end sub" )
+    CompleteAfter( "    q." )
+    AssertTrue( Has( "Age" ), "dim as App.Customer: Customer's members" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 
 scope

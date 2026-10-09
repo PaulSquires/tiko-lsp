@@ -117,8 +117,10 @@ function DeclaredTypeName( byref sym as SymbolInfo ) as string
     dim as string rest = trim( mid( sym.Detail_, 4 ) )
     if( len(rest) = 0 ) then return ""
 
-    '' Take the first word, and stop at anything that is not part of a name --
-    '' `Customer ptr`, `FB.Array( of string )` and `long` all end here.
+    '' Take the first name, and stop at anything that is not part of one --
+    '' `Customer ptr`, `FB.Array( of string )` and `long` all end here. A
+    '' DOTTED name is qualified by its namespace, and the type is its LAST
+    '' segment: `FB.Result( of boolean, TrkError )` names Result, not FB.
     dim as string word_
     for i as long = 0 to len(rest) - 1
         dim as ubyte c = rest[i]
@@ -127,10 +129,13 @@ function DeclaredTypeName( byref sym as SymbolInfo ) as string
         if( c >= asc("A") andalso c <= asc("Z") ) then part = true
         if( c >= asc("0") andalso c <= asc("9") ) then part = true
         if( c = asc("_") ) then part = true
+        if( c = asc(".") ) then part = true
         if( part = false ) then exit for
         word_ &= chr( c )
     next
 
+    dim as long dotAt = instrrev( word_, "." )
+    if( dotAt > 0 ) then word_ = mid( word_, dotAt + 1 )
     return word_
 end function
 
@@ -148,6 +153,30 @@ end function
 '' read out of the declaration and looked up. It is not inference -- an
 '' expression like `arr(0).` or `GetCustomer().` is not resolved, and falls
 '' back to the file-wide member list.
+'' The container a TYPE NAME stands for in this file, following aliases --
+'' `type CustAlias as Customer` -- as many hops as there are, bounded so a
+'' cycle cannot loop. -1 when the name, or what it finally names, is not a
+'' container this file declares (the handler then asks the index).
+private function ContainerNamed_( byref syms as SymbolTable, byref typeName as string ) as long
+    dim as string want = typeName
+    for hop as long = 1 to 8
+        dim as long found = -1
+        for i as long = 0 to syms.Count( ) - 1
+            if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = want ) then
+                found = i
+                exit for
+            end if
+        next
+        if( found < 0 ) then return -1
+
+        '' An alias's detail is `as <target>`; a real type's is its keyword.
+        dim as string target = lcase( DeclaredTypeName( syms.Items[found] ) )
+        if( len(target) = 0 orelse target = want ) then return found
+        want = target
+    next
+    return -1
+end function
+
 private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as CompletionContext ) as long
     if( len(ctx.BaseName) = 0 ) then return -1
 
@@ -175,18 +204,17 @@ private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as Comp
 
     '' A container named directly: `Colour.`, `App.`
     for i as long = 0 to syms.Count( ) - 1
-        if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = ctx.BaseName ) then return i
+        if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = ctx.BaseName ) then
+            return ContainerNamed_( syms, ctx.BaseName )
+        end if
     next
 
-    '' A variable, field or parameter: follow its declared type.
+    '' A variable, field or parameter: follow its declared type, and through
+    '' any alias to the type that has the members.
     dim as long v = syms.Resolve( ctx.BaseName, ctx.BaseOffset )
     if( v >= 0 ) then
         dim as string typeName = lcase( DeclaredTypeName( syms.Items[v] ) )
-        if( len(typeName) > 0 ) then
-            for i as long = 0 to syms.Count( ) - 1
-                if( syms.IsContainer( i ) andalso syms.Items[i].LowerName = typeName ) then return i
-            next
-        end if
+        if( len(typeName) > 0 ) then return ContainerNamed_( syms, typeName )
     end if
 
     return -1
