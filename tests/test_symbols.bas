@@ -222,6 +222,42 @@ scope
     AssertEqStr( S_(l3).Detail_, "as long", "name-first with two names: second type" )
 end scope
 
+'' A type-first declaration whose INITIALIZER calls something. The name is the
+'' last identifier before `=`, not the last one on the line: this declared
+'' `LoadTickers`, `ToString` and `AfxGdipInit` as locals, and the names a user
+'' actually wrote existed for neither completion, hover nor member access.
+scope
+    Analyse( "sub Main( )" & LF & _
+             "    dim as TrkVoidResult tks = LoadTickers( )" & LF & _
+             "    dim as DWSTRING msg = cfg.Failure( ).ToString( )" & LF & _
+             "    dim as long a = Width( x ), b = Height( y )" & LF & _
+             "    dim as Foo ptr p = @other" & LF & _
+             "end sub" )
+
+    dim as long t = IndexOfName( "tks" )
+    AssertTrue ( t >= 0, "dim as T name = Call( ): the name is declared" )
+    AssertEqStr( S_(t).Detail_, "as TrkVoidResult", "with its type, not the initializer" )
+    AssertEqInt( IndexOfName( "LoadTickers" ), -1, "and the callee is NOT declared" )
+
+    dim as long m = IndexOfName( "msg" )
+    AssertTrue ( m >= 0, "a chained call in the initializer: the name is declared" )
+    AssertEqStr( S_(m).Detail_, "as DWSTRING", "with its type" )
+    AssertEqInt( IndexOfName( "ToString" ), -1, "and the last member call is NOT declared" )
+
+    dim as long a = IndexOfName( "a" )
+    dim as long b = IndexOfName( "b" )
+    AssertTrue ( a >= 0 andalso b >= 0, "two declarators, each with a call initializer" )
+    AssertEqStr( S_(a).Detail_, "as long", "first declarator's type" )
+    AssertEqStr( S_(b).Detail_, "as long", "second declarator's type" )
+    AssertEqInt( IndexOfName( "Width" ), -1, "neither callee is declared (first)" )
+    AssertEqInt( IndexOfName( "Height" ), -1, "neither callee is declared (second)" )
+
+    dim as long p = IndexOfName( "p" )
+    AssertTrue ( p >= 0, "an initializer that is an address-of" )
+    AssertEqStr( S_(p).Detail_, "as Foo ptr", "keeps a multi-word type" )
+    AssertEqInt( IndexOfName( "other" ), -1, "and its operand is not declared" )
+end scope
+
 '' ----------------------------------------------------------------------------
 TestGroup( "documentation comments" )
 

@@ -807,20 +807,32 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
                             tokens[ stmt[ stmt.Count( ) - 1 ] ].Length_
 
     if( typeFirst ) then
-        '' as <type> name [, name]...
+        '' as <type> name [= init] [, name [= init]]...
+        ''
+        '' A depth-0 `=` ends the declarator's NAME: everything after it, up to
+        '' the next depth-0 comma, is the initializer. Without that,
+        ''
+        ''     dim as TrkVoidResult tks = LoadTickers( )
+        ''
+        '' declared `LoadTickers` -- the last identifier on the line -- and
+        '' `tks` existed for neither completion, hover nor member access.
         dim as long depth = 0
         dim as long lastIdent = -1
         dim as long typeEnd = -1
         dim as boolean firstNameTaken = false
+        dim as boolean inInit = false
 
         for k as long = from_ + 1 to stmt.Count( ) - 1
             dim as Token t = tokens[ stmt[k] ]
             select case t.Kind
                 case TK_LPAREN, TK_LBRACKET : depth += 1
                 case TK_RPAREN, TK_RBRACKET : depth -= 1
+                case TK_OP
+                    if( depth = 0 andalso TokenText( text_, t ) = "=" ) then inInit = true
                 case TK_IDENT
-                    if( depth = 0 ) then lastIdent = k
+                    if( depth = 0 andalso inInit = false ) then lastIdent = k
                 case TK_COMMA
+                    if( depth = 0 ) then inInit = false
                     if( depth = 0 andalso lastIdent >= 0 ) then
                         dim as Token n = tokens[ stmt[lastIdent] ]
                         if( firstNameTaken = false ) then typeEnd = lastIdent - 1
