@@ -59,7 +59,28 @@ function ParseSignature( byref name_ as string, byref detail as string, _
     fullLabel = name_ & detail
 
     dim as string d = detail
-    if( left( d, 1 ) <> "(" ) then return false
+
+    '' PROCEDURE MODIFIERS BEFORE THE LIST -- `overload alias "fb_StrPadLeft" (`,
+    '' `cdecl (`, `lib "user32" alias "MessageBoxW" (` -- are dropped, and the
+    '' label is the name plus the list: most of fb/*.bi and the Win32 headers
+    '' declare this way, and none of them had a signature. A detail that is a
+    '' TYPE (`as function( ... )`) is not a procedure's and is not reread as one.
+    if( left( d, 1 ) <> "(" ) then
+        if( lcase( left( d, 3 ) ) = "as " ) then return false
+        dim as long openAt = -1
+        dim as boolean quoted = false
+        for j as long = 0 to len(d) - 1
+            if( d[j] = 34 ) then
+                quoted = ( quoted = false )
+            elseif( quoted = false andalso d[j] = asc("(") ) then
+                openAt = j
+                exit for
+            end if
+        next
+        if( openAt < 0 ) then return false
+        d = mid( d, openAt + 1 )
+        fullLabel = name_ & d
+    end if
 
     '' The parameter list ends at the parenthesis that matches the first one.
     '' Depth counting, and STRINGS ARE SKIPPED WHOLE: a default value may be

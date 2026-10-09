@@ -30,8 +30,15 @@
 declare sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
                               byref roots as PathArray, byref outDirs as PathArray )
 
-'' The toolchain's package tree, or "" when none can be found.
+'' The toolchain's package tree, or "" when none can be found. First choice first: what the
+'' client configured (initializationOptions.packagePaths -- SetConfiguredPackageDirs), then
+'' a `pkg` BESIDE a configured include directory (a packaged toolchain is <dir>/inc and
+'' <dir>/pkg, so naming the one finds the other), then TKO_PKG, then beside a `tiko` on PATH.
 declare function ToolchainPkgDir( ) as string
+
+'' Records the client's `packagePaths`. Same rule as SetConfiguredIncludeDirs: called once,
+'' from `initialize`, before the index worker starts.
+declare sub SetConfiguredPackageDirs( byref dirs as PathArray )
 
 '' THE TOOLCHAIN'S HEADER DIRECTORY, as the compiler finds it (tiko-lang cmdline.bas,
 '' AppendDefaultIncludeDir): TKO_INCLUDE, else <dir>/inc or <dir>/../inc beside a `tiko` on

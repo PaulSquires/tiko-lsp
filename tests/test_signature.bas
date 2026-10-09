@@ -115,6 +115,26 @@ private sub TestParseSignature( )
     AssertTrue( ParseSignature( "Half", "(byval a as long", label, params ), _
                 "an unbalanced list is still reported as a signature" )
     AssertEqInt( params.Count( ), 0, "but nothing can be located inside it" )
+
+    '' PROCEDURE MODIFIERS before the list -- how fb/*.bi and the Win32 headers
+    '' declare. They used to mean no signature at all.
+    params.Clear( )
+    AssertTrue ( ParseSignature( "PadLeft", "overload alias ""fb_StrPadLeft"" (byref s as const string, byval width as integer) as string", label, params ), _
+                 "overload alias before the list: still a signature" )
+    AssertEqStr( label, "PadLeft(byref s as const string, byval width as integer) as string", _
+                 "labelled without the modifiers" )
+    AssertEqInt( params.Count( ), 2, "with both parameters" )
+    AssertEqStr( mid( label, params[1].LabelStart + 1, params[1].LabelEnd - params[1].LabelStart ), _
+                 "byval width as integer", "and spans that index the shorter label" )
+
+    params.Clear( )
+    AssertTrue ( ParseSignature( "Beep_", "cdecl lib ""k(32)"" alias ""Beep"" (byval f as ulong)", label, params ), _
+                 "cdecl lib alias, with a parenthesis INSIDE a quoted name" )
+    AssertEqInt( params.Count( ), 1, "one parameter, not a list opened inside the string" )
+
+    params.Clear( )
+    AssertFalse( ParseSignature( "fp", "as function( byval x as long ) as long", label, params ), _
+                 "a function-pointer TYPE is not reread as a parameter list" )
 end sub
 
 '' ############################################################################

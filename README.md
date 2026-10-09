@@ -246,6 +246,13 @@ Without it the server falls back to `TKO_INCLUDE`, then to `inc` beside a `tiko`
 Directories are searched in order, after the includer's own directory and the workspace
 folders -- the order the compiler uses.
 
+**Packages** (`#import "std/strings"`) are found in the toolchain's `pkg`: by default the
+`pkg` beside a configured include directory -- a packaged toolchain is `<dir>/inc` and
+`<dir>/pkg`, so `includePaths` alone is enough. `initializationOptions.packagePaths` names
+it explicitly; without either, `TKO_PKG`, then `pkg` beside a `tiko` on PATH. After
+`strings.`, completion offers the module's exports, hover shows what an export names
+(`FB.PadLeft`), and `strings.PadLeft(` shows its signature.
+
 Toolchain headers are read-only to the server: never renamed into, never searched for
 references, and kept out of `workspace/symbol`. Measured on tracks (122 files): 248
 headers, 192,697 symbols, a 2.0 s full build on the worker thread; completion then costs

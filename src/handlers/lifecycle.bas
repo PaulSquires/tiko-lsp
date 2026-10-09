@@ -82,6 +82,27 @@ private function OnInitialize( byref srv as Server, _
     end if
     SetConfiguredIncludeDirs( incPaths )
 
+    '' `initializationOptions.packagePaths`: where `#import "std/strings"` is found -- the
+    '' toolchain's pkg/. Usually unnecessary: a `pkg` beside a configured include
+    '' directory is found on its own (ToolchainPkgDir).
+    dim as JsonValue pkgOpt = params.Member( "initializationOptions" ).Member( "packagePaths" )
+    dim pkgPaths as PathArray
+    if( pkgOpt.IsString( ) ) then
+        pkgPaths.Push( pkgOpt.AsString( "" ) )
+    else
+        for each pkgVal in ArrayOf( pkgOpt )
+            dim as string d = pkgVal.AsString( "" )
+            if( len(d) > 0 ) then pkgPaths.Push( d )
+        next
+    end if
+    SetConfiguredPackageDirs( pkgPaths )
+    dim as string pkgDir = ToolchainPkgDir( )
+    if( len(pkgDir) > 0 ) then
+        LogInfo( "toolchain packages from " & pkgDir )
+    else
+        LogInfo( "toolchain packages: none found -- #import of std/... will not resolve" )
+    end if
+
     dim incDirs as PathArray = ToolchainIncDirs( )
     if( incDirs.IsEmpty( ) ) then
         LogInfo( "toolchain headers: none configured (initializationOptions.includePaths, " & _

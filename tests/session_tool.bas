@@ -1252,6 +1252,29 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
                 Q & "contentChanges" & Q & ":[{" & Q & "text" & Q & ":" & JsonQuote( typed2 ) & "}]}" )
     s &= Req_( 11, "textDocument/completion", At_( appUri, 7, 6 ) )
 
+    '' 12-14. AN #IMPORTED TOOLCHAIN PACKAGE. imp.bas imports "demo", which lives in
+    '' tests/fixtures/pkg -- found as <include dir>/../pkg, with no packagePaths:
+    ''
+    ''     line 3:    dim as long n = demo.Twice( 1 )
+    ''     line 4:    dim as string s = demo.Shout( "a", 2 )
+    ''
+    '' Twice is the module's public function; Shout is a facade's re-export of
+    '' FB.Shout, declared `overload alias "fb_Shout" ( ... )` the way fb/*.bi is.
+    dim as string impPath = wsRoot & "\imp.bas"
+    dim as string impUri = PathToUri( impPath )
+    dim as string impText
+    if( ReadWholeFile( impPath, impText ) = false ) then
+        print "session_tool: cannot read " & impPath
+        end 1
+    end if
+    s &= Note_( "textDocument/didOpen", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & impUri & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( impText ) & "}}" )
+    s &= Req_( 12, "textDocument/completion", At_( impUri, 3, 25 ) )
+    s &= Req_( 13, "textDocument/signatureHelp", At_( impUri, 3, 32 ) )
+    s &= Req_( 14, "textDocument/signatureHelp", At_( impUri, 4, 39 ) )
+
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
     s &= Note_( "exit", "null" )
@@ -1309,7 +1332,7 @@ private function CheckIncSession( byref path as string ) as long
     loop
     AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary" )
 
-    for id as long = 1 to 11
+    for id as long = 1 to 14
         if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
     next
 
@@ -1385,6 +1408,37 @@ private function CheckIncSession( byref path as string ) as long
         next
         AssertContains( labels, " Get", "b. where b is an alias of FB.Box( of long ): Box's Get" )
         AssertContains( labels, " IsEmpty", "and IsEmpty" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 12 ) )
+        dim as string labels = ""
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & it.Member( "label" ).AsString( )
+        next
+        AssertContains( labels, " Twice", "demo. offers the package's public function" )
+        AssertContains( labels, " Shout", "and its re-exported name -- the package was FOUND" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 13 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue ( r.IsObject( ), "signature help for demo.Twice(" )
+        AssertContains( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                        "byval scale as long = 2", "with the module's parameter list" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 14 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue ( r.IsObject( ), "signature help for demo.Shout(, a re-export of FB.Shout" )
+        AssertEqStr( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                     "Shout(byref s as const string, byval times as long) as string", _
+                     "labelled without its `overload alias` prefix" )
+        AssertEqInt( r.Member( "activeParameter" ).AsLongInt( -1 ), 1, "and the second argument active" )
     end scope
 
     return TestSummary( "toolchain-header session" )

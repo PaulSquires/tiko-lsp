@@ -53,11 +53,27 @@ end function
 private function ResolveCalleeInIndex( byref srv as Server, byval doc as TextDocumentPtr, _
                                        byref ctx as CallContext, byref sym as SymbolInfo ) as boolean
     dim as string body = doc->Text( )
-    if( IsMemberAccess( body, doc->Tokens( ), ctx.NameTok ) ) then return false
-
     dim as string lowerName = lcase( TokenText( body, doc->Tokens( )[ctx.NameTok] ) )
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+
+    if( IsMemberAccess( body, doc->Tokens( ), ctx.NameTok ) ) then
+        '' `strings.PadLeft(` WHERE strings IS AN IMPORT'S ALIAS (tiko-lang ADR 0017):
+        '' the module's public declaration, or what its exported macro names -- a std
+        '' facade's `#define PadLeft FB.PadLeft` is shown as FB.PadLeft. Any other
+        '' member call stays unresolved: which type's method is meant needs the type
+        '' of the expression before the dot.
+        if( here < 0 orelse ctx.NameTok < 2 ) then return false
+        dim as string lowerBase = lcase( TokenText( body, doc->Tokens( )[ctx.NameTok - 2] ) )
+        dim as IndexHit target
+        dim as ExportHit xh
+        if( srv.Index->ModuleMemberAt( here, lowerBase, lowerName, target, xh ) = 0 ) then return false
+        if( target.FileIndex < 0 ) then return false
+        sym = srv.Index->SymbolAt( target.FileIndex, target.SymIndex )
+        return IsCallableKind( sym.Kind_ )
+    end if
+
     dim as IndexHit hit
-    if( srv.Index->FindDefinitionFrom( srv.Index->IndexOfUri( doc->Uri( ) ), lowerName, hit ) = false ) then
+    if( srv.Index->FindDefinitionFrom( here, lowerName, hit ) = false ) then
         return false
     end if
 

@@ -68,6 +68,10 @@ signatures, tell the server where the toolchain's `inc` is. Zed passes
 }
 ```
 
+The toolchain's `pkg` -- what `#import "std/strings"` names -- is found beside
+that `inc` on its own; `"packagePaths": [...]` names it explicitly if it lives
+elsewhere.
+
 Verified in Zed 1.23.2: the `initialize` request carries it and the server
 reports `toolchain headers from ...`. The headers are read on the server's
 worker thread, so the server starts as fast as before; Win32 names appear a

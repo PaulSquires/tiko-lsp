@@ -101,7 +101,31 @@ private function ManifestDirAbove( byref dir_ as string ) as string
     return ""
 end function
 
+'' What `initialize` was told. Written once, before the index worker starts.
+dim shared as PathArray g_configuredPackageDirs
+dim shared as PathArray g_configuredIncludeDirs
+
+sub SetConfiguredPackageDirs( byref dirs as PathArray )
+    g_configuredPackageDirs.Clear( )
+    for i as long = 0 to dirs.Count( ) - 1
+        dim as string d = NormalizePath( dirs[i] )
+        if( len(d) > 0 ) then g_configuredPackageDirs.Push( d )
+    next
+end sub
+
 function ToolchainPkgDir( ) as string
+    for i as long = 0 to g_configuredPackageDirs.Count( ) - 1
+        if( FB.IsDir( g_configuredPackageDirs[i] ) ) then return g_configuredPackageDirs[i]
+    next
+
+    '' <toolchain>/inc was named, so <toolchain>/pkg is the package tree -- the layout
+    '' every packaged toolchain has. Without this a client that configured includePaths
+    '' alone found headers but no `#import "std/strings"`.
+    for i as long = 0 to g_configuredIncludeDirs.Count( ) - 1
+        dim as string cand = JoinNative( g_configuredIncludeDirs[i], "../pkg" )
+        if( FB.IsDir( cand ) ) then return cand
+    next
+
     dim as string env_ = environ( "TKO_PKG" )
     if( len(env_) > 0 ) then return NormalizePath( env_ )
 
@@ -153,9 +177,6 @@ function ToolchainIncDir( ) as string
     wend
     return ""
 end function
-
-'' What `initialize` was told. Written once, before the index worker starts.
-dim shared as PathArray g_configuredIncludeDirs
 
 sub SetConfiguredIncludeDirs( byref dirs as PathArray )
     g_configuredIncludeDirs.Clear( )

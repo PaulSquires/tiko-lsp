@@ -772,7 +772,7 @@ scope
     SetConfiguredIncludeDirs( g_noIncDirs )
     dim as SymbolIndex idx
     BuildIncWs( idx, true )
-    AssertEqInt( idx.FileCount( ), 2, "no include directory: only the workspace's two files" )
+    AssertEqInt( idx.FileCount( ), 3, "no include directory: only the workspace's three files" )
     dim as long app = FileEndingIn( idx, "incws\app.bas" )
     AssertTrue ( idx.HasUnresolvedIncludes( app ), "and fakewin.bi is an edge to nowhere" )
     dim as IndexHit hit
@@ -784,15 +784,20 @@ scope
     dirs.Push( g_Root & "\tests\fixtures\toolinc" )
     SetConfiguredIncludeDirs( dirs )
 
-    '' The message loop's resolution stays lexical: it does not read headers.
+    '' The message loop's resolution stays lexical: it reads no header THE WORKSPACE
+    '' includes. It does find imp.bas's #import "demo" -- tests/fixtures/pkg, beside
+    '' the include directory -- and, as it always has, the header a module includes.
     dim as SymbolIndex lexical_
     BuildIncWs( lexical_, false )
-    AssertEqInt( lexical_.FileCount( ), 2, "a lexical resolve reads no header" )
+    AssertEqInt( FileEndingIn( lexical_, "toolinc\fakewin.bi" ), -1, _
+                 "a lexical resolve reads no header the workspace includes" )
+    AssertTrue ( FileEndingIn( lexical_, "pkg\demo\demo.bas" ) >= 0, _
+                 "but finds the imported package as <include dir>\..\pkg" )
 
     '' The worker's full build does.
     dim as SymbolIndex idx
     BuildIncWs( idx, true )
-    AssertEqInt( idx.FileCount( ), 4, "a full build reads fakewin.bi AND what it includes" )
+    AssertEqInt( idx.FileCount( ), 6, "a full build: 3 workspace files, the package, fakewin.bi and what it includes" )
 
     dim as long app  = FileEndingIn( idx, "incws\app.bas" )
     dim as long help = FileEndingIn( idx, "incws\helper.bi" )
@@ -820,7 +825,7 @@ scope
 
     '' A second full build over the same files reads nothing twice.
     idx.ResolveIncludes( true )
-    AssertEqInt( idx.FileCount( ), 4, "re-resolving does not index a header twice" )
+    AssertEqInt( idx.FileCount( ), 6, "re-resolving does not index a header twice" )
 end scope
 
 SetConfiguredIncludeDirs( g_noIncDirs )

@@ -12,4 +12,7 @@ type Box( of T )
     declare function Get( ) as T
     declare function IsEmpty( ) as boolean
 end type
+
+'' Declared the way fb/*.bi declares: modifiers BEFORE the parameter list.
+declare function Shout overload alias "fb_Shout" ( byref s as const string, byval times as long ) as string
 end namespace
