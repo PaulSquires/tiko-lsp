@@ -81,7 +81,9 @@
   name: (qualified_name (identifier) @function))
 
 (type_definition name: (identifier) @type)
-(union_definition name: (identifier) @type)
+; A field or keyword inside `union_definition` costs ~50s of query analysis
+; against this grammar (5,497 parse states); the named-child form takes 0.3s.
+(union_definition (identifier) @type)
 (enum_definition name: (identifier) @type)
 (type_alias name: (identifier) @type)
 (namespace_definition name: (qualified_name (identifier) @module))

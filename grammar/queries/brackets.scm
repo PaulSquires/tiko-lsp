@@ -14,7 +14,9 @@
   kind: _ @open
   close: _ @close)
 (type_definition       "type"      @open "end type"      @close)
-(union_definition      "union"     @open "end union"     @close)
+; A field or keyword inside `union_definition` costs ~50s of query analysis
+; against this grammar (5,497 parse states); the named-child form takes 0.3s.
+; There is no named child to hang a bracket pair on, so the pair is dropped.
 (enum_definition       "enum"      @open "end enum"      @close)
 (namespace_definition  "namespace" @open "end namespace" @close)
 (extern_block          "extern"    @open "end extern"    @close)

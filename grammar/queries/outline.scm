@@ -13,7 +13,9 @@
   name: (qualified_name) @name) @item
 
 (type_definition  "type"      @context name: (identifier) @name) @item
-(union_definition "union"     @context name: (identifier) @name) @item
+; A field or keyword inside `union_definition` costs ~50s of query analysis
+; against this grammar (5,497 parse states); the named-child form takes 0.3s.
+(union_definition (identifier) @name) @item
 (enum_definition  "enum"      @context name: (identifier) @name) @item
 (namespace_definition "namespace" @context name: (qualified_name) @name) @item
 (type_alias       "type"      @context name: (identifier) @name) @item
