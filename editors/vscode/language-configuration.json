@@ -1,0 +1,35 @@
+{
+  "comments": {
+    "lineComment": "'",
+    "blockComment": [ "/'", "'/" ]
+  },
+  "brackets": [
+    [ "(", ")" ],
+    [ "[", "]" ],
+    [ "{", "}" ]
+  ],
+  "autoClosingPairs": [
+    { "open": "(", "close": ")" },
+    { "open": "[", "close": "]" },
+    { "open": "{", "close": "}" },
+    { "open": "\"", "close": "\"", "notIn": [ "string", "comment" ] },
+    { "open": "/'", "close": "'/", "notIn": [ "string" ] }
+  ],
+  "surroundingPairs": [
+    [ "(", ")" ],
+    [ "[", "]" ],
+    [ "{", "}" ],
+    [ "\"", "\"" ]
+  ],
+  "wordPattern": "[A-Za-z_][A-Za-z0-9_]*[$%&!#]?",
+  "indentationRules": {
+    "increaseIndentPattern": "(?i)^\\s*((private\\s+|public\\s+|static\\s+|virtual\\s+|abstract\\s+|override\\s+)*(sub|function|property|constructor|destructor|operator)\\b(?!.*\\bdeclare\\b)|(type|union|enum)\\s+[A-Za-z_][A-Za-z0-9_.]*(\\s*\\(\\s*of\\b[^)]*\\))?\\s*('.*)?$|type\\s*('.*)?$|namespace\\b|extern\\s+\"|scope\\b|with\\b|asm\\s*$|for\\b|do\\b|while\\b|select\\s+case\\b|case\\b|if\\b.*\\bthen\\s*('.*)?$|else\\b|elseif\\b|#\\s*(if|ifdef|ifndef|else|elseif|macro)\\b)",
+    "decreaseIndentPattern": "(?i)^\\s*(end\\s*(sub|function|property|constructor|destructor|operator|type|union|enum|namespace|extern|scope|with|asm|select|if)\\b|endif\\b|next\\b|loop\\b|wend\\b|else\\b|elseif\\b|case\\b|#\\s*(endif|else|elseif|endmacro)\\b)"
+  },
+  "folding": {
+    "markers": {
+      "start": "^\\s*'\\s*#?region\\b",
+      "end": "^\\s*'\\s*#?endregion\\b"
+    }
+  }
+}

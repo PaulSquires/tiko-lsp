@@ -130,6 +130,7 @@ tiko-lsp/
   build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
   docs/         architecture.md, phase1.md .. phase10.md, grammar.md
   editors/zed/  a Zed extension: the language, and where to find the server
+  editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
   grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
                 for editors that colour and fold without a server
 ```
@@ -207,6 +208,10 @@ Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
   }
 }
 ```
+
+VS Code: install the extension in [editors/vscode](editors/vscode) (`npm install`,
+`npm run package`, `code --install-extension tiko-lsp.vsix`), then set
+`tiko.server.path` and `tiko.includePaths` -- see its README.
 
 Neovim:
 

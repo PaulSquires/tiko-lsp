@@ -1,0 +1,6 @@
+# Only what the extension needs at run time goes into the .vsix.
+.gitignore
+*.vsix
+syntaxes/gen_tmlanguage.py
+node_modules/@vscode/vsce/**
+node_modules/.bin/**

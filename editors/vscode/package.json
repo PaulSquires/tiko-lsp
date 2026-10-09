@@ -1,0 +1,121 @@
+{
+  "name": "tiko-lsp",
+  "displayName": "Tiko",
+  "description": "Language support for tiko, served by tiko-lsp.",
+  "version": "0.1.0",
+  "publisher": "PaulSquires",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PaulSquires/tiko-lsp"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Starting tiko-lsp runs an executable named in settings or found in the workspace."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "tiko",
+        "aliases": [
+          "Tiko",
+          "tiko"
+        ],
+        "extensions": [
+          ".tiko",
+          ".tko",
+          ".ti",
+          ".bas",
+          ".bi",
+          ".inc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tiko",
+        "scopeName": "source.tiko",
+        "path": "./syntaxes/tiko.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tiko.restartServer",
+        "title": "Restart Language Server",
+        "category": "Tiko"
+      },
+      {
+        "command": "tiko.showOutput",
+        "title": "Show Language Server Output",
+        "category": "Tiko"
+      }
+    ],
+    "configuration": {
+      "title": "Tiko",
+      "properties": {
+        "tiko.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Path to `tiko-lsp.exe`. Empty: `tiko-lsp` on the `PATH`, then `bin/tiko-lsp.exe` inside a workspace folder."
+        },
+        "tiko.server.arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "--stdio"
+          ],
+          "markdownDescription": "Arguments passed to the server. Add `--log-level`, `debug`, `--log-file`, `C:/temp/tiko-lsp.log` to see what it is doing; it never writes to stdout."
+        },
+        "tiko.includePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Directories `#include \"windows.bi\"` is found in -- the toolchain's `inc`, e.g. `C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc`. The server reads the headers the workspace includes from here, so Win32, AfxNova and runtime names complete, hover and show signatures. Sent as `initializationOptions.includePaths`."
+        },
+        "tiko.packagePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Where `#import \"std/strings\"` is found -- the toolchain's `pkg`. Usually unnecessary: the `pkg` beside an include path is found on its own. Sent as `initializationOptions.packagePaths`."
+        },
+        "tiko.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and tiko-lsp in the 'Tiko Language Server' output channel."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "3.2.1"
+  },
+  "scripts": {
+    "package": "vsce package --out tiko-lsp.vsix"
+  }
+}
