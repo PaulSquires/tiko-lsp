@@ -7,6 +7,8 @@
 #include once "watched_files.bi"
 #include once "../workspace/index_builder.bi"
 #include once "../workspace/modules.bi"
+#include once "../workspace/metadata.bi"
+#include once "fb/filesystem.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -101,6 +103,25 @@ private function OnInitialize( byref srv as Server, _
         LogInfo( "toolchain packages from " & pkgDir )
     else
         LogInfo( "toolchain packages: none found -- #import of std/... will not resolve" )
+    end if
+
+    '' `initializationOptions.compilerPath`: a tiko to ASK. With it, `tiko metadata` is read
+    '' for each workspace folder's tiko.toml before every whole-workspace scan, and what it
+    '' says about modules, -i roots, pkg/ and include directories comes first in resolution;
+    '' `tiko/metadata` hands its targets to the client (workspace/metadata.bi). It is never
+    '' run for diagnostics. Without it -- or when it fails -- nothing changes.
+    dim as string comp = params.Member( "initializationOptions" ).Member( "compilerPath" ).AsString( "" )
+    SetCompilerPath( "" )
+    if( len(comp) > 0 ) then
+#ifdef __FB_WIN32__
+        if( FB.IsFile( comp ) = false andalso FB.IsFile( comp & ".exe" ) ) then comp &= ".exe"
+#endif
+        if( FB.IsFile( comp ) ) then
+            SetCompilerPath( NormalizePath( comp ) )
+            LogInfo( "compiler: " & CompilerPath( ) & " -- tiko metadata is read for each workspace manifest" )
+        else
+            LogWarn( "compilerPath is not a file: " & comp & " -- resolving without the compiler" )
+        end if
     end if
 
     dim incDirs as PathArray = ToolchainIncDirs( )

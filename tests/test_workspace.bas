@@ -15,6 +15,7 @@
 #include once "../src/utils/uri.bi"
 #include once "../src/analysis/includes.bi"
 #include once "../src/workspace/modules.bi"
+#include once "../src/workspace/metadata.bi"
 
 const LF = chr(10)
 
@@ -937,5 +938,117 @@ scope
 end scope
 
 ShutdownIndexBuilder( )
+
+'' ----------------------------------------------------------------------------
+TestGroup( "compiler metadata (tiko metadata)" )
+
+scope
+    dim as string metaWs  = g_Root & "\tests\fixtures\meta\ws"
+    dim as string metaLib = g_Root & "\tests\fixtures\meta\lib"
+    dim as string mainFile = metaWs & "\src\main.tiko"
+    dim as string answer
+    AssertTrue( ReadSourceFile( metaWs & "\tiko-metadata.json", answer ), "the fixture answer is readable" )
+
+    '' -- with nothing known: the private resolver alone ---------------------------
+    ClearMetadata( )
+    dim roots as PathArray
+    roots.Push( metaWs )
+    dim cands as PathArray
+    ModuleCandidates( mainFile, "gadgets", roots, cands )
+    dim as boolean sawLib = false
+    for i as long = 0 to cands.Count( ) - 1
+        if( lcase( cands[i] ) = lcase( NormalizePath( metaLib & "\gadgets" ) ) ) then sawLib = true
+    next
+    AssertFalse( sawLib, "without metadata, a module reached by a target's -i is not a candidate" )
+    AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "and no module directory is known" )
+
+    '' -- one answer, accepted directly ------------------------------------------
+    AssertFalse( AcceptMetadata( metaWs, "{" & chr(34) & "format" & chr(34) & ":2}" ), _
+                 "an answer in another format is refused" )
+    AssertFalse( AcceptMetadata( metaWs, "not json" ), "and so is one that is not JSON" )
+    AssertTrue ( AcceptMetadata( metaWs, answer ), "the fixture's answer is accepted" )
+
+    dim as string want = NormalizePath( metaLib & "\gadgets" )
+    AssertEqStr( lcase( MetadataModuleDir( mainFile, "gadgets" ) ), lcase( want ), _
+                 "the module's directory, read against the manifest's directory" )
+    AssertEqStr( lcase( MetadataModuleDir( mainFile, "GADGETS" ) ), lcase( want ), _
+                 "matched by chain, case-insensitively" )
+    AssertEqStr( MetadataModuleDir( mainFile, "./gadgets" ), "", "a relative import is never looked up" )
+    AssertEqStr( MetadataModuleDir( mainFile, "nosuch" ), "", "nor is a module no target reaches" )
+    AssertEqStr( MetadataModuleDir( metaLib & "\gadgets\gadgets.tiko", "gadgets" ), "", _
+                 "and a file outside the manifest's directory has no package here" )
+
+    ModuleCandidates( mainFile, "gadgets", roots, cands )
+    AssertTrue( cands.Count( ) > 0, "with metadata there are candidates" )
+    if( cands.Count( ) > 0 ) then
+        AssertEqStr( lcase( cands[0] ), lcase( want ), "and the compiler's directory is FIRST" )
+    end if
+    dim as long rootAt = -1, wsAt = -1
+    for i as long = 0 to cands.Count( ) - 1
+        if( lcase( cands[i] ) = lcase( NormalizePath( metaWs & "\gadgets" ) ) ) then wsAt = i
+        if( lcase( cands[i] ) = lcase( want ) andalso i > 0 ) then rootAt = i
+    next
+    AssertTrue( rootAt > 0, "the -i root the compiler searched is a candidate too" )
+    AssertTrue( wsAt > rootAt, "ahead of the workspace folder that stands in for it" )
+
+    dim ir as PathArray
+    MetadataSearchRoots( mainFile, ir )
+    AssertEqInt( ir.Count( ), 1, "one -i root" )
+    if( ir.Count( ) = 1 ) then AssertEqStr( lcase( ir[0] ), lcase( NormalizePath( metaLib ) ), "../lib, made absolute" )
+
+    AssertEqStr( lcase( MetadataPkgDir( ) ), lcase( NormalizePath( g_Root & "\tests\fixtures\meta\nopkg" ) ), _
+                 "the pkg/ the compiler named" )
+    AssertTrue( lcase( ToolchainPkgDir( ) ) <> lcase( MetadataPkgDir( ) ), _
+                "but not used as the toolchain's when it is not a directory" )
+
+    dim incs as PathArray = MetadataIncludeDirs( )
+    AssertEqInt( incs.Count( ), 2, "both include directories of the one unit" )
+    dim tinc as PathArray = ToolchainIncDirs( )
+    dim as boolean sawToolinc = false
+    for i as long = 0 to tinc.Count( ) - 1
+        if( lcase( tinc[i] ) = lcase( NormalizePath( g_Root & "\tests\fixtures\toolinc" ) ) ) then sawToolinc = true
+    next
+    AssertTrue( sawToolinc, "and they are the toolchain include directories when none is configured" )
+
+    dim as string md, js
+    AssertTrue( MetadataFor( mainFile, md, js ), "a file in the package has its manifest's answer" )
+    AssertEqStr( lcase( md ), lcase( NormalizePath( metaWs ) ), "that manifest's directory" )
+    AssertContains( js, chr(34) & "main" & chr(34) & ":" & chr(34) & "src/main.tiko" & chr(34), _
+                    "and the answer as the compiler printed it" )
+    AssertTrue ( MetadataFor( "", md, js ), "with no file, the first package known" )
+    AssertFalse( MetadataFor( metaLib & "\gadgets\gadgets.tiko", md, js ), "a file in no known package has none" )
+
+    ClearMetadata( )
+    AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "ClearMetadata forgets it all" )
+    AssertEqInt( MetadataIncludeDirs( ).Count( ), 0, "include directories too" )
+
+    '' -- LoadMetadata: a real child process, in the manifest's directory ----------
+    SetCompilerPath( "" )
+    LoadMetadata( roots )
+    AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "with no compiler configured, LoadMetadata does nothing" )
+
+#ifdef __FB_WIN32__
+    dim as string fakeExe = g_Root & "\bin\fake_tiko.exe"
+#else
+    dim as string fakeExe = g_Root & "/bin/fake_tiko"
+#endif
+    SetCompilerPath( fakeExe )
+    dim nested as PathArray
+    nested.Push( metaWs & "\src" )
+    nested.Push( metaWs )
+    LoadMetadata( nested )
+    AssertEqStr( lcase( MetadataModuleDir( mainFile, "gadgets" ) ), lcase( want ), _
+                 "LoadMetadata runs the compiler for the manifest at or ABOVE a folder" )
+    AssertTrue( MetadataFor( "", md, js ), "and keeps its answer" )
+    AssertEqInt( MetadataManifestCount( ), 1, "once: two folders under one manifest ask once" )
+
+    SetCompilerPath( g_Root & "\bin\no_such_tiko.exe" )
+    LoadMetadata( roots )
+    AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "a compiler that cannot run leaves nothing known" )
+    ModuleCandidates( mainFile, "gadgets", roots, cands )
+    AssertTrue( cands.Count( ) > 0, "and the private resolver still answers" )
+    SetCompilerPath( "" )
+    ClearMetadata( )
+end scope
 
 end TestSummary( "workspace" )

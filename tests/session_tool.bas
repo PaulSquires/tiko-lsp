@@ -1474,6 +1474,203 @@ private function CheckIncSession( byref path as string ) as long
     return TestSummary( "toolchain-header session" )
 end function
 
+'' ############################################################################
+''  The COMPILER-METADATA session -- --write-meta / --check-meta / --check-meta-off
+''
+''      session_tool --write-meta session-meta.bin <meta-ws> <compiler or "">
+''      tiko-lsp < session-meta.bin > captured-meta.bin
+''      session_tool --check-meta captured-meta.bin       (with tests/fake_tiko)
+''      session_tool --check-meta-off captured-meta.bin   (with no compiler)
+''
+''  tests/fixtures/meta/ws imports `gadgets`, which lives in ../lib -- outside
+''  the workspace folder, reached only by the target's `-i ../lib`. The server
+''  knows that only from the compiler (`initializationOptions.compilerPath`),
+''  here tests/fake_tiko, which prints ws/tiko-metadata.json. The same session
+''  with no compiler is the control: it must NOT resolve the import, or the
+''  first run proves nothing.
+''
+''      line 3:    dim as long n = gadgets.Spin( 1 )
+'' ############################################################################
+
+private function MetaSessionBytes( byref wsRoot as string, byref compiler as string ) as string
+    dim as string s
+    dim as string wsUri   = PathToUri( wsRoot )
+    dim as string mainPath = wsRoot & "\src\main.tiko"
+    dim as string mainUri = PathToUri( mainPath )
+    dim as string libUri  = PathToUri( wsRoot & "\..\lib\gadgets\gadgets.tiko" )
+    dim as string mainText
+    if( ReadWholeFile( mainPath, mainText ) = false ) then
+        print "session_tool: cannot read " & mainPath
+        end 1
+    end if
+
+    s &= Req_( 1, "initialize", "{" & Q & "processId" & Q & ":4242," & _
+               Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "trace" & Q & ":" & Q & "messages" & Q & "," & _
+               Q & "capabilities" & Q & ":{}," & _
+               Q & "initializationOptions" & Q & ":{" & Q & "compilerPath" & Q & ":" & JsonQuote( compiler ) & "}," & _
+               Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "name" & Q & ":" & Q & "meta" & Q & "}]}" )
+    s &= Note_( "initialized", "{}" )
+
+    '' 2. waits for the scan, and with it for `tiko metadata`, which runs first.
+    s &= Req_( 2, "workspace/symbol", "{" & Q & "query" & Q & ":" & Q & "usegadgets" & Q & "}" )
+
+    '' 3-5. tiko/metadata: for main.tiko; with no document; for a file in no package.
+    dim as string td = "{" & Q & "textDocument" & Q & ":{" & Q & "uri" & Q & ":" & Q
+    s &= Req_( 3, "tiko/metadata", td & mainUri & Q & "}}" )
+    s &= Req_( 4, "tiko/metadata", "{}" )
+    s &= Req_( 5, "tiko/metadata", td & libUri & Q & "}}" )
+
+    s &= Note_( "textDocument/didOpen", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & mainUri & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( mainText ) & "}}" )
+
+    '' 6. completion after `gadgets.`; 7. signature help inside `Spin( `; 8. definition of Spin.
+    s &= Req_( 6, "textDocument/completion", At_( mainUri, 3, 28 ) )
+    s &= Req_( 7, "textDocument/signatureHelp", At_( mainUri, 3, 34 ) )
+    s &= Req_( 8, "textDocument/definition", At_( mainUri, 3, 30 ) )
+
+    '' 10. tiko.toml changed on disk: with a compiler, a new scan -- metadata and all --
+    ''     which tiko/metadata then waits for.
+    s &= Note_( "workspace/didChangeWatchedFiles", "{" & Q & "changes" & Q & ":[{" & Q & "uri" & Q & ":" & _
+                Q & PathToUri( wsRoot & "\tiko.toml" ) & Q & "," & Q & "type" & Q & ":2}]}" )
+    s &= Req_( 10, "tiko/metadata", td & mainUri & Q & "}}" )
+
+    s &= Req_( 9, "shutdown", "null" )
+    s &= Note_( "exit", "null" )
+    return s
+end function
+
+private function WriteMetaSession( byref path as string, byref wsRoot as string, _
+                                   byref compiler as string ) as long
+    dim as long f = freefile( )
+    if( open( path for binary access write as #f ) <> 0 ) then
+        print "session_tool: cannot write " & path
+        return 1
+    end if
+    dim as string bytes_ = MetaSessionBytes( wsRoot, compiler )
+    put #f, , bytes_
+    close #f
+    print "wrote " & len(bytes_) & " bytes to " & path
+    return 0
+end function
+
+private function CheckMetaSession( byref path as string, byval withCompiler as boolean ) as long
+    dim as string captured
+    if( ReadWholeFile( path, captured ) = false ) then
+        print "session_tool: cannot read " & path
+        return 1
+    end if
+
+    TestGroup( iif( withCompiler, "compiler metadata, over the wire", _
+                                  "compiler metadata, over the wire -- the control, with no compiler" ) )
+
+    dim as MessageFramer f
+    dim messages as FB.Array( of string )
+    f.Feed( captured )
+    do
+        dim as string payload
+        dim as FrameStatus st = f.NextMessage( payload )
+        if( st = FRAME_ERROR ) then
+            TestFail( "the server's output is well framed", f.ErrorText( ) )
+            exit do
+        end if
+        if( st = FRAME_NEED_MORE ) then exit do
+        messages.Push( payload )
+    loop
+    AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary -- the compiler wrote nothing into it" )
+
+    for id as long = 1 to 10
+        if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
+    next
+
+    dim as boolean restarted = false
+    for i as long = 0 to messages.Count( ) - 1
+        dim as JsonDoc d
+        if( d.Parse( messages[i] ) = false ) then continue for
+        if( d.Root( ).Member( "method" ).AsString( ) <> "$/logTrace" ) then continue for
+        if( d.Root( ).Member( "params" ).Member( "message" ).AsString( ) = "didChangeWatchedFiles (manifest)" ) then restarted = true
+    next
+
+    dim as string spinLabels = ""
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 6 ) )
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            spinLabels &= " " & lcase( it.Member( "label" ).AsString( ) ) & " "
+        next
+    end scope
+
+    if( withCompiler = false ) then
+        scope
+            dim as JsonDoc d
+            d.Parse( ResponseFor_( messages, 3 ) )
+            AssertTrue( d.Root( ).Member( "result" ).IsNull( ), "tiko/metadata is null with no compiler" )
+        end scope
+        AssertFalse( instr( spinLabels, " spin " ) > 0, _
+                     "and `gadgets.` offers nothing: the import is not found without the compiler" )
+        AssertFalse( restarted, "a changed tiko.toml does not restart the scan without a compiler" )
+        return TestSummary( "compiler-metadata control session" )
+    end if
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 3 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue( r.IsObject( ), "tiko/metadata for main.tiko answers" )
+        AssertContains( lcase( r.Member( "manifest" ).AsString( ) ), "/meta/ws/tiko.toml", "with the package's manifest" )
+        dim as JsonValue t = r.Member( "metadata" ).Member( "targets" ).Item( 0 )
+        AssertEqStr( t.Member( "name" ).AsString( ), "app", "its target" )
+        AssertEqStr( t.Member( "main" ).AsString( ), "src/main.tiko", "the target's main" )
+        AssertEqStr( t.Member( "defines" ).Item( 0 ).AsString( ), "GREETING=1", "and its defines" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 4 ) )
+        AssertTrue( d.Root( ).Member( "result" ).Member( "metadata" ).IsObject( ), _
+                    "tiko/metadata with no document: the first package" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 5 ) )
+        AssertTrue( d.Root( ).Member( "result" ).IsNull( ), "tiko/metadata for a file in no package: null" )
+    end scope
+
+    AssertContains( spinLabels, " spin ", "`gadgets.` offers Spin: the import resolved through the compiler's -i" )
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 7 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue( r.IsObject( ), "signature help inside gadgets.Spin(" )
+        AssertContains( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                        "byval turns as long", "with the module's parameter list" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 8 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        dim as string u = r.Member( "uri" ).AsString( "" )
+        if( r.IsArray( ) ) then u = r.Item( 0 ).Member( "uri" ).AsString( "" )
+        AssertContains( lcase( u ), "/meta/lib/gadgets/gadgets.tiko", "definition of Spin: the module outside the workspace" )
+    end scope
+
+    AssertTrue( restarted, "a changed tiko.toml restarts the scan" )
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 10 ) )
+        AssertEqStr( d.Root( ).Member( "result" ).Member( "metadata" ).Member( "targets" ).Item( 0 ).Member( "main" ).AsString( ), _
+                     "src/main.tiko", "and tiko/metadata answers from the re-read metadata" )
+    end scope
+
+    return TestSummary( "compiler-metadata session" )
+end function
+
 '' ----------------------------------------------------------------------------
 ''  Entry point
 '' ----------------------------------------------------------------------------
@@ -1506,6 +1703,19 @@ select case lcase( mode_ )
 
     case "--check-inc"
         end CheckIncSession( path_ )
+
+    case "--write-meta"
+        if( len(root_) = 0 ) then
+            print "session_tool --write-meta needs the workspace root and the compiler (or an empty one)"
+            end 2
+        end if
+        end WriteMetaSession( path_, root_, command( 4 ) )
+
+    case "--check-meta"
+        end CheckMetaSession( path_, true )
+
+    case "--check-meta-off"
+        end CheckMetaSession( path_, false )
 
     case else
         print "usage: session_tool --write <file> <workspace-root> | --check <file>"

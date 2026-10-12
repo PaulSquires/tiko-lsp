@@ -96,6 +96,11 @@
           "default": [],
           "markdownDescription": "Where `#import \"std/strings\"` is found -- the toolchain's `pkg`. Usually unnecessary: the `pkg` beside an include path is found on its own. Sent as `initializationOptions.packagePaths`."
         },
+        "tiko.compilerPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "A `tiko` the server may ASK about each workspace folder's `tiko.toml` (`tiko metadata`): imports then resolve where the compiler resolves them, `-i` options included, and the `tiko/metadata` request returns the package's targets. Never run for diagnostics. Empty: the server resolves on its own. Sent as `initializationOptions.compilerPath`."
+        },
         "tiko.trace.server": {
           "type": "string",
           "enum": [

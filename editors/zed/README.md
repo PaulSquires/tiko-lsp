@@ -77,6 +77,11 @@ reports `toolchain headers from ...`. The headers are read on the server's
 worker thread, so the server starts as fast as before; Win32 names appear a
 couple of seconds later.
 
+`"compilerPath": "C:/dev/tiko-editor-tiko/toolchains/tiko-windows/tiko.exe"` lets the
+server ask the compiler (`tiko metadata`) where each workspace folder's package
+resolves its imports -- `-i` options included -- and answer `tiko/metadata`; see the
+top-level README. Never run for diagnostics.
+
 ## What works
 
 Verified by running Zed **1.16.1** against this extension with a real

@@ -40,6 +40,11 @@ local defaults = {
   -- The toolchain's pkg (what `#import "std/strings"` names). Usually
   -- unnecessary: the pkg beside an include path is found on its own.
   package_paths = {},
+  -- A tiko the server may ASK about each workspace folder's tiko.toml
+  -- (`tiko metadata`): imports resolve where the compiler resolves them, and
+  -- the tiko/metadata request returns the targets. Never run for diagnostics.
+  -- Sent as initializationOptions.compilerPath.
+  compiler_path = nil,
   -- What marks a project's root -- the workspace folder the server scans.
   root_markers = { 'tiko.toml', '.git' },
   -- Also claim the legacy FreeBASIC extensions .bas/.bi/.inc for tiko. Set to
@@ -92,6 +97,7 @@ local function init_options()
   local opts = {}
   if #M.config.include_paths > 0 then opts.includePaths = M.config.include_paths end
   if #M.config.package_paths > 0 then opts.packagePaths = M.config.package_paths end
+  if M.config.compiler_path then opts.compilerPath = M.config.compiler_path end
   return opts
 end
 

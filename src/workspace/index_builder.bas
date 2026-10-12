@@ -3,6 +3,7 @@
 '' ############################################################################
 
 #include once "index_builder.bi"
+#include once "metadata.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -78,6 +79,10 @@ end sub
 '' ----------------------------------------------------------------------------
 private sub IndexBuildWorker( byval param as any ptr )
     dim as double started = timer( )
+
+    '' What the configured compiler says (metadata.bi) is asked for FIRST: the scan's
+    '' import resolution reads it. Nothing happens when no compiler is configured.
+    LoadMetadata( g_idxRoots )
 
     dim as SymbolIndex ptr idx = new SymbolIndex
     idx->SetSearchPaths( g_idxSearch )

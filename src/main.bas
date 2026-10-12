@@ -35,6 +35,7 @@
 #include once "handlers/formatting.bi"
 #include once "handlers/code_action.bi"
 #include once "handlers/watched_files.bi"
+#include once "handlers/tiko_metadata.bi"
 #include once "workspace/index_builder.bi"
 
 using FB
@@ -143,6 +144,7 @@ private function RunServer( ) as long
     RegisterFormattingHandlers( )
     RegisterCodeActionHandlers( )
     RegisterWatchedFilesHandlers( )
+    RegisterTikoMetadataHandlers( )
     LogDebug( RegisteredCount( ) & " methods registered" )
 
     dim as string payload

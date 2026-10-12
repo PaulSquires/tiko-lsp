@@ -408,6 +408,11 @@ function JsonBuilder.NewObject( ) as JsonNode
     return JsonNode( yyjson_mut_obj( this.m_doc ) )
 end function
 
+function JsonBuilder.CopyOf( byval v as JsonValue ) as JsonNode
+    if( this.m_doc = NULL orelse v.Handle( ) = NULL ) then return JsonNode( )
+    return JsonNode( yyjson_val_mut_copy( this.m_doc, v.Handle( ) ) )
+end function
+
 function JsonBuilder.NewArray( ) as JsonNode
     if( this.m_doc = NULL ) then return JsonNode( )
     return JsonNode( yyjson_mut_arr( this.m_doc ) )

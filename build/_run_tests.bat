@@ -88,9 +88,12 @@ echo [8/13] completion tests
 "%ROOT%\bin\test_completion.exe" || set FAILED=1
 
 echo [9/13] workspace tests
+rem tests\fake_tiko stands in for `tiko metadata`, here and in the metadata session.
+"%FBC%" -w all "%ROOT%\tests\fake_tiko.bas" -x "%ROOT%\bin\fake_tiko.exe" || exit /b 1
 "%FBC%" -w all -mt %INC% "%ROOT%\tests\test_workspace.bas" ^
     "%ROOT%\src\workspace\workspace.bas" "%ROOT%\src\workspace\symbol_index.bas" "%ROOT%\src\workspace\modules.bas" "%ROOT%\src\analysis\includes.bas" ^
-    "%ROOT%\src\workspace\index_builder.bas" ^
+    "%ROOT%\src\workspace\index_builder.bas" "%ROOT%\src\workspace\metadata.bas" ^
+    "%ROOT%\src\utils\process.bas" "%ROOT%\src\json\json.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
     "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\diagnostics.bas" ^
     "%ROOT%\src\utils\position.bas" "%ROOT%\src\utils\uri.bas" "%ROOT%\src\utils\logging.bas" ^
@@ -152,6 +155,16 @@ rem reach a stand-in toolchain inc through initializationOptions.includePaths.
 "%ROOT%\bin\session_tool.exe" --write-inc "%ROOT%\bin\session-inc.bin" "%ROOT%\tests\fixtures\incws" "%ROOT%\tests\fixtures\toolinc" || exit /b 1
 "%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-inc.bin" > "%ROOT%\bin\captured-inc.bin" 2>"%ROOT%\bin\server-inc.log"
 "%ROOT%\bin\session_tool.exe" --check-inc "%ROOT%\bin\captured-inc.bin" || set FAILED=1
+
+rem The compiler-metadata session: tests\fixtures\meta\ws, whose one import is found only
+rem through `tiko metadata` -- here tests\fake_tiko -- and then the same session with no
+rem compiler, which must not find it.
+"%ROOT%\bin\session_tool.exe" --write-meta "%ROOT%\bin\session-meta.bin" "%ROOT%\tests\fixtures\meta\ws" "%ROOT%\bin\fake_tiko.exe" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-meta.bin" > "%ROOT%\bin\captured-meta.bin" 2>"%ROOT%\bin\server-meta.log"
+"%ROOT%\bin\session_tool.exe" --check-meta "%ROOT%\bin\captured-meta.bin" || set FAILED=1
+"%ROOT%\bin\session_tool.exe" --write-meta "%ROOT%\bin\session-meta-off.bin" "%ROOT%\tests\fixtures\meta\ws" "" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-meta-off.bin" > "%ROOT%\bin\captured-meta-off.bin" 2>"%ROOT%\bin\server-meta-off.log"
+"%ROOT%\bin\session_tool.exe" --check-meta-off "%ROOT%\bin\captured-meta-off.bin" || set FAILED=1
 
 echo.
 if "!FAILED!"=="0" (

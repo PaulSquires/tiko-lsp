@@ -57,6 +57,12 @@ const LSP_REGISTER_CAPABILITY = "client/registerCapability"
 '' The glob the server asks to be watched, and the kind bits: 1 create,
 '' 2 change, 4 delete -- all three.
 const LSP_WATCH_GLOB = "**/*.{tiko,tko,ti,bas,bi,inc}"
+'' ...and the manifests, which change what an import resolves to (workspace/metadata.bi).
+const LSP_WATCH_MANIFEST_GLOB = "**/tiko.toml"
+
+'' This server's own request: what the configured compiler said about a file's package
+'' (handlers/tiko_metadata.bi).
+const LSP_TIKO_METADATA = "tiko/metadata"
 const LSP_WATCH_KIND = 7
 
 '' Editing features (phase 7).

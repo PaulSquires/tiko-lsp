@@ -168,6 +168,9 @@ type JsonBuilder
         declare function NewDouble( byval v as double  ) as JsonNode
         declare function NewBool  ( byval v as boolean ) as JsonNode
         declare function NewNull  ( ) as JsonNode
+        '' A DEEP COPY of a parsed value into this document -- what a reply that passes
+        '' another program's JSON through needs, since the parsed document dies first.
+        declare function CopyOf   ( byval v as JsonValue ) as JsonNode
 
         '' -- object writers --------------------------------------------------
         declare function SetStr   ( byval obj as JsonNode, byref key as string, byref v as string  ) as boolean
