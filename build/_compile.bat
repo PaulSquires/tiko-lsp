@@ -51,6 +51,7 @@ set SOURCES=^
  "%ROOT%\src\handlers\formatting.bas"^
  "%ROOT%\src\handlers\code_action.bas"^
  "%ROOT%\src\handlers\watched_files.bas"^
+ "%ROOT%\src\handlers\tiko_metadata.bas"^
  "%ROOT%\src\document\document.bas"^
  "%ROOT%\src\document\document_manager.bas"^
  "%ROOT%\src\analysis\lexer.bas"^
@@ -65,6 +66,8 @@ set SOURCES=^
  "%ROOT%\src\workspace\symbol_index.bas"^
  "%ROOT%\src\workspace\modules.bas"^
  "%ROOT%\src\workspace\index_builder.bas"^
+ "%ROOT%\src\workspace\metadata.bas"^
+ "%ROOT%\src\utils\process.bas"^
  "%ROOT%\src\analysis\diagnostics.bas"^
  "%ROOT%\src\utils\logging.bas"^
  "%ROOT%\src\utils\position.bas"^

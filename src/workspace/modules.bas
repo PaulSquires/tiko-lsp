@@ -3,6 +3,7 @@
 '' ############################################################################
 
 #include once "modules.bi"
+#include once "metadata.bi"
 #include once "fb/filesystem.bi"
 
 private function DirPart( byref path_ as string ) as string
@@ -88,8 +89,7 @@ private sub ReadManifest( byref dir_ as string, byref name_ as string, _
     wend
 end sub
 
-'' The nearest directory at or above `dir_` holding a tiko.toml, or "".
-private function ManifestDirAbove( byref dir_ as string ) as string
+function ManifestDirAbove( byref dir_ as string ) as string
     dim as string d = dir_
     for guard as long = 0 to 64
         if( len(d) = 0 ) then exit for
@@ -117,6 +117,10 @@ function ToolchainPkgDir( ) as string
     for i as long = 0 to g_configuredPackageDirs.Count( ) - 1
         if( FB.IsDir( g_configuredPackageDirs[i] ) ) then return g_configuredPackageDirs[i]
     next
+
+    '' The one the configured compiler named (metadata.bi): not a guess.
+    dim as string mp = MetadataPkgDir( )
+    if( len(mp) > 0 andalso FB.IsDir( mp ) ) then return mp
 
     '' <toolchain>/inc was named, so <toolchain>/pkg is the package tree -- the layout
     '' every packaged toolchain has. Without this a client that configured includePaths
@@ -192,6 +196,13 @@ function ToolchainIncDirs( ) as PathArray
         if( FB.IsDir( g_configuredIncludeDirs[i] ) ) then out_.Push( g_configuredIncludeDirs[i] )
     next
     if( out_.IsEmpty( ) ) then
+        '' What the configured compiler compiles the workspace's roots with (metadata.bi).
+        dim md as PathArray = MetadataIncludeDirs( )
+        for i as long = 0 to md.Count( ) - 1
+            if( FB.IsDir( md[i] ) ) then out_.Push( md[i] )
+        next
+    end if
+    if( out_.IsEmpty( ) ) then
         dim as string d = ToolchainIncDir( )
         if( len(d) > 0 ) then out_.Push( d )
     end if
@@ -211,6 +222,11 @@ sub ModuleCandidates( byref importerPath as string, byref importPath as string, 
         exit sub
     end if
 
+    '' 0. where the configured compiler found it (metadata.bi), when it was asked and
+    '' a target of this file's package reaches the module.
+    dim as string known = MetadataModuleDir( importerPath, p )
+    if( len(known) > 0 ) then outDirs.Push( known )
+
     dim as long sl = instr( p, "/" )
     dim as string first_ = lcase( iif( sl = 0, p, left( p, sl - 1 ) ) )
     dim as string rest = iif( sl = 0, "", mid( p, sl + 1 ) )
@@ -229,7 +245,13 @@ sub ModuleCandidates( byref importerPath as string, byref importPath as string, 
             next
         end if
 
-        '' 4. the workspace folders.
+        '' 4. the -i roots the compiler searched, when it said; then the workspace
+        '' folders, which stand in for them.
+        dim ir as PathArray
+        MetadataSearchRoots( importerPath, ir )
+        for i as long = 0 to ir.Count( ) - 1
+            outDirs.Push( JoinNative( ir[i], p ) )
+        next
         for i as long = 0 to roots.Count( ) - 1
             outDirs.Push( JoinNative( roots[i], p ) )
         next

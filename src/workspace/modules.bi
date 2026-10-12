@@ -17,6 +17,11 @@
 ''
 ''  `std` skips 2-4: it is always the toolchain's.
 ''
+''  WHEN A COMPILER IS CONFIGURED (metadata.bi) its answer comes FIRST: the
+''  directory it resolved the chain to, ahead of 2; the -i roots it really
+''  searched, ahead of the workspace folders in 4; and its pkg/ in 5. Everything
+''  above stays, behind it, as the fallback.
+''
 ''  The answer is a list of CANDIDATES, in that order. Which of them holds the
 ''  module is the index's question -- it knows which files it has.
 '' ----------------------------------------------------------------------------
@@ -30,9 +35,12 @@
 declare sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
                               byref roots as PathArray, byref outDirs as PathArray )
 
+'' The nearest directory at or above `dir_` holding a tiko.toml, or "".
+declare function ManifestDirAbove( byref dir_ as string ) as string
+
 '' The toolchain's package tree, or "" when none can be found. First choice first: what the
 '' client configured (initializationOptions.packagePaths -- SetConfiguredPackageDirs), then
-'' a `pkg` BESIDE a configured include directory (a packaged toolchain is <dir>/inc and
+'' the configured compiler's own (metadata.bi), then a `pkg` BESIDE a configured include directory (a packaged toolchain is <dir>/inc and
 '' <dir>/pkg, so naming the one finds the other), then TKO_PKG, then beside a `tiko` on PATH.
 declare function ToolchainPkgDir( ) as string
 
@@ -47,7 +55,8 @@ declare function ToolchainIncDir( ) as string
 
 '' THE DIRECTORIES A WORKSPACE'S INCLUDES ARE LOOKED UP IN after the includer's own
 '' directory and the workspace folders, first choice first: what the client configured
-'' (initializationOptions.includePaths -- SetConfiguredIncludeDirs), else ToolchainIncDir.
+'' (initializationOptions.includePaths -- SetConfiguredIncludeDirs), else the configured
+'' compiler's (metadata.bi), else ToolchainIncDir.
 '' Empty when there is neither. Only directories that exist are returned.
 declare function ToolchainIncDirs( ) as PathArray
 

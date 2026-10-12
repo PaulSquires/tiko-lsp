@@ -1,0 +1,12 @@
+# A package whose one import is found ONLY through the compiler's answer: gadgets lives in
+# ../lib, outside the workspace folder, reached by the target's -i option. tiko-lsp never
+# reads -i from here; tests/fake_tiko prints ws/tiko-metadata.json as `tiko metadata` would.
+[package]
+name = "mw"
+
+[target.app]
+main = "src/main.tiko"
+options = ["-i", "../lib"]
+
+[target.app.defines]
+GREETING = "1"

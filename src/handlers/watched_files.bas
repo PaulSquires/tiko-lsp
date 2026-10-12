@@ -8,6 +8,7 @@
 #include once "../workspace/index_builder.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
+#include once "../workspace/metadata.bi"
 #include once "fb/map.bi"
 
 '' FileChangeType, from the specification.
@@ -56,6 +57,11 @@ sub RequestFileWatching( byref srv as Server )
     dim as JsonNode watchers = rb.NewArray( )
     rb.PushNode( watchers, watcher )
 
+    dim as JsonNode manifests = rb.NewObject( )
+    rb.SetStr( manifests, "globPattern", LSP_WATCH_MANIFEST_GLOB )
+    rb.SetInt( manifests, "kind", LSP_WATCH_KIND )
+    rb.PushNode( watchers, manifests )
+
     dim as JsonNode options_ = rb.NewObject( )
     rb.SetNode( options_, "watchers", watchers )
 
@@ -73,7 +79,8 @@ sub RequestFileWatching( byref srv as Server )
     rb.SetNode( params, "registrations", list_ )
 
     dim as string id = srv.SendRequest( LSP_REGISTER_CAPABILITY, rb, params )
-    LogInfo( "asked the client to watch " & LSP_WATCH_GLOB & " (request " & id & ")" )
+    LogInfo( "asked the client to watch " & LSP_WATCH_GLOB & " and " & LSP_WATCH_MANIFEST_GLOB & _
+             " (request " & id & ")" )
 end sub
 
 '' ----------------------------------------------------------------------------
@@ -83,6 +90,27 @@ private function OnDidChangeWatchedFiles( byref srv as Server, _
                                           byref req as RpcMessage, _
                                           byref rb as JsonBuilder, _
                                           byref err_ as RpcError ) as JsonNode
+
+    '' A CHANGED tiko.toml, WITH A COMPILER CONFIGURED, is a new scan: what the compiler says
+    '' (workspace/metadata.bi) is read ahead of every scan, and a manifest moves where every
+    '' import of its package resolves -- not one file, all of them. Started even over a scan
+    '' in flight, which may have read the manifest before it changed. Without a compiler,
+    '' a manifest is not a source file and falls through to be ignored, as it always was.
+    if( len( CompilerPath( ) ) > 0 ) then
+        for each mc in ArrayOf( req.Params( ).Member( "changes" ) )
+            dim as string mp = UriToPath( mc.Member( "uri" ).AsString( "" ) )
+            dim as long n = len(mp)
+            if( n < 9 ) then continue for
+            if( lcase( right( mp, 9 ) ) <> "tiko.toml" ) then continue for
+            dim as ubyte sep = iif( n = 9, asc( "/" ), mp[n - 10] )
+            if( sep <> asc( "/" ) andalso sep <> asc( "\" ) ) then continue for
+            LogInfo( "watched files: " & mp & " changed -- re-reading the compiler's metadata " & _
+                     "and the workspace" )
+            StartWorkspaceIndex( srv )
+            srv.SendTrace( "didChangeWatchedFiles (manifest)", "workspace scan restarted" )
+            return JsonNode( )
+        next
+    end if
 
     '' A SCAN IN FLIGHT ALREADY COVERS THIS. The worker reads each file as it
     '' reaches it, so whatever these notifications describe is what it will

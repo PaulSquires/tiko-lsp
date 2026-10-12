@@ -101,8 +101,10 @@ async function start(context) {
     const initializationOptions = {};
     const includePaths = cfg.get('includePaths', []);
     const packagePaths = cfg.get('packagePaths', []);
+    const compilerPath = cfg.get('compilerPath', '');
     if (includePaths.length > 0) initializationOptions.includePaths = includePaths;
     if (packagePaths.length > 0) initializationOptions.packagePaths = packagePaths;
+    if (compilerPath) initializationOptions.compilerPath = compilerPath;
 
     // stdio, with the arguments exactly as configured. No `transport` field:
     // the client library would append its own `--stdio` to the command line.
@@ -157,7 +159,7 @@ async function activate(context) {
         // initializationOptions are read once, at `initialize`: a change to
         // anything the server is started with needs a restart to take effect.
         vscode.workspace.onDidChangeConfiguration((e) => {
-            const affected = ['tiko.server.path', 'tiko.server.arguments', 'tiko.includePaths', 'tiko.packagePaths']
+            const affected = ['tiko.server.path', 'tiko.server.arguments', 'tiko.includePaths', 'tiko.packagePaths', 'tiko.compilerPath']
                 .some((key) => e.affectsConfiguration(key));
             if (!affected) return;
             vscode.window

@@ -1,0 +1,77 @@
+'' ############################################################################
+''  workspace/metadata.bi -- what the compiler says about a package
+''
+''  tiko-lang's `tiko metadata` (its tiko-build RFC-0001 §8.2) prints, for one
+''  tiko.toml, every target with its `main`, roots and defines, the module graph
+''  of those roots with the directory each module chain was found in, and the
+''  search paths the compiler used -- the -i roots a target's options add, the
+''  toolchain's pkg/, and each root's include directories. The server's own
+''  resolver (modules.bi) can only guess the -i roots, and cannot know a target
+''  at all.
+''
+''  WHEN IT IS ASKED. Only when the client named a compiler
+''  (`initializationOptions.compilerPath`): on the index worker, before every
+''  whole-workspace scan -- the one `initialized` starts, and the one a changed
+''  tiko.toml starts. NEVER FOR DIAGNOSTICS: those stay the server's own, typed
+''  as fast as the user types.
+''
+''  WHICH MANIFESTS. For each workspace folder, the tiko.toml at or above it. A
+''  package nested deeper in a folder is resolved by modules.bi alone.
+''
+''  THE FALLBACK IS ALWAYS THERE. No compiler, a compiler that fails, a module
+''  no target reaches: modules.bi resolves as it did before. What this adds goes
+''  FIRST in its candidate lists, never instead of them.
+''
+''  THREADS. The worker writes, every thread reads, so the store is behind a
+''  mutex and every query returns a copy.
+'' ############################################################################
+
+#pragma once
+
+#include once "workspace.bi"
+
+'' The compiler `tiko metadata` is run with, from `initialize`. "" (the default)
+'' turns all of this off.
+declare sub SetCompilerPath( byref path_ as string )
+declare function CompilerPath( ) as string
+
+'' Runs `tiko metadata` for the manifest at or above each of `roots` and REPLACES
+'' everything known with what it says. Blocks for as long as the compiler takes
+'' (at most 30 seconds per manifest): call it from the index worker, never from
+'' the message loop. A no-op when no compiler is configured.
+declare sub LoadMetadata( byref roots as PathArray )
+
+'' Takes one `tiko metadata` answer for the manifest in `manifestDir` (native,
+'' absolute), ADDING it to what is known. Relative paths in it are read against
+'' `manifestDir` -- the directory LoadMetadata runs the compiler in. False when
+'' `jsonText` is not a metadata object. LoadMetadata's half that needs no process,
+'' and what the tests drive.
+declare function AcceptMetadata( byref manifestDir as string, byref jsonText as string ) as boolean
+
+'' Forgets everything known.
+declare sub ClearMetadata( )
+
+'' THE MODULE DIRECTORY the compiler resolved `importPath` to, for a file at
+'' `importerPath` -- matched by chain (`acme/net/http` is `acme.net.http`) in the
+'' graph of the manifest that file belongs to. "" when it is not known: a relative
+'' import, no metadata, or a module no target of that package reaches.
+declare function MetadataModuleDir( byref importerPath as string, byref importPath as string ) as string
+
+'' The -i roots the compiler searched for the manifest `importerPath` belongs to,
+'' native and absolute; empty when not known.
+declare sub MetadataSearchRoots( byref importerPath as string, byref outDirs as PathArray )
+
+'' The toolchain's package tree the compiler named, "" when not known.
+declare function MetadataPkgDir( ) as string
+
+'' Every include directory any root of any known manifest is compiled with, first
+'' seen first, without repeats.
+declare function MetadataIncludeDirs( ) as PathArray
+
+'' How many manifests are known.
+declare function MetadataManifestCount( ) as long
+
+'' The manifest `path_` belongs to -- its directory and the compiler's answer as
+'' it printed it. With `path_` = "", the first one known. False when none is.
+declare function MetadataFor( byref path_ as string, byref manifestDir as string, _
+                              byref jsonText as string ) as boolean

@@ -1,0 +1,23 @@
+'' ############################################################################
+''  handlers/tiko_metadata.bi -- `tiko/metadata`, a request of this server's own
+''
+''  What the configured compiler said about the package a file belongs to
+''  (workspace/metadata.bi): its targets, each target's `main`, roots and
+''  defines, its profiles and outputs. An editor's task runner or build menu
+''  reads it instead of parsing tiko.toml itself.
+''
+''      params:  { "textDocument": { "uri": ... } }   -- optional; without it,
+''                                                       the first package known
+''      result:  { "manifest": <tiko.toml's URI>,
+''                 "metadata": <tiko metadata's object, as tiko printed it> }
+''               or null -- no compiler configured, or no package known there
+''
+''  Paths inside `metadata` are as tiko printed them: relative ones are
+''  relative to the manifest's directory, where the server ran it.
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.bi"
+
+declare sub RegisterTikoMetadataHandlers( )

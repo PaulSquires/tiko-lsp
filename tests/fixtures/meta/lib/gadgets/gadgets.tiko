@@ -1,0 +1,7 @@
+' A module outside the workspace folder tests/fixtures/meta/ws, found only through the
+' -i root and the module directory tiko metadata reports. Read by tests/session_tool.bas.
+#module "gadgets"
+
+public function Spin( byval turns as long ) as long
+    return turns + 1
+end function

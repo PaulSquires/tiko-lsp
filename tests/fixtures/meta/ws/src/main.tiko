@@ -1,0 +1,5 @@
+#import "gadgets"
+
+sub UseGadgets( )
+    dim as long n = gadgets.Spin( 1 )
+end sub

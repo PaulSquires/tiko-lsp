@@ -269,6 +269,28 @@ references, and kept out of `workspace/symbol`. Measured on tracks (122 files): 
 headers, 192,697 symbols, a 2.0 s full build on the worker thread; completion then costs
 ~57 ms a keystroke instead of ~6.
 
+### Asking the compiler -- `compilerPath`
+
+```json
+"initializationOptions": { "compilerPath": "C:/dev/tiko-editor-tiko/toolchains/tiko-windows/tiko.exe" }
+```
+
+With a compiler named, the server runs `tiko metadata --manifest . --format json` in the
+directory of each workspace folder's `tiko.toml` (the one at or above the folder) before
+every full workspace build -- the first, and the one a changed `tiko.toml` starts. What it
+says comes FIRST in resolution: the directory the compiler resolved each module chain to,
+the `-i` roots a target's options add (ahead of the workspace folders that otherwise stand
+in for them), its `pkg`, and each root's include directories when `includePaths` is not
+set. The server's own resolver stays behind it as the fallback -- no compiler, a compiler
+that fails, a module no target reaches. It is **never run for diagnostics**, and its output
+never reaches stdout: both of its streams are pipes the server reads.
+
+The request `tiko/metadata` (`{"textDocument":{"uri":...}}`, or no document for the first
+package) answers `{"manifest": <tiko.toml URI>, "metadata": <tiko metadata's object>}` --
+targets, each one's `main`, roots and defines, profiles and outputs, with paths relative to
+the manifest's directory -- or `null`. A task runner or build menu reads it instead of
+parsing `tiko.toml`.
+
 Not handled: `#if` is not evaluated, so `MessageBoxA` and `MessageBoxW` are both
 offered, and `MessageBox` -- a `#define` -- gets no signature. A header a buffer starts
 including is read at the next full build, not as it is typed.
