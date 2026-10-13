@@ -95,3 +95,8 @@
 ((identifier) @type
   (#match? @type
    "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64)$"))
+; tiko-lang's predeclared constant, `const nullptr as any ptr = 0`: a
+; constant, as an enum member is. Not a keyword, so matched here like the
+; type names above.
+((identifier) @constant
+  (#match? @constant "^(?i)(nullptr)$"))

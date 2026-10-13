@@ -478,6 +478,13 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
                  "", CMPGROUP_KEYWORD )
     next
 
+    ''    ...and its predeclared constant, nullptr, on the same terms.
+    dim consts as FB.Array( of string ) = AllBuiltinConstants( )
+    for i as long = 0 to consts.Count( ) - 1
+        AddItem( items, consts[i], CMP_CONSTANT, BuiltinConstantDecl( consts[i] ), _
+                 "", CMPGROUP_KEYWORD )
+    next
+
     '' 4. the language. Last, because a reserved word is almost never what the
     ''    user is reaching for, and there are 247 of them.
     dim words as FB.Array( of string ) = AllKeywords( )

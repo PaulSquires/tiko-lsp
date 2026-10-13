@@ -241,3 +241,19 @@ function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as Tok
     return "```tiko" & chr(10) & "type " & lcase(word_) & " as " & target & chr(10) & "```" & _
            chr(10) & chr(10) & "*built-in type, " & BuiltinTypedefBytes( target ) & " bytes*"
 end function
+
+function BuiltinConstantHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
+                                       byval offset as long ) as string
+    dim as long tokIdx = TokenIndexAt( tokens, offset )
+    if( tokIdx < 0 ) then return ""
+
+    dim as Token tok = tokens[tokIdx]
+    if( tok.Kind <> TK_IDENT ) then return ""
+    if( IsMemberAccess( text_, tokens, tokIdx ) ) then return ""
+
+    dim as string decl = BuiltinConstantDecl( TokenText( text_, tok ) )
+    if( len(decl) = 0 ) then return ""
+
+    return "```tiko" & chr(10) & decl & chr(10) & "```" & chr(10) & chr(10) & _
+           "*built-in constant: the null pointer, which converts to every pointer type*"
+end function

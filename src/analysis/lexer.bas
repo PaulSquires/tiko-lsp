@@ -187,6 +187,30 @@ function AllBuiltinTypedefs( ) as FB.Array( of string )
     return out_
 end function
 
+'' ############################################################################
+''  tiko-lang's predeclared CONSTANTS -- today one, `nullptr`
+''
+''  The prelude declares `const nullptr as any ptr = 0` beside the typedefs
+''  above (tiko-lang 9ecc7d20, docs/tiko-nullptr RFC), and it is not a keyword
+''  for the same reason they are not: a program's own declaration of the name
+''  replaces it -- fbc's own virtual/fbrtti.bi has a field called nullptr. So
+''  the lexer leaves it an identifier, and only a name the file does not
+''  declare itself means the built-in.
+'' ############################################################################
+
+function BuiltinConstantDecl( byref word_ as string ) as string
+    select case lcase(word_)
+        case "nullptr" : return "const nullptr as any ptr = 0"
+    end select
+    return ""
+end function
+
+function AllBuiltinConstants( ) as FB.Array( of string )
+    dim out_ as FB.Array( of string )
+    out_.Push( "nullptr" )
+    return out_
+end function
+
 '' The preprocessor directives that open or close a block; every other
 '' directive is KW_PP_OTHER and the parser ignores the rest of its line.
 private function PpKeywordOf( byref word_ as string ) as FbKeyword

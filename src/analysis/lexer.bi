@@ -139,3 +139,11 @@ declare function BuiltinTypedefTarget( byref word_ as string ) as string
 
 '' The ten names, lower-cased, narrowest first.
 declare function AllBuiltinTypedefs( ) as FB.Array( of string )
+
+'' tiko-lang's predeclared constants -- nullptr, an `any ptr`. NOT keywords
+'' either: they lex as identifiers. Returns the declaration tiko-lang's prelude
+'' makes ("const nullptr as any ptr = 0"), or "" when the word is not one.
+declare function BuiltinConstantDecl( byref word_ as string ) as string
+
+'' The names, lower-cased.
+declare function AllBuiltinConstants( ) as FB.Array( of string )

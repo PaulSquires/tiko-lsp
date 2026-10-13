@@ -55,6 +55,7 @@ syn match   tikoNumber "&b[01]\+[ul]*"
 syn match   tikoNumber "&o\=\o\+[ul]*"
 syn match   tikoNumber "\<\d\+\(\.\d*\)\=\(e[+-]\=\d\+\)\=[!#%&ful]*"
 syn keyword tikoBoolean true false
+syn keyword tikoNull nullptr
 
 " Preprocessor directives, and the path an #include or #import names.
 syn match   tikoPreProc "^\s*#\s*\a\+"
@@ -78,6 +79,7 @@ hi def link tikoString        String
 hi def link tikoEscape        SpecialChar
 hi def link tikoNumber        Number
 hi def link tikoBoolean       Boolean
+hi def link tikoNull          Constant
 hi def link tikoPreProc       PreProc
 hi def link tikoInclude       Include
 hi def link tikoPreProcWord   PreProc

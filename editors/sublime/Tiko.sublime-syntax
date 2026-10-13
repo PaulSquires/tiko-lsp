@@ -87,6 +87,8 @@ contexts:
       scope: constant.numeric.decimal.tiko
     - match: '(?i)\b(true|false)\b'
       scope: constant.language.boolean.tiko
+    - match: '(?i)(?<![\w.])(nullptr)(?![\w$%&!#])'
+      scope: constant.language.null.tiko
 
   declarations:
     - match: '(?i)\b(sub|function|property|constructor|destructor|operator)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)'

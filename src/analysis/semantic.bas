@@ -146,8 +146,15 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                         dim as boolean builtinType = _
                             len( BuiltinTypedefTarget( TokenText( text_, tok ) ) ) > 0
                         if( builtinType ) then builtinType = ( IsMemberAccess( text_, tokens, i ) = false )
+                        '' ...and its predeclared constant, nullptr: coloured as a
+                        '' file-level CONST is, readonly and static.
+                        dim as boolean builtinConst = _
+                            len( BuiltinConstantDecl( TokenText( text_, tok ) ) ) > 0
+                        if( builtinConst ) then builtinConst = ( IsMemberAccess( text_, tokens, i ) = false )
                         if( builtinType ) then
                             packed = SEMTYPE_TYPE * 16
+                        elseif( builtinConst ) then
+                            packed = PackClass( SEMTYPE_VARIABLE, SEMMOD_READONLY or SEMMOD_STATIC )
                         else
                             '' An identifier this file never declares: a name
                             '' from an #include, or one being typed. The

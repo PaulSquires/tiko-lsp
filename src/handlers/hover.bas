@@ -240,6 +240,9 @@ private function OnHover( byref srv as Server, _
         if( len(markdown) = 0 ) then
             markdown = BuiltinTypedefHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
         end if
+        if( len(markdown) = 0 ) then
+            markdown = BuiltinConstantHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
+        end if
     end if
 
     '' A null result is the correct answer for "nothing to say here", and is

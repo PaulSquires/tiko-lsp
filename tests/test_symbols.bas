@@ -414,6 +414,31 @@ scope
                 "a file's own float64 resolves, so it is hovered as the file's" )
 end scope
 
+scope
+    '' tiko-lang's predeclared nullptr: asked only when a name did not resolve.
+    Analyse( "dim as long ptr p = nullptr" & LF & _
+             "if p = NULLPTR then p = 0" & LF & _
+             "print rec.nullptr" )
+
+    dim as string h = BuiltinConstantHoverMarkdown( g_Src, g_Tokens, ByteAt( "nullptr", 1 ) )
+    AssertContains( h, "```tiko", "nullptr hovers as a code block" )
+    AssertContains( h, "const nullptr as any ptr = 0", "showing the prelude's declaration" )
+    AssertContains( h, "null pointer", "and what it is" )
+
+    h = BuiltinConstantHoverMarkdown( g_Src, g_Tokens, ByteAt( "NULLPTR", 1 ) )
+    AssertContains( h, "const nullptr as any ptr = 0", "in any case" )
+
+    AssertEqStr( BuiltinConstantHoverMarkdown( g_Src, g_Tokens, ByteAt( "rec.nullptr", 5 ) ), "", _
+                 "never after a dot: rec.nullptr is a member" )
+    AssertEqStr( BuiltinConstantHoverMarkdown( g_Src, g_Tokens, ByteAt( "dim", 1 ) ), "", _
+                 "and a keyword is not one" )
+
+    '' A file's own nullptr resolves, so the handler hovers it as the file's.
+    Analyse( "dim shared as long nullptr" & LF & "print nullptr" )
+    AssertTrue( g_Syms.Resolve( "nullptr", ByteAt( "print" ) ) >= 0, _
+                "a file's own nullptr resolves, so it is hovered as the file's" )
+end scope
+
 '' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 

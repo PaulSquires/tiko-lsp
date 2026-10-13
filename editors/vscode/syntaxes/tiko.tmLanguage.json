@@ -132,6 +132,10 @@
         {
           "name": "constant.language.boolean.tiko",
           "match": "(?i)\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.null.tiko",
+          "match": "(?i)(?<![\\w.])(nullptr)(?![\\w$%&!#])"
         }
       ]
     },
