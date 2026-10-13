@@ -303,6 +303,32 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "the predeclared constant nullptr" )
+
+scope
+    Analyse( "sub Work( )" & LF & "    x" & LF & "end sub" )
+    CompleteAfter( "    x" )
+
+    AssertTrue ( Has( "nullptr" ), "tiko-lang's nullptr is offered" )
+    AssertEqInt( KindOf( "nullptr" ), CMP_CONSTANT, "as a constant" )
+    AssertEqStr( DetailOf( "nullptr" ), "const nullptr as any ptr = 0", "naming the prelude's declaration" )
+    AssertEqInt( GroupOf( "nullptr" ), CMPGROUP_KEYWORD, "ranked with the language" )
+end scope
+
+scope
+    '' A file's own nullptr has replaced tiko's: one candidate, the file's.
+    Analyse( "dim shared as long nullptr" & LF & "x" )
+    CompleteAfter( LF & "x" )
+
+    AssertEqInt( KindOf( "nullptr" ), CMP_VARIABLE, "a file's own nullptr wins" )
+    dim as long n = 0
+    for i as long = 0 to g_Items.Count( ) - 1
+        if( lcase( g_Items[i].Label ) = "nullptr" ) then n += 1
+    next
+    AssertEqInt( n, 1, "and is the only nullptr offered" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "no duplicates" )
 
 scope

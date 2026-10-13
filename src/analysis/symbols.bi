@@ -142,6 +142,9 @@ declare function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
 '' to resolve, so a file's own int32 wins, as it does in the compiler.
 declare function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
                                               byval offset as long ) as string
+'' ...and tiko-lang's predeclared constant, nullptr, on the same terms.
+declare function BuiltinConstantHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
+                                               byval offset as long ) as string
 
 '' The human name for a kind, used in hover text.
 declare function SymbolKindName( byval kind as SymbolKind ) as string

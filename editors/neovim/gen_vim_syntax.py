@@ -16,8 +16,10 @@ OUT = os.path.join(HERE, 'syntax', 'tiko.vim')
 
 hl = io.open(HL, encoding='utf-8').read()
 lists = re.findall(r'"\^\(\?i\)\(([^"]*)\)\$"', hl)
-assert len(lists) == 2, len(lists)
+assert len(lists) == 3, len(lists)
 reserved, builtin_types = lists[0].split('|'), lists[1].split('|')
+# The predeclared constants -- `nullptr` -- the third list, linked to Constant.
+constants = lists[2].split('|')
 
 structural = ('sub function property constructor destructor operator declare type union enum '
               'namespace extern scope with asm if then else elseif endif select case is for to '
@@ -82,6 +84,7 @@ w('syn match   tikoNumber "&b[01]\\+[ul]*"')
 w('syn match   tikoNumber "&o\\=\\o\\+[ul]*"')
 w('syn match   tikoNumber "\\<\\d\\+\\(\\.\\d*\\)\\=\\(e[+-]\\=\\d\\+\\)\\=[!#%&ful]*"')
 w('syn keyword tikoBoolean true false')
+w('syn keyword tikoNull ' + ' '.join(constants))
 w('')
 w('" Preprocessor directives, and the path an #include or #import names.')
 w('syn match   tikoPreProc "^\\s*#\\s*\\a\\+"')
@@ -96,7 +99,7 @@ for a, b in (('tikoControl', 'Conditional'), ('tikoModifier', 'StorageClass'), (
              ('tikoType', 'Type'), ('tikoOperatorWord', 'Operator'), ('tikoBuiltin', 'Function'),
              ('tikoTodo', 'Todo'), ('tikoComment', 'Comment'), ('tikoBlockComment', 'Comment'),
              ('tikoString', 'String'), ('tikoEscape', 'SpecialChar'), ('tikoNumber', 'Number'),
-             ('tikoBoolean', 'Boolean'), ('tikoPreProc', 'PreProc'), ('tikoInclude', 'Include'),
+             ('tikoBoolean', 'Boolean'), ('tikoNull', 'Constant'), ('tikoPreProc', 'PreProc'), ('tikoInclude', 'Include'),
              ('tikoPreProcWord', 'PreProc'), ('tikoFunctionName', 'Function'), ('tikoTypeName', 'Type')):
     w('hi def link {:<17} {}'.format(a, b))
 w('')

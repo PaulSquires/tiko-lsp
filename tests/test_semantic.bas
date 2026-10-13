@@ -251,6 +251,27 @@ private sub TestFixedWidthTypes( )
 end sub
 
 '' ############################################################################
+private sub TestBuiltinConstants( )
+    TestGroup( "the predeclared constant nullptr" )
+
+    ''         0         1         2         3
+    ''         0123456789012345678901234567890123
+    Analyse( "dim as long ptr p = nullptr" & LF & _    '' line 0
+             "if p = NULLPTR then p = 0" & LF & _      '' line 1
+             "print rec.nullptr" & LF )                '' line 2
+
+    AssertEqInt( TypeAt( 0, 20 ), SEMTYPE_VARIABLE, "nullptr is a variable though the file never declares it" )
+    AssertEqInt( ModsAt( 0, 20 ), SEMMOD_READONLY or SEMMOD_STATIC, "readonly and static, as a file-level const is" )
+    AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_VARIABLE, "in any case" )
+    AssertEqInt( TypeAt( 2, 10 ), -1, "never after a dot: rec.nullptr is a member" )
+
+    Analyse( "dim shared as long nullptr" & LF & _     '' line 0
+             "nullptr = 5" & LF )                      '' line 1
+
+    AssertEqInt( ModsAt( 1, 0 ), SEMMOD_STATIC, "a file's own nullptr is its variable, not readonly" )
+end sub
+
+'' ############################################################################
 ''  Main
 '' ############################################################################
 print "tiko-lsp -- semantic token tests"
@@ -261,5 +282,6 @@ TestLineSplitting( )
 TestEncoding( )
 TestUtf16( )
 TestFixedWidthTypes( )
+TestBuiltinConstants( )
 
 end TestSummary( "semantic tokens" )

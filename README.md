@@ -323,16 +323,18 @@ build\_run_tests.bat
   recovery rule (one missing `end if` is one diagnostic, pointing at the `if`),
   half-typed text, and every false positive found in the corpora. The suite also
   analyses **this project's own source** and requires zero diagnostics from it.
-- **symbols** — 81 assertions over symbol extraction, the two ranges every
+- **symbols** — 111 assertions over symbol extraction, the two ranges every
   symbol carries, scope resolution (a parameter shadows a global of the same
   name), member resolution, the token-under-the-cursor rules, hover markdown,
-  the hover for tiko-lang's fixed-width type names (`int32` and the rest), and
-  half-typed code — an unclosed `type` must still produce an outline.
-- **completion** — 70 assertions over context detection (including inside a
+  the hover for tiko-lang's fixed-width type names (`int32` and the rest) and
+  its predeclared `nullptr`, and half-typed code — an unclosed `type` must
+  still produce an outline.
+- **completion** — 98 assertions over context detection (including inside a
   string and inside a comment, where the answer is nothing), member completion
   through a declared type, a pointer, `this.`, an enum and a namespace, the
-  scope list with its group ordering, the fixed-width type names (and a file's
-  own `float32` replacing tiko's), and case-insensitive de-duplication.
+  scope list with its group ordering, the fixed-width type names and `nullptr`
+  (and a file's own `float32` or `nullptr` replacing tiko's), and
+  case-insensitive de-duplication.
 - **workspace** — 182 assertions over discovery rules, the include graph
   (a chain, a cycle, an edge to nowhere, a wrong-case forward-slash path, and
   two files declaring one name where only one is visible, and a `.tko` that
@@ -346,10 +348,11 @@ build\_run_tests.bat
   inside a default value does not split it; a function-pointer parameter counts
   as one), finding which call the caret is in (the INNER one, when they nest),
   and the argument sites inlay hints are built from.
-- **semantic tokens** — 38 assertions, mostly about the encoding, because that
+- **semantic tokens** — 45 assertions, mostly about the encoding, because that
   is what fails silently: a four-line block comment must be four tokens, the
   deltas must rebuild the absolute positions, and lengths are UTF-16 units. A
-  fixed-width name such as `int32` is a type unless the file declares it.
+  fixed-width name such as `int32` is a type unless the file declares it, and
+  `nullptr` a readonly variable on the same terms.
 - **formatting** — 33 assertions written as "this text formats to that text",
   including everything it must leave alone: an already-tidy file (zero edits),
   broken structure (zero edits, and a reason), comment art inside a block

@@ -24,8 +24,10 @@ LANGCFG = os.path.join(HERE, '..', 'vscode', 'language-configuration.json')
 # ---- the word lists ----------------------------------------------------------
 hl = io.open(HL, encoding='utf-8').read()
 lists = re.findall(r'"\^\(\?i\)\(([^"]*)\)\$"', hl)
-assert len(lists) == 2, len(lists)
+assert len(lists) == 3, len(lists)
 reserved, builtin_types = lists[0].split('|'), lists[1].split('|')
+# The predeclared constants -- `nullptr` -- the third list, coloured as a language constant.
+constants = lists[2].split('|')
 
 structural = ('sub function property constructor destructor operator declare type union enum '
               'namespace extern scope with asm if then else elseif endif select case is for to '
@@ -143,6 +145,8 @@ w('    - match: ' + q(r'(?i)(?<![\w.])\d+(\.\d*)?(e[+-]?\d+)?[!#%&ful]*\b'))
 w('      scope: constant.numeric.decimal.tiko')
 w('    - match: ' + q(r'(?i)\b(true|false)\b'))
 w('      scope: constant.language.boolean.tiko')
+w('    - match: ' + q(r'(?i)(?<![\w.])(' + alt(constants) + r')(?![\w$%&!#])'))
+w('      scope: constant.language.null.tiko')
 w('')
 w('  declarations:')
 w('    - match: ' + q(r'(?i)\b(sub|function|property|constructor|destructor|operator)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)'))

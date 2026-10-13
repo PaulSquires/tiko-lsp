@@ -15,9 +15,11 @@ OUT = os.path.join(HERE, 'tiko.tmLanguage.json')
 
 hl = io.open(HL, encoding='utf-8').read()
 lists = re.findall(r'"\^\(\?i\)\(([^"]*)\)\$"', hl)
-assert len(lists) == 2, len(lists)
+assert len(lists) == 3, len(lists)
 reserved = lists[0].split('|')
 builtin_types = lists[1].split('|')
+# The predeclared constants -- `nullptr` -- the third list, coloured as a language constant.
+constants = lists[2].split('|')
 
 # Structural words: the ones the grammar knows because they open or close blocks.
 structural = ('sub function property constructor destructor operator declare type union enum '
@@ -96,6 +98,8 @@ g = {
                 {"name": "constant.numeric.decimal.tiko",
                  "match": r'(?i)(?<![\w.])\d+(\.\d*)?(e[+-]?\d+)?[!#%&ful]*\b'},
                 {"name": "constant.language.boolean.tiko", "match": r'(?i)\b(true|false)\b'},
+                {"name": "constant.language.null.tiko",
+                 "match": r'(?i)(?<![\w.])(' + alt(constants) + r')(?![\w$%&!#])'},
             ]
         },
         "declarations": {
