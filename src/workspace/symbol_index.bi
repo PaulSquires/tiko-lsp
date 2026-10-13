@@ -65,6 +65,11 @@ type IncludeEdge
     Target    as string   '' as written
     ToFile    as long     '' index into the index, or -1 for outside it
 
+    '' A `#cinclude`: Target is a C header, and ToFile the BINDING tiko made of it
+    '' (cincludes.bi) -- found by asking, never by path, since the header itself is
+    '' not FreeBASIC and is never read.
+    IsC_      as boolean
+
     '' Where the quoted path is, in LSP coordinates, so a jump to it has a
     '' range to answer with.
     Line      as long
@@ -174,6 +179,13 @@ type SymbolIndex
 
         '' Reads the file and indexes it. False when it could not be read.
         declare function IndexPath( byref path_ as string ) as boolean
+
+        '' Indexes a `#cinclude` binding (cincludes.bi) as an EXTERNAL file, with a
+        '' larger size cap than a source. False when it could not be read.
+        declare function IndexBinding( byref path_ as string ) as boolean
+
+        '' True when the file has a `#cinclude` edge.
+        declare function HasCIncludes( byval fileIndex as long ) as boolean
 
         declare sub Remove( byref uri as string )
 

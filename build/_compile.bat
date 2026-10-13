@@ -67,6 +67,7 @@ set SOURCES=^
  "%ROOT%\src\workspace\modules.bas"^
  "%ROOT%\src\workspace\index_builder.bas"^
  "%ROOT%\src\workspace\metadata.bas"^
+ "%ROOT%\src\workspace\cincludes.bas"^
  "%ROOT%\src\utils\process.bas"^
  "%ROOT%\src\analysis\diagnostics.bas"^
  "%ROOT%\src\utils\logging.bas"^

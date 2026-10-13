@@ -37,7 +37,7 @@ Nothing here launches one, and nothing ever will.
         +-----------------------------------------+
 ```
 
-## Status: phases 1-11 complete
+## Status: phases 1-12 complete
 
 | Phase | Contents | State |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ Nothing here launches one, and nothing ever will.
 | 9 | watched files: an index that notices `git checkout`, bursts included | **done** |
 | 10 | the include graph: what a file can actually see | **done** |
 | 11 | tiko modules: `#import`, `alias.` completion and definition, `tiko.toml` packages, the toolchain `std` | **done** |
+| 12 | `#cinclude`: C headers, through the binding the compiler makes ([docs/phase12.md](docs/phase12.md)) | **done** |
 
 The `initialize` response advertises exactly what works: `textDocumentSync`
 (incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
@@ -294,6 +295,21 @@ parsing `tiko.toml`.
 Not handled: `#if` is not evaluated, so `MessageBoxA` and `MessageBoxW` are both
 offered, and `MessageBox` -- a `#define` -- gets no signature. A header a buffer starts
 including is read at the next full build, not as it is typed.
+
+### C headers -- `#cinclude`
+
+`#cinclude "raylib.h"` imports a C header, which this server cannot read. With
+`compilerPath` set it asks the compiler instead: `tiko --print-cincludes <file>`, on the
+worker, for each file that holds a `#cinclude`, run in the package's directory. tiko imports
+each header exactly as a build does -- the same cache, so a project that has been built
+answers at once -- and says where the FreeBASIC binding is; the server indexes it as an
+external header. raylib's functions, types and enum values then complete, hover, show their
+signatures and jump to their declaration in the binding, and go to definition on the
+header path opens the binding. Without a compiler a `#cinclude` resolves to nothing.
+
+Not handled: `#define` macros are not offered -- raylib's colours among them; this server
+indexes no object-like macro anywhere. A `#cinclude` typed into a buffer resolves when the
+file is saved. See [docs/phase12.md](docs/phase12.md).
 
 ## Tests
 

@@ -124,7 +124,8 @@ private sub FreeFileMutex destructor
     end if
 end sub
 
-function ReadSourceFile( byref path_ as string, byref outText as string ) as boolean
+function ReadSourceFile( byref path_ as string, byref outText as string, _
+                         byval maxBytes as longint ) as boolean
     outText = ""
 
     mutexlock( g_fileMutex )
@@ -135,7 +136,7 @@ function ReadSourceFile( byref path_ as string, byref outText as string ) as boo
     if( openErr <> 0 ) then return false
 
     dim as longint n = lof( f )
-    if( n > WS_MAX_FILE_BYTES ) then
+    if( n > maxBytes ) then
         close #f
         return false
     end if

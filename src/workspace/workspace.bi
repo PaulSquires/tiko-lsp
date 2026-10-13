@@ -43,4 +43,7 @@ declare function NormalizePath( byref path_ as string ) as string
 
 '' Reads a file as BYTES. Deliberately not ReadAllText: the analyser works in
 '' UTF-8 byte offsets, and a decode-and-re-encode round trip would move them.
-declare function ReadSourceFile( byref path_ as string, byref outText as string ) as boolean
+'' False for a file over `maxBytes`: a source is capped at 4 MB, a #cinclude binding is not
+'' a source (windows.h's is larger), so cincludes.bi reads with its own cap.
+declare function ReadSourceFile( byref path_ as string, byref outText as string, _
+                                 byval maxBytes as longint = WS_MAX_FILE_BYTES ) as boolean
