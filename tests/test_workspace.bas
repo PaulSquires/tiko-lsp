@@ -16,6 +16,7 @@
 #include once "../src/analysis/includes.bi"
 #include once "../src/workspace/modules.bi"
 #include once "../src/workspace/metadata.bi"
+#include once "../src/workspace/cincludes.bi"
 
 const LF = chr(10)
 
@@ -1049,6 +1050,84 @@ scope
     AssertTrue( cands.Count( ) > 0, "and the private resolver still answers" )
     SetCompilerPath( "" )
     ClearMetadata( )
+end scope
+
+'' ############################################################################
+''  #cinclude: the binding tiko makes of a C header, indexed as an #include
+''
+''  tests/fixtures/cinc/ws/main.bas #cincludes fake.h, which fake_tiko says became
+''  ../cache/fake-binding.bi, and broken.h, which it says could not be imported.
+'' ############################################################################
+TestGroup( "#cinclude" )
+
+'' The worker's order: every file, the graph, the #cincludes, the graph again.
+private sub BuildCincWs( byref idx as SymbolIndex )
+    dim as string ws = g_Root & "\tests\fixtures\cinc\ws"
+    dim roots as PathArray
+    roots.Push( ws )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( ws, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( true )
+    LoadCIncludes( idx, true )
+    idx.ResolveIncludes( true )
+end sub
+
+scope
+    '' THE EDGES are read whether or not a compiler is configured.
+    dim as SymbolIndex bare
+    SetCompilerPath( "" )
+    BuildCincWs( bare )
+    dim as long m0 = FileEndingIn( bare, "cinc\ws\main.bas" )
+    AssertTrue ( bare.HasCIncludes( m0 ), "main.bas has #cinclude edges" )
+    AssertEqInt( bare.IncludeCount( m0 ), 2, "two of them" )
+    AssertTrue ( bare.IncludeAt( m0, 0 ).IsC_ andalso bare.IncludeAt( m0, 1 ).IsC_, "both marked as C" )
+    AssertEqStr( bare.IncludeAt( m0, 1 ).Target, "broken.h", "'once' is read past" )
+    AssertEqInt( bare.IncludeAt( m0, 0 ).ToFile, -1, "with no compiler, the header resolves to nothing" )
+    AssertEqInt( FileEndingIn( bare, "fake.h" ), -1, "and the C header itself is never read" )
+    AssertTrue ( bare.HasUnresolvedIncludes( m0 ), "so main.bas's visible set is a lower bound" )
+
+#ifdef __FB_WIN32__
+    SetCompilerPath( g_Root & "\bin\fake_tiko.exe" )
+#else
+    SetCompilerPath( g_Root & "/bin/fake_tiko" )
+#endif
+    dim as SymbolIndex idx
+    BuildCincWs( idx )
+    dim as long m = FileEndingIn( idx, "cinc\ws\main.bas" )
+    dim as long b = FileEndingIn( idx, "cinc\cache\fake-binding.bi" )
+    AssertTrue ( b >= 0, "the binding the compiler named is indexed" )
+    AssertTrue ( idx.IsExternal( b ), "as an external file" )
+    AssertEqInt( idx.IncludeAt( m, 0 ).ToFile, b, "#cinclude ""fake.h"" points at it" )
+    AssertEqInt( idx.IncludeAt( m, 1 ).ToFile, -1, "a header that could not be imported points at nothing" )
+    AssertTrue ( idx.CanSee( m, b ), "main.bas sees the binding" )
+
+    dim as IndexHit hit
+    AssertTrue ( idx.FindDefinitionFrom( m, "fakeadd", hit ), "FakeAdd is found from main.bas" )
+    AssertEqInt( hit.FileIndex, b, "in the binding" )
+    AssertContains( idx.SymbolAt( hit.FileIndex, hit.SymIndex ).Detail_, "byval b as long", _
+                    "with its parameters, for signature help" )
+    AssertTrue ( idx.FindDefinitionFrom( m, "fakecolor", hit ), "and the C struct's type" )
+
+    dim qh as IndexHitArray
+    idx.Query( "fakeadd", 50, qh )
+    AssertEqInt( qh.Count( ), 0, "workspace/symbol skips the binding, as a toolchain header" )
+
+    AssertEqStr( lcase( CIncludeBinding( idx.FilePath( m ), "FAKE.H" ) ), lcase( idx.FilePath( b ) ), _
+                 "the store answers by includer and header, case aside" )
+    AssertFalse( AcceptCIncludes( "{""format"":2}" ), "an answer in another format is refused" )
+
+    '' A compiler that cannot run leaves the edges unresolved and nothing broken.
+    SetCompilerPath( g_Root & "\bin\no_such_tiko.exe" )
+    dim as SymbolIndex gone
+    BuildCincWs( gone )
+    AssertEqInt( gone.IncludeAt( FileEndingIn( gone, "cinc\ws\main.bas" ), 0 ).ToFile, -1, _
+                 "a compiler that cannot run resolves nothing" )
+    SetCompilerPath( "" )
+    ClearCIncludes( )
 end scope
 
 end TestSummary( "workspace" )

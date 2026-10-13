@@ -45,8 +45,13 @@ private function OnDefinition( byref srv as Server, _
     '' by waiting for a workspace scan it does not need.
     dim includeRefs as IncludeRefArray
     FindIncludes( doc->Text( ), doc->Tokens( ), includeRefs )
+    '' ...or on a `#cinclude` header, whose edge goes to the BINDING tiko made of it
+    '' (workspace/cincludes.bi): the C file itself is never indexed.
+    dim cincludeRefs as IncludeRefArray
+    FindCIncludes( doc->Text( ), doc->Tokens( ), cincludeRefs )
 
-    if( IncludeAtOffset( includeRefs, offset ) >= 0 ) then
+    if( IncludeAtOffset( includeRefs, offset ) >= 0 orelse _
+        IncludeAtOffset( cincludeRefs, offset ) >= 0 ) then
         EnsureWorkspaceIndex( srv )
         dim as long here = srv.Index->IndexOfUri( uriText )
 

@@ -4,6 +4,7 @@
 
 #include once "index_builder.bi"
 #include once "metadata.bi"
+#include once "cincludes.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -131,6 +132,15 @@ private sub IndexBuildWorker( byval param as any ptr )
     '' seconds of parsing for a Win32 project, so off the message loop.
     idx->ResolveIncludes( true )
 
+    '' THE #cincludes, asked of the compiler now that every file -- toolchain headers
+    '' included -- is known (cincludes.bi). Each binding is indexed, and the graph
+    '' resolved again: the #cinclude edges point at them, and what they #include
+    '' (crt/long.bi) is read in.
+    if( len(CompilerPath( )) > 0 ) then
+        LoadCIncludes( *idx, true )
+        idx->ResolveIncludes( true )
+    end if
+
     dim as long headers = 0
     for f as long = 0 to idx->FileCount( ) - 1
         if( idx->IsExternal( f ) ) then headers += 1
@@ -183,6 +193,10 @@ private sub IndexRefreshWorker( byval param as any ptr )
             failed += 1
         end if
     next
+
+    '' A changed file's #cincludes are asked again: a header added or edited, a
+    '' #cinclude typed and saved. Its bindings join the merge as external files.
+    LoadCIncludes( *idx, false )
 
     g_idxResult  = idx
     g_idxSummary = "re-indexed " & indexed & " of " & g_idxRoots.Count( ) & " file(s) in " & _

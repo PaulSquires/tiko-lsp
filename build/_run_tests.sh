@@ -77,7 +77,7 @@ echo "[9/13] workspace tests"
 "$FBC" -w all "$ROOT/tests/fake_tiko.bas" -x "$ROOT/bin/fake_tiko"
 "$FBC" -w all -mt $INC "$ROOT/tests/test_workspace.bas" \
     "$ROOT/src/workspace/workspace.bas" "$ROOT/src/workspace/symbol_index.bas" "$ROOT/src/workspace/modules.bas" "$ROOT/src/analysis/includes.bas" \
-    "$ROOT/src/workspace/index_builder.bas" "$ROOT/src/workspace/metadata.bas" \
+    "$ROOT/src/workspace/index_builder.bas" "$ROOT/src/workspace/metadata.bas" "$ROOT/src/workspace/cincludes.bas" \
     "$ROOT/src/utils/process.bas" "$ROOT/src/json/json.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/diagnostics.bas" \

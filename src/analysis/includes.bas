@@ -23,13 +23,14 @@ private function Unquote( byref text_ as string, byref tok as Token ) as string
     return raw_
 end function
 
-sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
-                  byref out_ as IncludeRefArray )
+'' Every `word [once] "path"` directive -- `#include` and `#cinclude` read alike.
+private sub FindPathDirectives( byref text_ as string, byref tokens as TokenArray, _
+                                byref word as string, byref out_ as IncludeRefArray )
     out_.Clear( )
 
     for i as long = 0 to tokens.Count( ) - 1
         if( tokens[i].Kind <> TK_PP ) then continue for
-        if( lcase( TokenText( text_, tokens[i] ) ) <> "#include" ) then continue for
+        if( lcase( TokenText( text_, tokens[i] ) ) <> word ) then continue for
 
         '' `once` is optional and is an ordinary identifier to the lexer.
         dim as long k = i + 1
@@ -65,6 +66,16 @@ sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
         r.Length_ = tokens[k].Length_
         out_.Push( r )
     next
+end sub
+
+sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
+                  byref out_ as IncludeRefArray )
+    FindPathDirectives( text_, tokens, "#include", out_ )
+end sub
+
+sub FindCIncludes( byref text_ as string, byref tokens as TokenArray, _
+                   byref out_ as IncludeRefArray )
+    FindPathDirectives( text_, tokens, "#cinclude", out_ )
 end sub
 
 '' THE IMPORTS: `#import "a/b" [as x] [public]`. The path is a plain string literal -- a

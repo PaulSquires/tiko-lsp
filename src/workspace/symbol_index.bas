@@ -4,6 +4,7 @@
 
 #include once "symbol_index.bi"
 #include once "modules.bi"
+#include once "cincludes.bi"
 #include once "fb/filesystem.bi"
 #include once "fb/map.bi"
 #include once "../utils/uri.bi"
@@ -127,6 +128,8 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
     '' reason the name ranges are: the text is in hand here and nowhere else.
     dim refs as IncludeRefArray
     FindIncludes( text_, tokens, refs )
+    dim crefs as IncludeRefArray
+    FindCIncludes( text_, tokens, crefs )
 
     '' ...and the imports, the same way.
     dim irefs as ImportRefArray
@@ -172,6 +175,20 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
         dim as IncludeEdge e
         e.Target    = refs[i].Target
         e.ToFile    = -1          '' filled in by ResolveIncludes
+        e.Line      = a.Line
+        e.StartChar = a.Column
+        e.EndChar   = b.Column
+        edges.Push( e )
+    next
+    '' ...and the #cincludes, as edges to the binding tiko makes (cincludes.bi).
+    for i as long = 0 to crefs.Count( ) - 1
+        dim as SourcePosition a = OffsetToSourcePosition( text_, lines_, crefs[i].Start_ )
+        dim as SourcePosition b = OffsetToSourcePosition( text_, lines_, crefs[i].Start_ + crefs[i].Length_ )
+
+        dim as IncludeEdge e
+        e.Target    = crefs[i].Target
+        e.ToFile    = -1
+        e.IsC_      = true
         e.Line      = a.Line
         e.StartChar = a.Column
         e.EndChar   = b.Column
@@ -225,6 +242,26 @@ function SymbolIndex.IndexPath( byref path_ as string ) as boolean
 
     this.IndexText( PathToUri( path_ ), path_, body, false )
     return true
+end function
+
+'' 256 MB: a binding is generated, not written, and windows.h's is several times a
+'' source file's 4 MB.
+function SymbolIndex.IndexBinding( byref path_ as string ) as boolean
+    dim as string body
+    if( ReadSourceFile( path_, body, 256 * 1024 * 1024 ) = false ) then return false
+
+    this.IndexText( PathToUri( path_ ), path_, body, false )
+    dim as long f = this.IndexOfUri( PathToUri( path_ ) )
+    if( f >= 0 ) then this.m_files[f].External_ = true
+    return true
+end function
+
+function SymbolIndex.HasCIncludes( byval fileIndex as long ) as boolean
+    if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return false
+    for i as long = 0 to this.m_files[fileIndex].Includes.Count( ) - 1
+        if( this.m_files[fileIndex].Includes[i].IsC_ ) then return true
+    next
+    return false
 end function
 
 sub SymbolIndex.Absorb( byref other as SymbolIndex )
@@ -388,6 +425,8 @@ private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as Symbol
         w += 1
         dim as string here = DirOf( files_[f].Path_ )
         for k as long = 0 to files_[f].Includes.Count( ) - 1
+            '' A C header is never read: its binding is indexed by cincludes.bi.
+            if( files_[f].Includes[k].IsC_ ) then continue for
             dim as string tgt = files_[f].Includes[k].Target
 
             '' Already indexed under any candidate spelling: nothing to read.
@@ -455,6 +494,19 @@ sub SymbolIndex.ResolveIncludes( byval readHeaders as boolean = false )
 
         for k as long = 0 to this.m_files[i].Includes.Count( ) - 1
             dim as long found = -1
+
+            '' A #cinclude IS THE BINDING tiko said it made (cincludes.bi), or nothing:
+            '' a lookup in the store and a hash probe, no I/O -- safe on the message
+            '' loop. Unknown until the worker has asked, which leaves the file's
+            '' visible set a lower bound, as any unresolved include does.
+            if( this.m_files[i].Includes[k].IsC_ ) then
+                dim as string b = CIncludeBinding( this.m_files[i].Path_, this.m_files[i].Includes[k].Target )
+                if( len(b) > 0 ) then
+                    if( byKey.TryGet( lcase( b ), found ) = false ) then found = -1
+                end if
+                this.m_files[i].Includes[k].ToFile = found
+                continue for
+            end if
 
             '' RELATIVE TO THE INCLUDER FIRST, which is what fbc does and what
             '' a reader assumes: two directories can each have a `shared.bi`,

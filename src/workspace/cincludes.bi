@@ -1,0 +1,52 @@
+'' ############################################################################
+''  workspace/cincludes.bi -- what a `#cinclude` brings in
+''
+''  `#cinclude "raylib.h"` (tiko-lang ADR 0016) imports a C HEADER: tiko runs
+''  libclang over it and compiles the FreeBASIC binding it writes -- every
+''  function, type, constant and macro the header declares. This server cannot
+''  read C, but it can read that binding, and does: as an `#include` of it.
+''
+''  WHERE THE BINDING IS comes from the compiler. `tiko --print-cincludes file`
+''  preprocesses the file, imports each `#cinclude` exactly as a build does --
+''  the same disk cache, the same delta chain -- and prints one JSON object:
+''
+''      {"format":1,"cincludes":[{"file","line","header","binding"[,"error"]}]}
+''
+''  `file` is the file that wrote the directive, `binding` the absolute path of
+''  the binding.bi in tiko's cache, "" with `error` when there is none. Each
+''  binding is indexed as an EXTERNAL file (symbol_index.bi), like a toolchain
+''  header: visible to completion, hover, signature help and definition, never
+''  renamed, never searched for references.
+''
+''  WHEN. Only when the client named a compiler (`compilerPath`), and only on the
+''  index worker: a cold import of windows.h is ~19 s. Once per file that itself
+''  contains a `#cinclude` -- not per unit root -- so a `.bi` that does is asked
+''  as its own root and gets its whole binding rather than a build's delta.
+''
+''  THREADS. The worker writes, the message loop's ResolveIncludes reads -- a
+''  lookup, no I/O -- so the store is behind a mutex and queries return copies.
+'' ############################################################################
+
+#pragma once
+
+#include once "workspace.bi"
+#include once "symbol_index.bi"
+
+'' Asks the compiler about every file in `idx` that has a `#cinclude` edge, and
+'' indexes each binding it names into `idx` as an external file. Blocks for as
+'' long as the compiler takes: the index worker only. A no-op when no compiler is
+'' configured. `fresh` forgets what earlier runs found first (a full build);
+'' a refresh adds to it.
+declare sub LoadCIncludes( byref idx as SymbolIndex, byval fresh as boolean )
+
+'' Takes one `--print-cincludes` answer, ADDING its bindings to what is known.
+'' False when `jsonText` is not one. LoadCIncludes' half that needs no process,
+'' and what the tests drive. The bindings it names are NOT indexed here.
+declare function AcceptCIncludes( byref jsonText as string ) as boolean
+
+'' The binding the `#cinclude "header"` in the file at `includerPath` got --
+'' native, absolute -- or "" when none is known.
+declare function CIncludeBinding( byref includerPath as string, byref header as string ) as string
+
+'' Forgets everything known.
+declare sub ClearCIncludes( )

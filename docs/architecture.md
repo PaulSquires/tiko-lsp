@@ -132,7 +132,9 @@ against the includer's directory, the workspace folders, and -- when the name is
 unique -- the file name alone. A file with an edge the server could not place
 has UNKNOWN visibility, and every caller treats that as "maybe everything"
 rather than "nothing": definition falls back, completion adds without removing,
-rename widens its edit set. See [phase10.md](phase10.md).
+rename widens its edit set. See [phase10.md](phase10.md). A `#cinclude` is an
+edge too, to the FreeBASIC binding tiko made of the C header -- found by asking the
+compiler on the worker, never by path. See [phase12.md](phase12.md).
 
 THE CLIENT WATCHES THE FILESYSTEM, not the server. File events arrive as
 `workspace/didChangeWatchedFiles` after the server registers for them at run

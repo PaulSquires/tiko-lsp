@@ -77,6 +77,12 @@ declare sub FindExports( byref text_ as string, byref tokens as TokenArray, _
 declare sub FindIncludes( byref text_ as string, byref tokens as TokenArray, _
                           byref out_ as IncludeRefArray )
 
+'' Every `#cinclude [once] "header.h"` (tiko-lang ADR 0016), in source order. The header is a
+'' C file this server cannot read; the workspace asks tiko for the FreeBASIC binding it makes
+'' of it (`tiko --print-cincludes`, workspace/cincludes.bi) and indexes THAT as the include.
+declare sub FindCIncludes( byref text_ as string, byref tokens as TokenArray, _
+                           byref out_ as IncludeRefArray )
+
 '' The include whose path literal contains `offset`, or -1. This is what turns
 '' a click on `#include "shared.bi"` into a jump to that file.
 declare function IncludeAtOffset( byref includes_ as IncludeRefArray, byval offset as long ) as long

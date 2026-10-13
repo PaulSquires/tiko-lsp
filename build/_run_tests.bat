@@ -92,7 +92,7 @@ rem tests\fake_tiko stands in for `tiko metadata`, here and in the metadata sess
 "%FBC%" -w all "%ROOT%\tests\fake_tiko.bas" -x "%ROOT%\bin\fake_tiko.exe" || exit /b 1
 "%FBC%" -w all -mt %INC% "%ROOT%\tests\test_workspace.bas" ^
     "%ROOT%\src\workspace\workspace.bas" "%ROOT%\src\workspace\symbol_index.bas" "%ROOT%\src\workspace\modules.bas" "%ROOT%\src\analysis\includes.bas" ^
-    "%ROOT%\src\workspace\index_builder.bas" "%ROOT%\src\workspace\metadata.bas" ^
+    "%ROOT%\src\workspace\index_builder.bas" "%ROOT%\src\workspace\metadata.bas" "%ROOT%\src\workspace\cincludes.bas" ^
     "%ROOT%\src\utils\process.bas" "%ROOT%\src\json\json.bas" ^
     "%ROOT%\src\analysis\lexer.bas" "%ROOT%\src\analysis\parser.bas" ^
     "%ROOT%\src\analysis\symbols.bas" "%ROOT%\src\analysis\diagnostics.bas" ^
@@ -165,6 +165,15 @@ rem compiler, which must not find it.
 "%ROOT%\bin\session_tool.exe" --write-meta "%ROOT%\bin\session-meta-off.bin" "%ROOT%\tests\fixtures\meta\ws" "" || exit /b 1
 "%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-meta-off.bin" > "%ROOT%\bin\captured-meta-off.bin" 2>"%ROOT%\bin\server-meta-off.log"
 "%ROOT%\bin\session_tool.exe" --check-meta-off "%ROOT%\bin\captured-meta-off.bin" || set FAILED=1
+
+rem The #cinclude session: tests\fixtures\cinc\ws, whose #cinclude "fake.h" resolves only through
+rem `tiko --print-cincludes` -- here tests\fake_tiko -- and the control with no compiler.
+"%ROOT%\bin\session_tool.exe" --write-cinc "%ROOT%\bin\session-cinc.bin" "%ROOT%\tests\fixtures\cinc\ws" "%ROOT%\bin\fake_tiko.exe" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-cinc.bin" > "%ROOT%\bin\captured-cinc.bin" 2>"%ROOT%\bin\server-cinc.log"
+"%ROOT%\bin\session_tool.exe" --check-cinc "%ROOT%\bin\captured-cinc.bin" || set FAILED=1
+"%ROOT%\bin\session_tool.exe" --write-cinc "%ROOT%\bin\session-cinc-off.bin" "%ROOT%\tests\fixtures\cinc\ws" "" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-cinc-off.bin" > "%ROOT%\bin\captured-cinc-off.bin" 2>"%ROOT%\bin\server-cinc-off.log"
+"%ROOT%\bin\session_tool.exe" --check-cinc-off "%ROOT%\bin\captured-cinc-off.bin" || set FAILED=1
 
 echo.
 if "!FAILED!"=="0" (

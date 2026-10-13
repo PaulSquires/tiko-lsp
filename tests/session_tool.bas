@@ -1671,6 +1671,156 @@ private function CheckMetaSession( byref path as string, byval withCompiler as b
     return TestSummary( "compiler-metadata session" )
 end function
 
+'' ############################################################################
+''  The #cinclude session -- --write-cinc / --check-cinc / --check-cinc-off
+''
+''      session_tool --write-cinc session-cinc.bin <cinc-ws> <compiler or "">
+''      tiko-lsp < session-cinc.bin > captured-cinc.bin
+''      session_tool --check-cinc captured-cinc.bin       (with tests/fake_tiko)
+''      session_tool --check-cinc-off captured-cinc.bin   (with no compiler)
+''
+''  tests/fixtures/cinc/ws/main.bas #cincludes fake.h; tests/fake_tiko answers
+''  `--print-cincludes` with ../cache/fake-binding.bi, which declares FakeAdd. The
+''  control, with no compiler, must NOT find it, or the first run proves nothing.
+''
+''      line 0:    #cinclude "fake.h"
+''      line 2:    dim as long r = FakeAdd( 1, 2 )
+'' ############################################################################
+
+private function CincSessionBytes( byref wsRoot as string, byref compiler as string ) as string
+    dim as string s
+    dim as string wsUri    = PathToUri( wsRoot )
+    dim as string mainPath = wsRoot & "\main.bas"
+    dim as string mainUri  = PathToUri( mainPath )
+    dim as string mainText
+    if( ReadWholeFile( mainPath, mainText ) = false ) then
+        print "session_tool: cannot read " & mainPath
+        end 1
+    end if
+
+    s &= Req_( 1, "initialize", "{" & Q & "processId" & Q & ":4242," & _
+               Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "capabilities" & Q & ":{}," & _
+               Q & "initializationOptions" & Q & ":{" & Q & "compilerPath" & Q & ":" & JsonQuote( compiler ) & "}," & _
+               Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
+               Q & "name" & Q & ":" & Q & "cinc" & Q & "}]}" )
+    s &= Note_( "initialized", "{}" )
+
+    '' 2. waits for the scan, and with it for `tiko --print-cincludes`.
+    s &= Req_( 2, "workspace/symbol", "{" & Q & "query" & Q & ":" & Q & "r" & Q & "}" )
+
+    s &= Note_( "textDocument/didOpen", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & mainUri & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( mainText ) & "}}" )
+
+    '' 3. completion after `Fake`; 4. signature help inside `FakeAdd( `; 5. hover on FakeAdd;
+    '' 6. definition of FakeAdd; 7. definition on the header path itself.
+    s &= Req_( 3, "textDocument/completion", At_( mainUri, 2, 20 ) )
+    s &= Req_( 4, "textDocument/signatureHelp", At_( mainUri, 2, 25 ) )
+    s &= Req_( 5, "textDocument/hover", At_( mainUri, 2, 18 ) )
+    s &= Req_( 6, "textDocument/definition", At_( mainUri, 2, 18 ) )
+    s &= Req_( 7, "textDocument/definition", At_( mainUri, 0, 13 ) )
+
+    s &= Req_( 9, "shutdown", "null" )
+    s &= Note_( "exit", "null" )
+    return s
+end function
+
+private function WriteCincSession( byref path as string, byref wsRoot as string, _
+                                   byref compiler as string ) as long
+    dim as long f = freefile( )
+    if( open( path for binary access write as #f ) <> 0 ) then
+        print "session_tool: cannot write " & path
+        return 1
+    end if
+    dim as string bytes_ = CincSessionBytes( wsRoot, compiler )
+    put #f, , bytes_
+    close #f
+    print "wrote " & len(bytes_) & " bytes to " & path
+    return 0
+end function
+
+'' The `uri` of a definition result, a Location or the first of an array of them.
+private function DefinitionUri_( byref messages as FB.Array( of string ), byval id as long ) as string
+    dim as JsonDoc d
+    d.Parse( ResponseFor_( messages, id ) )
+    dim as JsonValue r = d.Root( ).Member( "result" )
+    if( r.IsArray( ) ) then return r.Item( 0 ).Member( "uri" ).AsString( "" )
+    return r.Member( "uri" ).AsString( "" )
+end function
+
+private function CheckCincSession( byref path as string, byval withCompiler as boolean ) as long
+    dim as string captured
+    if( ReadWholeFile( path, captured ) = false ) then
+        print "session_tool: cannot read " & path
+        return 1
+    end if
+
+    TestGroup( iif( withCompiler, "#cinclude, over the wire", _
+                                  "#cinclude, over the wire -- the control, with no compiler" ) )
+
+    dim as MessageFramer f
+    dim messages as FB.Array( of string )
+    f.Feed( captured )
+    do
+        dim as string payload
+        dim as FrameStatus st = f.NextMessage( payload )
+        if( st = FRAME_ERROR ) then
+            TestFail( "the server's output is well framed", f.ErrorText( ) )
+            exit do
+        end if
+        if( st = FRAME_NEED_MORE ) then exit do
+        messages.Push( payload )
+    loop
+    AssertEqInt( f.Pending( ), 0, "the output ends on a message boundary -- the compiler wrote nothing into it" )
+
+    for id as long = 1 to 7
+        if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
+    next
+
+    dim as string labels = ""
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 3 ) )
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & lcase( it.Member( "label" ).AsString( ) ) & " "
+        next
+    end scope
+
+    if( withCompiler = false ) then
+        AssertFalse( instr( labels, " fakeadd " ) > 0, "completion does not offer FakeAdd without the compiler" )
+        AssertFalse( instr( lcase( DefinitionUri_( messages, 6 ) ), "fake-binding.bi" ) > 0, _
+                     "and FakeAdd has no definition" )
+        return TestSummary( "#cinclude control session" )
+    end if
+
+    AssertContains( labels, " fakeadd ", "completion after `Fake` offers FakeAdd, from the binding" )
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 4 ) )
+        dim as JsonValue r = d.Root( ).Member( "result" )
+        AssertTrue( r.IsObject( ), "signature help inside FakeAdd(" )
+        AssertContains( r.Member( "signatures" ).Item( 0 ).Member( "label" ).AsString( ), _
+                        "byval b as long", "with the binding's parameter list" )
+    end scope
+
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 5 ) )
+        AssertContains( lcase( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( "" ) ), _
+                        "fakeadd", "hover on FakeAdd shows it" )
+    end scope
+
+    AssertContains( lcase( DefinitionUri_( messages, 6 ) ), "/cinc/cache/fake-binding.bi", _
+                    "definition of FakeAdd: in the binding, outside the workspace" )
+    AssertContains( lcase( DefinitionUri_( messages, 7 ) ), "/cinc/cache/fake-binding.bi", _
+                    "definition on the #cinclude path: the binding" )
+
+    return TestSummary( "#cinclude session" )
+end function
+
 '' ----------------------------------------------------------------------------
 ''  Entry point
 '' ----------------------------------------------------------------------------
@@ -1716,6 +1866,19 @@ select case lcase( mode_ )
 
     case "--check-meta-off"
         end CheckMetaSession( path_, false )
+
+    case "--write-cinc"
+        if( len(root_) = 0 ) then
+            print "session_tool --write-cinc needs the workspace root and the compiler (or an empty one)"
+            end 2
+        end if
+        end WriteCincSession( path_, root_, command( 4 ) )
+
+    case "--check-cinc"
+        end CheckCincSession( path_, true )
+
+    case "--check-cinc-off"
+        end CheckCincSession( path_, false )
 
     case else
         print "usage: session_tool --write <file> <workspace-root> | --check <file>"
