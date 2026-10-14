@@ -27,6 +27,30 @@ end function
     (identifier)))
 
 ================================================================================
+A typed variadic parameter
+================================================================================
+
+function Sum( byval k as long, nums() as const long ... ) as long
+    return k
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        name: (identifier)
+        type: (identifier))
+      (parameter
+        name: (identifier)
+        type: (identifier)))
+    return_type: (identifier)
+    (identifier)
+    (identifier)))
+
+================================================================================
 A method body, named with a dot
 ================================================================================
 

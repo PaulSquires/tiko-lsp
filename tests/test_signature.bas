@@ -77,6 +77,14 @@ private sub TestParseSignature( )
     AssertFalse( ParseSignature( "total", "as long", label, params ), _
                  "a variable's detail is not a parameter list" )
 
+    '' A TYPED VARIADIC is one parameter, named, with its '...' in the label.
+    params.Clear( )
+    AssertTrue( ParseSignature( "Fmt", "(byref f as const ustring, args() as const FormatArg ...) as ustring", _
+                                label, params ), "a typed variadic signature parses" )
+    AssertEqInt( params.Count( ), 2, "the variadic is one parameter" )
+    AssertEqStr( params[1].Name_, "args", "named by its array" )
+    AssertEqStr( params[1].Label, "args() as const FormatArg ...", "with the '...' in its label" )
+
     params.Clear( )
     AssertFalse( ParseSignature( "MAXV", "= 100", label, params ), _
                  "and neither is a constant's value" )

@@ -373,7 +373,11 @@ module.exports = grammar({
         optional(choice(kw('byval'), kw('byref'))),
         field('name', $.identifier),
         optional(seq('(', optional(commaSep1($._atom)), ')')),
-        optional(seq(kw('as'), field('type', $._type))),
+        // A TYPED VARIADIC -- `args( ) as const T ...`, tiko-lang RFC-0001 -- ends the type.
+        // Without it the three dots were swallowed by `_type` as three '.' tokens: no ERROR,
+        // and no trace of the marker in the tree. Only after a TYPE, so `#macro M( a... )`
+        // keeps its own form.
+        optional(seq(kw('as'), field('type', $._type), optional(field('variadic', '...')))),
         optional(seq('=', field('default', $._value))),
       ),
       // An unnamed parameter, which a DECLARE may write: `declare sub f( as long )`.

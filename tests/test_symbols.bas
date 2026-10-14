@@ -220,6 +220,20 @@ end scope
 '' ----------------------------------------------------------------------------
 TestGroup( "extraction: locals and parameters" )
 
+'' A TYPED VARIADIC is a parameter like any other (tiko-lang RFC-0001).
+scope
+    Analyse( "function Sum( byval k as long, nums() as const long ... ) as long" & LF & _
+             "    return k" & LF & _
+             "end function" )
+    dim as long f = IndexOfName( "Sum" )
+    dim as long pv = IndexOfName( "nums" )
+    AssertTrue ( pv >= 0, "a typed variadic parameter is a symbol" )
+    if( pv >= 0 ) then
+        AssertTrue ( S_(pv).IsLocal, "and a local" )
+        AssertEqInt( S_(pv).Parent, f, "of its procedure" )
+    end if
+end scope
+
 scope
     Analyse( "sub Work( byval count as long, byref name_ as string )" & LF & _
              "    dim as long total = 0" & LF & _
