@@ -246,6 +246,16 @@ AssertClean( "function Add( byval a as long ) as long" & LF & "    return a" & L
              "a balanced function" )
 AssertClean( "private sub Hidden( )" & LF & "end sub", "PRIVATE qualifies the sub, it does not hide it" )
 AssertClean( "declare sub Later( )", "a declare opens nothing" )
+
+'' TYPED VARIADICS (tiko-lang RFC-0001): '...' after an array parameter's type, the last one.
+AssertClean( "function Sum( nums() as const long ... ) as long" & LF & "    return 0" & LF & "end function", _
+             "a typed variadic parameter" )
+AssertClean( "declare function Fmt( byref f as const ustring, args() as const FormatArg ... ) as ustring", _
+             "a typed variadic in a declare" )
+AssertClean( "type Bag" & LF & "    as long n" & LF & "    declare constructor( xs() as const long ... )" & LF & "end type", _
+             "a typed variadic constructor" )
+AssertClean( "dim as function( xs() as const long ... ) as long fp", "a typed variadic procedure type" )
+AssertClean( "print Sum( 1, 2, 3 ), Sum( ), Sum( xs( ) )", "calls packing, empty and spread" )
 AssertClean( "function Add( ) as long" & LF & "    function = 1" & LF & "end function", _
              "`function = expr` sets the result, it does not open a procedure" )
 AssertClean( "sub Customer.SetName( byref v as string )" & LF & "end sub", "a dotted member name" )

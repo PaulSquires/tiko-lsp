@@ -1726,6 +1726,22 @@
                         "type": "SYMBOL",
                         "name": "_type"
                       }
+                    },
+                    {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "FIELD",
+                          "name": "variadic",
+                          "content": {
+                            "type": "STRING",
+                            "value": "..."
+                          }
+                        },
+                        {
+                          "type": "BLANK"
+                        }
+                      ]
                     }
                   ]
                 },
