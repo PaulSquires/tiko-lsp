@@ -263,7 +263,7 @@ scope
         '' the hang this test detects, arrived at from the other end.
         dim as long rc = _pipe( @fds(0), 64 * 1024, _O_BINARY )
     #else
-        dim as long rc = pipe( @fds(0) )
+        dim as long rc = pipe_( @fds(0) )   '' PIPE and WRITE are keywords: the crt names end in _
     #endif
 
     if( rc <> 0 ) then
@@ -284,7 +284,7 @@ scope
         #ifdef __FB_WIN32__
             _write( fds(1), strptr(msg), len(msg) )
         #else
-            write( fds(1), strptr(msg), len(msg) )
+            write_( fds(1), strptr(msg), len(msg) )
         #endif
 
         g_PipeDone = false
