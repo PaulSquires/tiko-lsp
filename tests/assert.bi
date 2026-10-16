@@ -11,7 +11,7 @@
 '' A PATH AS THE TESTS SPELL IT -- Windows' backslashes -- in THIS host's spelling. The
 '' fixtures are written `g_Root & "\tests\fixtures\x"`, and on Linux a backslash is a
 '' character of the file name, so every one of them named nothing there.
-function N( byref p as string ) as string
+function NativePath( byref p as string ) as string
 #ifdef __FB_WIN32__
     return p
 #else

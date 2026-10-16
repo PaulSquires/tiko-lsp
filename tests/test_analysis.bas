@@ -548,18 +548,18 @@ end function
 private sub CheckRealSource( byref root as string )
     TestGroup( "the analyser against this project's own source" )
 
-    dim as string dirs( 0 to 6 ) = { "src", N( "src\json" ), N( "src\rpc" ), N( "src\lsp" ), _
-                                     N( "src\document" ), N( "src\handlers" ), N( "src\utils" ) }
+    dim as string dirs( 0 to 6 ) = { "src", NativePath( "src\json" ), NativePath( "src\rpc" ), NativePath( "src\lsp" ), _
+                                     NativePath( "src\document" ), NativePath( "src\handlers" ), NativePath( "src\utils" ) }
     dim as long filesSeen = 0
     dim as long filesClean = 0
     dim as long linesSeen = 0
 
     for d as long = 0 to ubound( dirs )
-        dim as string pattern = root & N( "\" ) & dirs(d) & N( "\*.b*" )
+        dim as string pattern = root & NativePath( "\" ) & dirs(d) & NativePath( "\*.b*" )
         dim as string leaf = dir( pattern )
 
         while( len(leaf) > 0 )
-            dim as string full = root & N( "\" ) & dirs(d) & N( "\" ) & leaf
+            dim as string full = root & NativePath( "\" ) & dirs(d) & NativePath( "\" ) & leaf
             dim as string body
             if( ReadWholeFile( full, body ) ) then
                 filesSeen += 1
@@ -572,7 +572,7 @@ private sub CheckRealSource( byref root as string )
                 if( diags.Count( ) = 0 ) then
                     filesClean += 1
                 else
-                    TestFail( "clean: " & dirs(d) & N( "\" ) & leaf, _
+                    TestFail( "clean: " & dirs(d) & NativePath( "\" ) & leaf, _
                               diags.Count( ) & " diagnostic(s), first at byte " & _
                               diags[0].StartOffset & ": " & diags[0].Message_ )
                 end if
