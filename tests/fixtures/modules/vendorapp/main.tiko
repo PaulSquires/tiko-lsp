@@ -1,0 +1,4 @@
+'' A root importing a vendor package with a link mode.
+#import "vendor/clib" link dynamic
+dim as clib_handle h
+print clib_open( "x" ) = CLIB_OK

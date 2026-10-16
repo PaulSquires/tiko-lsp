@@ -278,6 +278,15 @@ function TokenText( byref text_ as string, byref tok as Token ) as string
     return mid( text_, tok.Start_ + 1, tok.Length_ )
 end function
 
+'' The last token is a `public` keyword, and the first of its logical line.
+private function PublicHeadsLine_( byref tokens as TokenArray ) as boolean
+    dim as long n = tokens.Count( )
+    if( n = 0 ) then return false
+    if( tokens[n - 1].Kind <> TK_KEYWORD orelse tokens[n - 1].Kw <> KW_PUBLIC ) then return false
+    if( n = 1 ) then return true
+    return tokens[n - 2].Kind = TK_EOL orelse tokens[n - 2].Kind = TK_COLON
+end function
+
 private sub Emit( byref tokens as TokenArray, byval kind as TokenKind, _
                   byval start_ as long, byval length_ as long, _
                   byval kw as FbKeyword = KW_NONE )
@@ -710,8 +719,10 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
         '' -- preprocessor directive ---------------------------------------------
         ''
         '' Only at the head of a logical line: '#' is also a file number in
-        '' PRINT #1 and a stringify in a macro body.
-        if( c = asc("#") andalso atLineStart ) then
+        '' PRINT #1 and a stringify in a macro body. ...OR AFTER A `public` THAT HEADS
+        '' ONE: tiko's `public #include "x.ti"` and `public #cinclude "x.h"` carry a
+        '' header with a module's interface, and are directives all the same.
+        if( c = asc("#") andalso (atLineStart orelse PublicHeadsLine_( tokens )) ) then
             dim as long start_ = i
             i += 1
             while( i < n andalso IsIdentPart( text_[i] ) )

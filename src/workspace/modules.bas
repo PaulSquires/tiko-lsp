@@ -231,7 +231,9 @@ sub ModuleCandidates( byref importerPath as string, byref importPath as string, 
     dim as string first_ = lcase( iif( sl = 0, p, left( p, sl - 1 ) ) )
     dim as string rest = iif( sl = 0, "", mid( p, sl + 1 ) )
 
-    if( first_ <> "std" ) then
+    '' std/ AND vendor/ ARE THE TOOLCHAIN'S (tiko-lang RFC-0007 §3; tiko-vendor RFC-0002
+    '' V3): looked for in its pkg/ alone, never in a package, a dependency or an -i root.
+    if( first_ <> "std" andalso first_ <> "vendor" ) then
         '' 2 and 3: the importing file's package, and its manifest's dependencies.
         dim as string md = ManifestDirAbove( here )
         if( len(md) > 0 ) then

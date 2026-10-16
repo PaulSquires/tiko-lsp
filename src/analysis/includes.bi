@@ -28,6 +28,10 @@
 type IncludeRef
     Target  as string    '' the path as written, without its quotes
     Once_   as boolean   '' `#include once`
+    '' `public #include` / `public #cinclude` in a module file (tiko-vendor RFC-0002 V1):
+    '' the header travels with the module's interface, and its names reach every
+    '' importer unqualified.
+    Public_ as boolean
 
     '' The QUOTED literal, so a client can be told exactly what to highlight --
     '' and so "go to definition" on an include line has a range to answer with.
@@ -37,13 +41,15 @@ end type
 
 type IncludeRefArray as FB.Array( of IncludeRef )
 
-'' ONE `#import "path" [as alias] [public]` LINE (tiko-lang ADR 0017; RFC-0001). The alias
+'' ONE `#import "path" [as alias] [public] [link static|dynamic]` LINE (tiko-lang ADR 0017; RFC-0001). The alias
 '' is lower-cased -- names are compared that way -- and is the path's last segment when no
 '' `as` is written.
 type ImportRef
     Path_    as string
     Alias_   as string
     Public_  as boolean
+    '' `link static` / `link dynamic` (tiko-vendor RFC-0002 V4): "" when not written.
+    Link_    as string
     Start_   as long      '' byte offset of the opening quote
     Length_  as long      '' in bytes, quotes included
 end type

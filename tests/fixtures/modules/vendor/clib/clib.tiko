@@ -1,0 +1,5 @@
+'' NOT the vendor package: a workspace directory named vendor cannot shadow the toolchain's.
+#module "clib"
+public function Shadowed( ) as long
+    return 1
+end function

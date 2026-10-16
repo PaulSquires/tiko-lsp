@@ -618,6 +618,89 @@ scope
     AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), "pkglib\core" ) > 0, "in ../pkglib" )
 end scope
 
+
+'' VENDOR PACKAGES (tiko-vendor RFC-0002): `#import "vendor/clib" link dynamic` -- the link
+'' clause is read and is no diagnostic; vendor/ resolves to the toolchain's pkg/ alone, not
+'' to the workspace's own vendor/ directory; and the header the module carries with
+'' `public #include` is visible to the importer bare, while the one it includes for itself
+'' is not.
+scope
+    dim tokens as TokenArray
+    dim diags  as DiagnosticArray
+    dim syms   as SymbolTable
+    dim as string src = "#import ""vendor/clib"" link dynamic" & LF & _
+                        "#import ""vendor/zz"" as q public link static" & LF
+    AnalyzeFull( src, tokens, diags, syms )
+    dim refs as ImportRefArray
+    FindImports( src, tokens, refs )
+    AssertEqInt( refs.Count( ), 2, "two #import lines with 'link'" )
+    AssertEqStr( refs[0].Link_, "dynamic", "the first links dynamic" )
+    AssertEqStr( refs[0].Alias_, "clib", "and still binds its last segment" )
+    AssertEqStr( refs[1].Alias_, "q", "'as' before 'link'" )
+    AssertTrue ( refs[1].Public_, "'public' before 'link'" )
+    AssertEqStr( refs[1].Link_, "static", "'link static', static being a keyword" )
+    AssertEqInt( diags.Count( ), 0, "'link' is no diagnostic" )
+
+    dim as string m = "#module ""clib""" & LF & _
+                      "public #include once ""clib.ti""" & LF & _
+                      "#include once ""clibpriv.ti""" & LF & _
+                      "public #cinclude ""c.h""" & LF
+    AnalyzeFull( m, tokens, diags, syms )
+    dim incs as IncludeRefArray
+    FindIncludes( m, tokens, incs )
+    AssertEqInt( incs.Count( ), 2, "'public #include' is an include" )
+    AssertTrue ( incs[0].Public_, "and a public one" )
+    AssertFalse( incs[1].Public_, "the plain one is not" )
+    dim cincs as IncludeRefArray
+    FindCIncludes( m, tokens, cincs )
+    AssertEqInt( cincs.Count( ), 1, "'public #cinclude' is a #cinclude" )
+    AssertTrue ( cincs[0].Public_, "and a public one" )
+    AssertEqInt( diags.Count( ), 0, "'public #include' is no diagnostic" )
+end scope
+
+setenviron g_pkgEnv
+scope
+    dim as string fx = g_Root & "\tests\fixtures\modules"
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long app = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        if( instr( lcase( idx.FilePath( i ) ), "vendorapp\main.tiko" ) > 0 ) then app = i
+    next
+    AssertTrue( app >= 0, "the vendor importer is indexed" )
+
+    dim files_ as FB.Array( of long )
+    AssertTrue ( idx.ModuleFilesOf( app, "clib", files_ ), "vendor/clib resolves" )
+    AssertEqInt( files_.Count( ), 1, "to one file" )
+    AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), "modpkg\vendor\clib" ) > 0, _
+                 "in the toolchain's pkg/, not the workspace's vendor/" )
+
+    dim as IndexHit hit
+    AssertTrue ( idx.FindDefinitionFrom( app, "clib_open", hit ), "clib_open is found from the importer" )
+    AssertTrue ( instr( lcase( idx.FilePath( hit.FileIndex ) ), "clib.ti" ) > 0, "in the public header" )
+    dim vis as FB.Array( of long )
+    idx.VisibleFrom( app, vis )
+    dim as boolean seesPub = false, seesPriv = false, seesMod = false
+    for each f as long in vis
+        dim as string p = lcase( idx.FilePath( f ) )
+        if( right( p, 7 ) = "clib.ti" ) then seesPub = true
+        if( instr( p, "clibpriv.ti" ) > 0 ) then seesPriv = true
+        if( right( p, 9 ) = "clib.tiko" ) then seesMod = true
+    next
+    AssertTrue ( seesPub, "the importer sees the public header" )
+    AssertFalse( seesPriv, "but not the header the module keeps" )
+    AssertFalse( seesMod, "nor the module's own file, which stays behind its alias" )
+end scope
+
 setenviron "TKO_PKG="
 
 '' EXPORTED MACROS: a facade (tiko-lang RFC-0009) is `#define N FB.N` + `#export N`. Its

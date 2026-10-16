@@ -1,0 +1,6 @@
+# A stand-in for the toolchain's pkg/vendor (tiko-vendor RFC-0002).
+[package]
+name = "vendor"
+
+[vendor.clib]
+links = ["static", "dynamic"]

@@ -1,0 +1,4 @@
+'' A vendor package's module: one header it carries publicly, one it keeps.
+#module "clib"
+public #include once "clib.ti"
+#include once "clibpriv.ti"
