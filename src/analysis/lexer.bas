@@ -47,17 +47,23 @@ end function
 
 type KeywordMap as FB.Map( of string, long )
 
-dim shared as KeywordMap    g_Keywords
-dim shared as FB.Array( of string ) g_KeywordNames
+'' POINTERS, MADE BY THE FIRST FILL -- not objects. A shared FB.Map has a constructor of its
+'' own, and on Linux it ran AFTER InitKeywords below had filled it, emptying the table:
+'' no word was a keyword and every lexer test failed there, while Windows ran the two in the
+'' other order. A pointer is zeroed data, with no constructor to run late.
+dim shared as KeywordMap ptr g_Keywords
+dim shared as FB.Array( of string ) ptr g_KeywordNames
 dim shared as boolean       g_KeywordsReady
 
 private sub Register( byref word_ as string, byval kw as FbKeyword )
-    if( g_Keywords.Put( word_, clng(kw) ) ) then g_KeywordNames.Push( word_ )
+    if( g_Keywords->Put( word_, clng(kw) ) ) then g_KeywordNames->Push( word_ )
 end sub
 
 private sub EnsureKeywords( )
     if( g_KeywordsReady ) then exit sub
     g_KeywordsReady = true
+    g_Keywords = new KeywordMap
+    g_KeywordNames = new FB.Array( of string )
 
     '' The split result is bound to a LOCAL first. Iterating the temporary
     '' directly -- `for each w in FB.Split( ... )` -- destroys the array before
@@ -132,7 +138,7 @@ end sub
 function KeywordOf( byref word_ as string ) as FbKeyword
     EnsureKeywords( )
     dim as long kw = 0
-    if( g_Keywords.TryGet( lcase(word_), kw ) ) then return cast( FbKeyword, kw )
+    if( g_Keywords->TryGet( lcase(word_), kw ) ) then return cast( FbKeyword, kw )
     return KW_NONE
 end function
 
@@ -142,7 +148,7 @@ end function
 
 function AllKeywords( ) as FB.Array( of string )
     EnsureKeywords( )
-    return g_KeywordNames
+    return *g_KeywordNames
 end function
 
 '' ############################################################################
@@ -276,6 +282,15 @@ function TokenText( byref text_ as string, byref tok as Token ) as string
     if( tok.Length_ <= 0 ) then return ""
     if( tok.Start_ < 0 orelse tok.Start_ >= len(text_) ) then return ""
     return mid( text_, tok.Start_ + 1, tok.Length_ )
+end function
+
+'' The last token is a `public` keyword, and the first of its logical line.
+private function PublicHeadsLine_( byref tokens as TokenArray ) as boolean
+    dim as long n = tokens.Count( )
+    if( n = 0 ) then return false
+    if( tokens[n - 1].Kind <> TK_KEYWORD orelse tokens[n - 1].Kw <> KW_PUBLIC ) then return false
+    if( n = 1 ) then return true
+    return tokens[n - 2].Kind = TK_EOL orelse tokens[n - 2].Kind = TK_COLON
 end function
 
 private sub Emit( byref tokens as TokenArray, byval kind as TokenKind, _
@@ -710,8 +725,10 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
         '' -- preprocessor directive ---------------------------------------------
         ''
         '' Only at the head of a logical line: '#' is also a file number in
-        '' PRINT #1 and a stringify in a macro body.
-        if( c = asc("#") andalso atLineStart ) then
+        '' PRINT #1 and a stringify in a macro body. ...OR AFTER A `public` THAT HEADS
+        '' ONE: tiko's `public #include "x.ti"` and `public #cinclude "x.h"` carry a
+        '' header with a module's interface, and are directives all the same.
+        if( c = asc("#") andalso (atLineStart orelse PublicHeadsLine_( tokens )) ) then
             dim as long start_ = i
             i += 1
             while( i < n andalso IsIdentPart( text_[i] ) )

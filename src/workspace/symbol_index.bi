@@ -70,6 +70,10 @@ type IncludeEdge
     '' not FreeBASIC and is never read.
     IsC_      as boolean
 
+    '' `public #include` / `public #cinclude` in a module file: an importer of the module
+    '' sees the header's names bare (VisibleFrom).
+    Public_   as boolean
+
     '' Where the quoted path is, in LSP coordinates, so a jump to it has a
     '' range to answer with.
     Line      as long

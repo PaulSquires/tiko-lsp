@@ -174,6 +174,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
 
         dim as IncludeEdge e
         e.Target    = refs[i].Target
+        e.Public_   = refs[i].Public_
         e.ToFile    = -1          '' filled in by ResolveIncludes
         e.Line      = a.Line
         e.StartChar = a.Column
@@ -187,6 +188,7 @@ sub SymbolIndex.IndexText( byref uri as string, byref path_ as string, _
 
         dim as IncludeEdge e
         e.Target    = crefs[i].Target
+        e.Public_   = crefs[i].Public_
         e.ToFile    = -1
         e.IsC_      = true
         e.Line      = a.Line
@@ -326,6 +328,14 @@ private function FileNameOf( byref path_ as string ) as string
     return lcase( path_ )
 end function
 
+'' A MODULE'S OWN FILE: '.tiko', or the legacy '.bas' -- what tiko compiles as the module
+'' (tiko-lang modresolve.tiko ModuleFiles). A '.ti' or '.bi' beside them is a HEADER: the
+'' module includes it, publicly or not, and its names are not the module's.
+private function IsModuleSourceName_( byref nm as string ) as boolean
+    dim as string l = lcase( nm )
+    return right( l, 5 ) = ".tiko" orelse right( l, 4 ) = ".bas"
+end function
+
 '' THE IMPORTS, each to its module directory's files (workspace/modules.bi). The first
 '' candidate directory that holds a file of the index wins. A candidate the index knows
 '' nothing of but that exists -- the toolchain's pkg/, which no workspace folder covers --
@@ -343,14 +353,15 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
                 dim as string want = lcase( cands[c] )
                 dim found as FB.Array( of long )
                 for f as long = 0 to files_.Count( ) - 1
-                    if( lcase( DirOf( NormalizePath( files_[f].Path_ ) ) ) = want ) then found.Push( f )
+                    if( lcase( DirOf( NormalizePath( files_[f].Path_ ) ) ) <> want ) then continue for
+                    if( IsModuleSourceName_( files_[f].Path_ ) ) then found.Push( f )
                 next
                 if( found.Count( ) = 0 andalso FB.IsDir( cands[c] ) ) then
                     dim entries as FB.Array( of FB.DirEntry )
                     if( FB.ListDir( cands[c], entries ).IsOk( ) ) then
                         for q as long = 0 to entries.Count( ) - 1
                             if( entries[q].IsFile( ) = false ) then continue for
-                            if( IsSourceFileName( entries[q].Name( ) ) = false ) then continue for
+                            if( IsModuleSourceName_( entries[q].Name( ) ) = false ) then continue for
                             if( idx.IndexPath( FB.PathJoin( cands[c], entries[q].Name( ) ) ) ) then
                                 found.Push( files_.Count( ) - 1 )
                             end if
@@ -397,7 +408,10 @@ end function
 '' Bounded, since a header tree can be large.
 private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as SymbolIndex, _
                            byref incDirs as PathArray, byval everyFile as boolean )
-    if( incDirs.IsEmpty( ) ) then exit sub
+    '' With no include directory only a header BESIDE its includer can be found, and the
+    '' module seed is the one that needs that: a vendor package's sqlite3.ti sits beside
+    '' sqlite.tiko in the toolchain's pkg/, read for no other file.
+    if( incDirs.IsEmpty( ) ) then everyFile = false
     dim seen as FB.Map( of string, boolean )
     for i as long = 0 to files_.Count( ) - 1
         seen.Put( files_[i].Key_, true )
@@ -776,6 +790,24 @@ sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of
             if( seen_.Contains( to_ ) ) then continue for
             seen_.Put( to_, true )
             out_.Push( to_ )
+        next
+
+        '' AN IMPORTED MODULE'S PUBLIC HEADERS (tiko-vendor RFC-0002 V1): `#import
+        '' "vendor/sqlite"` makes sqlite3.ti's names this file's, bare, because the module
+        '' wrote `public #include once "sqlite3.ti"`. Its other files stay behind their
+        '' alias -- only the headers it carries publicly are followed.
+        for k as long = 0 to this.m_files[f].Imports.Count( ) - 1
+            for each mf as long in this.m_files[f].Imports[k].Files
+                if( mf < 0 orelse mf >= this.m_files.Count( ) ) then continue for
+                for i as long = 0 to this.m_files[mf].Includes.Count( ) - 1
+                    if( this.m_files[mf].Includes[i].Public_ = false ) then continue for
+                    dim as long to_ = this.m_files[mf].Includes[i].ToFile
+                    if( to_ < 0 ) then continue for
+                    if( seen_.Contains( to_ ) ) then continue for
+                    seen_.Put( to_, true )
+                    out_.Push( to_ )
+                next
+            next
         next
     wend
 end sub

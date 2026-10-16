@@ -30,7 +30,7 @@ if( len(g_Root) = 0 ) then
     print "usage: test_workspace <project-root>"
     end 2
 end if
-g_Fixture = g_Root & "\tests\fixtures\workspace"
+g_Fixture = g_Root & NativePath( "\tests\fixtures\workspace" )
 
 '' ----------------------------------------------------------------------------
 TestGroup( "file discovery" )
@@ -53,11 +53,11 @@ AssertFalse( IsSourceFileName( "notes.txt" ), "nor a text file" )
 AssertFalse( IsSourceFileName( "Makefile" ), "nor a file with no extension" )
 AssertFalse( IsSourceFileName( "basic" ), "and `bas` inside a name is not an extension" )
 
-AssertTrue ( IsIgnoredPath( "C:\dev\proj\.git\hooks\x.bas" ), ".git is skipped" )
+AssertTrue ( IsIgnoredPath( NativePath( "C:\dev\proj\.git\hooks\x.bas" ) ), ".git is skipped" )
 AssertTrue ( IsIgnoredPath( "/home/u/proj/node_modules/p/x.bi" ), "so is node_modules" )
-AssertTrue ( IsIgnoredPath( "C:\dev\proj\.vscode\x.bas" ), "and .vscode" )
-AssertFalse( IsIgnoredPath( "C:\dev\proj\src\git\x.bas" ), "a folder merely NAMED git is kept" )
-AssertFalse( IsIgnoredPath( "C:\dev\proj\bin\x.bas" ), "build folders are NOT skipped -- the extension filter is enough" )
+AssertTrue ( IsIgnoredPath( NativePath( "C:\dev\proj\.vscode\x.bas" ) ), "and .vscode" )
+AssertFalse( IsIgnoredPath( NativePath( "C:\dev\proj\src\git\x.bas" ) ), "a folder merely NAMED git is kept" )
+AssertFalse( IsIgnoredPath( NativePath( "C:\dev\proj\bin\x.bas" ) ), "build folders are NOT skipped -- the extension filter is enough" )
 
 '' ----------------------------------------------------------------------------
 TestGroup( "scanning the fixture workspace" )
@@ -78,9 +78,9 @@ scope
     AssertTrue( sawShared andalso sawWidgets, "both of them by name" )
 
     dim as string body
-    AssertTrue ( ReadSourceFile( g_Fixture & "\shared.bi", body ), "a source file reads" )
+    AssertTrue ( ReadSourceFile( g_Fixture & NativePath( "\shared.bi" ), body ), "a source file reads" )
     AssertContains( body, "type Widget", "and the bytes are the file's" )
-    AssertFalse( ReadSourceFile( g_Fixture & "\nothing-here.bas", body ), "a missing file reports false" )
+    AssertFalse( ReadSourceFile( g_Fixture & NativePath( "\nothing-here.bas" ), body ), "a missing file reports false" )
 end scope
 
 '' ----------------------------------------------------------------------------
@@ -88,17 +88,17 @@ TestGroup( "indexing" )
 
 scope
     dim as SymbolIndex idx
-    AssertTrue ( idx.IndexPath( g_Fixture & "\shared.bi" ), "a file indexes" )
-    AssertTrue ( idx.IndexPath( g_Fixture & "\widgets.bas" ), "and another" )
+    AssertTrue ( idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) ), "a file indexes" )
+    AssertTrue ( idx.IndexPath( g_Fixture & NativePath( "\widgets.bas" ) ), "and another" )
     AssertEqInt( idx.FileCount( ), 2, "two files are in the index" )
     AssertTrue ( idx.SymbolCount( ) >= 6, "carrying their symbols" )
 
     '' Re-indexing the same file REPLACES it. Two entries for one file would
     '' show every symbol in it twice in a picker.
-    idx.IndexPath( g_Fixture & "\shared.bi" )
+    idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) )
     AssertEqInt( idx.FileCount( ), 2, "re-indexing a file does not add a second entry" )
 
-    dim as string sharedUri = PathToUri( g_Fixture & "\shared.bi" )
+    dim as string sharedUri = PathToUri( g_Fixture & NativePath( "\shared.bi" ) )
     AssertTrue ( idx.IndexOfUri( sharedUri ) >= 0, "a file is found by its URI" )
     AssertTrue ( idx.IndexOfUri( ucase( sharedUri ) ) >= 0, "case-insensitively, as Windows paths are" )
     AssertEqInt( idx.IndexOfUri( "file:///nothing.bas" ), -1, "and an unknown URI is not found" )
@@ -141,10 +141,10 @@ scope
     '' The open buffer beats the file on disk, which is what makes a symbol
     '' findable from another file before it is saved.
     dim as SymbolIndex idx
-    idx.IndexPath( g_Fixture & "\shared.bi" )
+    idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) )
 
-    dim as string uri = PathToUri( g_Fixture & "\shared.bi" )
-    idx.IndexText( uri, g_Fixture & "\shared.bi", _
+    dim as string uri = PathToUri( g_Fixture & NativePath( "\shared.bi" ) )
+    idx.IndexText( uri, g_Fixture & NativePath( "\shared.bi" ), _
                    "type Widget" & LF & "end type" & LF & "sub JustTyped( )" & LF & "end sub", true )
 
     AssertEqInt( idx.FileCount( ), 1, "indexing from a buffer replaces the disk entry" )
@@ -161,18 +161,18 @@ scope
     '' is found twice and every reference reported twice, which is what the
     '' piped session caught before this was keyed on the resolved path.
     dim as SymbolIndex idx
-    idx.IndexPath( g_Fixture & "\shared.bi" )
+    idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) )
 
-    dim as string roundabout = g_Fixture & "\..\workspace\shared.bi"
+    dim as string roundabout = g_Fixture & NativePath( "\..\workspace\shared.bi" )
     idx.IndexPath( roundabout )
     AssertEqInt( idx.FileCount( ), 1, "a path through `..` is the SAME file" )
 
     dim as string body
-    ReadSourceFile( g_Fixture & "\shared.bi", body )
+    ReadSourceFile( g_Fixture & NativePath( "\shared.bi" ), body )
     idx.IndexText( PathToUri( roundabout ), roundabout, body, true )
     AssertEqInt( idx.FileCount( ), 1, "and so is the client's spelling of it" )
 
-    AssertTrue( idx.IndexOfUri( PathToUri( g_Fixture & "\shared.bi" ) ) >= 0, _
+    AssertTrue( idx.IndexOfUri( PathToUri( g_Fixture & NativePath( "\shared.bi" ) ) ) >= 0, _
                 "either spelling finds the one entry" )
     AssertTrue( idx.IndexOfUri( PathToUri( roundabout ) ) >= 0, _
                 "including the roundabout one" )
@@ -183,8 +183,8 @@ TestGroup( "workspace/symbol queries" )
 
 scope
     dim as SymbolIndex idx
-    idx.IndexPath( g_Fixture & "\shared.bi" )
-    idx.IndexPath( g_Fixture & "\widgets.bas" )
+    idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) )
+    idx.IndexPath( g_Fixture & NativePath( "\widgets.bas" ) )
 
     dim as IndexHitArray hits
 
@@ -254,8 +254,8 @@ end scope
 scope
     '' Across the fixture: `Widget` appears twice in each file.
     dim as string sharedText, widgetsText
-    ReadSourceFile( g_Fixture & "\shared.bi", sharedText )
-    ReadSourceFile( g_Fixture & "\widgets.bas", widgetsText )
+    ReadSourceFile( g_Fixture & NativePath( "\shared.bi" ), sharedText )
+    ReadSourceFile( g_Fixture & NativePath( "\widgets.bas" ), widgetsText )
 
     dim offsets as FB.Array( of long )
     FindIdentifierOffsets( sharedText, "widget", offsets )
@@ -275,15 +275,15 @@ scope
     '' widgets.bas` -- sends that file as the workspace folder, and walking a
     '' file finds nothing at all.
     dim as WorkspaceScan one_
-    ScanFolder( g_Fixture & "\widgets.bas", one_ )
+    ScanFolder( g_Fixture & NativePath( "\widgets.bas" ), one_ )
     AssertEqInt( one_.Files.Count( ), 1, "a file root scans to itself" )
 
     dim as WorkspaceScan none_
-    ScanFolder( g_Fixture & "\notes.txt", none_ )
+    ScanFolder( g_Fixture & NativePath( "\notes.txt" ), none_ )
     AssertEqInt( none_.Files.Count( ), 0, "and a file that is not tiko source scans to nothing" )
 
     dim as WorkspaceScan gone_
-    ScanFolder( g_Fixture & "\nothing-here.bas", gone_ )
+    ScanFolder( g_Fixture & NativePath( "\nothing-here.bas" ), gone_ )
     AssertEqInt( gone_.Files.Count( ), 0, "a path that does not exist is not a file either" )
 end scope
 
@@ -301,12 +301,12 @@ TestGroup( "the include graph" )
 
 '' Indexes one made-up file under the fixture directory.
 private sub Fake( byref idx as SymbolIndex, byref name_ as string, byref text_ as string )
-    dim as string path_ = g_Fixture & "\" & name_
+    dim as string path_ = g_Fixture & NativePath( "\" ) & name_
     idx.IndexText( PathToUri( path_ ), path_, text_ )
 end sub
 
 private function FakeIndex( byref idx as SymbolIndex, byref name_ as string ) as long
-    return idx.IndexOfUri( PathToUri( g_Fixture & "\" & name_ ) )
+    return idx.IndexOfUri( PathToUri( g_Fixture & NativePath( "\" ) & name_ ) )
 end function
 
 scope
@@ -387,11 +387,11 @@ scope
     '' neither may cost a resolution.
     dim as SymbolIndex idx
     Fake( idx, "m.bas",   "#include once ""sub/D.BI""" & LF )
-    Fake( idx, "sub\d.bi", "dim shared as long DDD" & LF )
+    Fake( idx, NativePath( "sub\d.bi" ), "dim shared as long DDD" & LF )
     idx.ResolveIncludes( )
 
     AssertEqInt( idx.IncludeAt( FakeIndex( idx, "m.bas" ), 0 ).ToFile, _
-                 FakeIndex( idx, "sub\d.bi" ), _
+                 FakeIndex( idx, NativePath( "sub\d.bi" ) ), _
                  "a forward slash and the wrong case still find the file" )
 end scope
 
@@ -403,18 +403,18 @@ scope
     roots.Push( g_Fixture )
     idx.SetSearchPaths( roots )
 
-    Fake( idx, "deep\down\far.bas", "#include once ""shared.bi""" & LF )
+    Fake( idx, NativePath( "deep\down\far.bas" ), "#include once ""shared.bi""" & LF )
     idx.ResolveIncludes( )
 
-    dim as long far_ = FakeIndex( idx, "deep\down\far.bas" )
+    dim as long far_ = FakeIndex( idx, NativePath( "deep\down\far.bas" ) )
     AssertTrue( idx.IncludeAt( far_, 0 ).ToFile < 0, _
                 "with no search path hit and no neighbour, it stays unresolved" )
 
     '' The real shared.bi, in the fixture root, is what the search path finds.
-    idx.IndexPath( g_Fixture & "\shared.bi" )
+    idx.IndexPath( g_Fixture & NativePath( "\shared.bi" ) )
     idx.ResolveIncludes( )
 
-    far_ = FakeIndex( idx, "deep\down\far.bas" )
+    far_ = FakeIndex( idx, NativePath( "deep\down\far.bas" ) )
     AssertTrue( idx.IncludeAt( far_, 0 ).ToFile >= 0, _
                 "a search path resolves what the includer's directory cannot" )
 end scope
@@ -473,7 +473,7 @@ scope
     '' gadgets.tko includes parts.ti and the legacy legacy.bi; assembly.tiko, in
     '' tiko's current extension, includes parts.ti too; notes.txt is not source
     '' and must stay out.
-    dim as string tkoFixture = g_Root & "\tests\fixtures\tko"
+    dim as string tkoFixture = g_Root & NativePath( "\tests\fixtures\tko" )
     dim as SymbolIndex idx
     dim roots as PathArray
     roots.Push( tkoFixture )
@@ -557,11 +557,11 @@ end scope
 
 '' The toolchain's pkg/: std/strings lives there and in no workspace folder.
 dim shared as string g_pkgEnv
-g_pkgEnv = "TKO_PKG=" & g_Root & "\tests\fixtures\modpkg"
+g_pkgEnv = "TKO_PKG=" & g_Root & NativePath( "\tests\fixtures\modpkg" )
 setenviron g_pkgEnv
 
 scope
-    dim as string fx = g_Root & "\tests\fixtures\modules"
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
     dim as SymbolIndex idx
     dim roots as PathArray
     roots.Push( fx )
@@ -578,8 +578,8 @@ scope
     dim as long app = -1, proj = -1
     for i as long = 0 to idx.FileCount( ) - 1
         dim as string p = lcase( idx.FilePath( i ) )
-        if( instr( p, "app\main.bas" ) > 0 ) then app = i
-        if( instr( p, "pkgproj\main.bas" ) > 0 ) then proj = i
+        if( instr( p, NativePath( "app\main.bas" ) ) > 0 ) then app = i
+        if( instr( p, NativePath( "pkgproj\main.bas" ) ) > 0 ) then proj = i
     next
     AssertTrue( app >= 0 andalso proj >= 0, "both roots are indexed" )
     AssertEqInt( idx.ImportCount( app ), 3, "app/main.bas imports three modules" )
@@ -615,7 +615,90 @@ scope
     AssertEqInt( files_.Count( ), 1, "one file" )
     AssertTrue ( idx.ModuleFilesOf( proj, "core", files_ ), "libz/core: a [dependencies] path" )
     AssertEqInt( files_.Count( ), 1, "one file" )
-    AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), "pkglib\core" ) > 0, "in ../pkglib" )
+    AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), NativePath( "pkglib\core" ) ) > 0, "in ../pkglib" )
+end scope
+
+
+'' VENDOR PACKAGES (tiko-vendor RFC-0002): `#import "vendor/clib" link dynamic` -- the link
+'' clause is read and is no diagnostic; vendor/ resolves to the toolchain's pkg/ alone, not
+'' to the workspace's own vendor/ directory; and the header the module carries with
+'' `public #include` is visible to the importer bare, while the one it includes for itself
+'' is not.
+scope
+    dim tokens as TokenArray
+    dim diags  as DiagnosticArray
+    dim syms   as SymbolTable
+    dim as string src = "#import ""vendor/clib"" link dynamic" & LF & _
+                        "#import ""vendor/zz"" as q public link static" & LF
+    AnalyzeFull( src, tokens, diags, syms )
+    dim refs as ImportRefArray
+    FindImports( src, tokens, refs )
+    AssertEqInt( refs.Count( ), 2, "two #import lines with 'link'" )
+    AssertEqStr( refs[0].Link_, "dynamic", "the first links dynamic" )
+    AssertEqStr( refs[0].Alias_, "clib", "and still binds its last segment" )
+    AssertEqStr( refs[1].Alias_, "q", "'as' before 'link'" )
+    AssertTrue ( refs[1].Public_, "'public' before 'link'" )
+    AssertEqStr( refs[1].Link_, "static", "'link static', static being a keyword" )
+    AssertEqInt( diags.Count( ), 0, "'link' is no diagnostic" )
+
+    dim as string m = "#module ""clib""" & LF & _
+                      "public #include once ""clib.ti""" & LF & _
+                      "#include once ""clibpriv.ti""" & LF & _
+                      "public #cinclude ""c.h""" & LF
+    AnalyzeFull( m, tokens, diags, syms )
+    dim incs as IncludeRefArray
+    FindIncludes( m, tokens, incs )
+    AssertEqInt( incs.Count( ), 2, "'public #include' is an include" )
+    AssertTrue ( incs[0].Public_, "and a public one" )
+    AssertFalse( incs[1].Public_, "the plain one is not" )
+    dim cincs as IncludeRefArray
+    FindCIncludes( m, tokens, cincs )
+    AssertEqInt( cincs.Count( ), 1, "'public #cinclude' is a #cinclude" )
+    AssertTrue ( cincs[0].Public_, "and a public one" )
+    AssertEqInt( diags.Count( ), 0, "'public #include' is no diagnostic" )
+end scope
+
+setenviron g_pkgEnv
+scope
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long app = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        if( instr( lcase( idx.FilePath( i ) ), NativePath( "vendorapp\main.tiko" ) ) > 0 ) then app = i
+    next
+    AssertTrue( app >= 0, "the vendor importer is indexed" )
+
+    dim files_ as FB.Array( of long )
+    AssertTrue ( idx.ModuleFilesOf( app, "clib", files_ ), "vendor/clib resolves" )
+    AssertEqInt( files_.Count( ), 1, "to one file" )
+    AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), NativePath( "modpkg\vendor\clib" ) ) > 0, _
+                 "in the toolchain's pkg/, not the workspace's vendor/" )
+
+    dim as IndexHit hit
+    AssertTrue ( idx.FindDefinitionFrom( app, "clib_open", hit ), "clib_open is found from the importer" )
+    AssertTrue ( instr( lcase( idx.FilePath( hit.FileIndex ) ), "clib.ti" ) > 0, "in the public header" )
+    dim vis as FB.Array( of long )
+    idx.VisibleFrom( app, vis )
+    dim as boolean seesPub = false, seesPriv = false, seesMod = false
+    for each f as long in vis
+        dim as string p = lcase( idx.FilePath( f ) )
+        if( right( p, 7 ) = "clib.ti" ) then seesPub = true
+        if( instr( p, "clibpriv.ti" ) > 0 ) then seesPriv = true
+        if( right( p, 9 ) = "clib.tiko" ) then seesMod = true
+    next
+    AssertTrue ( seesPub, "the importer sees the public header" )
+    AssertFalse( seesPriv, "but not the header the module keeps" )
+    AssertFalse( seesMod, "nor the module's own file, which stays behind its alias" )
 end scope
 
 setenviron "TKO_PKG="
@@ -624,12 +707,12 @@ setenviron "TKO_PKG="
 '' names are offered after `fs.` as what they name -- FB.PathJoin, in a header found through
 '' the toolchain's include directory (TKO_INCLUDE here) -- and are never symbols.
 dim shared as string g_incEnv
-g_incEnv = "TKO_INCLUDE=" & g_Root & "\tests\fixtures\modinc"
+g_incEnv = "TKO_INCLUDE=" & g_Root & NativePath( "\tests\fixtures\modinc" )
 setenviron g_incEnv
 setenviron g_pkgEnv
 
 scope
-    dim as string fx = g_Root & "\tests\fixtures\modules"
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
     dim as SymbolIndex idx
     dim roots as PathArray
     roots.Push( fx )
@@ -644,8 +727,8 @@ scope
     dim as long fac = -1, app = -1
     for i as long = 0 to idx.FileCount( ) - 1
         dim as string p = lcase( idx.FilePath( i ) )
-        if( instr( p, "facade\main.bas" ) > 0 ) then fac = i
-        if( instr( p, "app\main.bas" ) > 0 ) then app = i
+        if( instr( p, NativePath( "facade\main.bas" ) ) > 0 ) then fac = i
+        if( instr( p, NativePath( "app\main.bas" ) ) > 0 ) then app = i
     next
     AssertTrue( fac >= 0, "the facade's importer is indexed" )
     AssertEqInt( idx.ImportCount( app ), 3, "app/main.bas still imports three modules" )
@@ -688,7 +771,7 @@ scope
     AssertEqInt( idx.ModuleMemberAt( fac, "fs", "pathjoin", t, x ), 2, "fs.PathJoin is an exported macro" )
     AssertTrue ( t.FileIndex >= 0, "that names a declaration" )
     if( t.FileIndex >= 0 ) then
-        AssertTrue ( instr( lcase( idx.FilePath( t.FileIndex ) ), "modinc\fb\fakefs.bi" ) > 0, _
+        AssertTrue ( instr( lcase( idx.FilePath( t.FileIndex ) ), NativePath( "modinc\fb\fakefs.bi" ) ) > 0, _
                      "in the header, read in from the toolchain's include directory" )
         dim as SymbolInfo ts = idx.SymbolAt( t.FileIndex, t.SymIndex )
         AssertEqStr( ts.LowerName, "pathjoin", "FB.PathJoin itself" )
@@ -742,7 +825,7 @@ setenviron "TKO_PKG="
 TestGroup( "toolchain headers" )
 
 dim shared as string g_incWs
-g_incWs = g_Root & "\tests\fixtures\incws"
+g_incWs = g_Root & NativePath( "\tests\fixtures\incws" )
 
 '' Builds an index of the incws workspace the way the worker does -- every file,
 '' then the graph -- reading headers only when `readHeaders` says so.
@@ -775,7 +858,7 @@ scope
     dim as SymbolIndex idx
     BuildIncWs( idx, true )
     AssertEqInt( idx.FileCount( ), 3, "no include directory: only the workspace's three files" )
-    dim as long app = FileEndingIn( idx, "incws\app.bas" )
+    dim as long app = FileEndingIn( idx, NativePath( "incws\app.bas" ) )
     AssertTrue ( idx.HasUnresolvedIncludes( app ), "and fakewin.bi is an edge to nowhere" )
     dim as IndexHit hit
     AssertFalse( idx.FindDefinitionFrom( app, "messageboxw", hit ), "MessageBoxW is unknown" )
@@ -783,7 +866,7 @@ end scope
 
 scope
     dim dirs as PathArray
-    dirs.Push( g_Root & "\tests\fixtures\toolinc" )
+    dirs.Push( g_Root & NativePath( "\tests\fixtures\toolinc" ) )
     SetConfiguredIncludeDirs( dirs )
 
     '' The message loop's resolution stays lexical: it reads no header THE WORKSPACE
@@ -791,20 +874,20 @@ scope
     '' the include directory -- and, as it always has, the header a module includes.
     dim as SymbolIndex lexical_
     BuildIncWs( lexical_, false )
-    AssertEqInt( FileEndingIn( lexical_, "toolinc\fakewin.bi" ), -1, _
+    AssertEqInt( FileEndingIn( lexical_, NativePath( "toolinc\fakewin.bi" ) ), -1, _
                  "a lexical resolve reads no header the workspace includes" )
-    AssertTrue ( FileEndingIn( lexical_, "pkg\demo\demo.bas" ) >= 0, _
-                 "but finds the imported package as <include dir>\..\pkg" )
+    AssertTrue ( FileEndingIn( lexical_, NativePath( "pkg\demo\demo.bas" ) ) >= 0, _
+                 NativePath( "but finds the imported package as <include dir>\..\pkg" ) )
 
     '' The worker's full build does.
     dim as SymbolIndex idx
     BuildIncWs( idx, true )
     AssertEqInt( idx.FileCount( ), 6, "a full build: 3 workspace files, the package, fakewin.bi and what it includes" )
 
-    dim as long app  = FileEndingIn( idx, "incws\app.bas" )
-    dim as long help = FileEndingIn( idx, "incws\helper.bi" )
-    dim as long win_ = FileEndingIn( idx, "toolinc\fakewin.bi" )
-    dim as long user = FileEndingIn( idx, "toolinc\win\fakeuser.bi" )
+    dim as long app  = FileEndingIn( idx, NativePath( "incws\app.bas" ) )
+    dim as long help = FileEndingIn( idx, NativePath( "incws\helper.bi" ) )
+    dim as long win_ = FileEndingIn( idx, NativePath( "toolinc\fakewin.bi" ) )
+    dim as long user = FileEndingIn( idx, NativePath( "toolinc\win\fakeuser.bi" ) )
     AssertTrue ( win_ >= 0 andalso user >= 0, "both toolchain headers are indexed" )
     AssertTrue ( idx.IsExternal( win_ ) andalso idx.IsExternal( user ), "and marked external" )
     AssertFalse( idx.IsExternal( app ) orelse idx.IsExternal( help ), "the workspace's own files are not" )
@@ -944,11 +1027,11 @@ ShutdownIndexBuilder( )
 TestGroup( "compiler metadata (tiko metadata)" )
 
 scope
-    dim as string metaWs  = g_Root & "\tests\fixtures\meta\ws"
-    dim as string metaLib = g_Root & "\tests\fixtures\meta\lib"
-    dim as string mainFile = metaWs & "\src\main.tiko"
+    dim as string metaWs  = g_Root & NativePath( "\tests\fixtures\meta\ws" )
+    dim as string metaLib = g_Root & NativePath( "\tests\fixtures\meta\lib" )
+    dim as string mainFile = metaWs & NativePath( "\src\main.tiko" )
     dim as string answer
-    AssertTrue( ReadSourceFile( metaWs & "\tiko-metadata.json", answer ), "the fixture answer is readable" )
+    AssertTrue( ReadSourceFile( metaWs & NativePath( "\tiko-metadata.json" ), answer ), "the fixture answer is readable" )
 
     '' -- with nothing known: the private resolver alone ---------------------------
     ClearMetadata( )
@@ -958,7 +1041,7 @@ scope
     ModuleCandidates( mainFile, "gadgets", roots, cands )
     dim as boolean sawLib = false
     for i as long = 0 to cands.Count( ) - 1
-        if( lcase( cands[i] ) = lcase( NormalizePath( metaLib & "\gadgets" ) ) ) then sawLib = true
+        if( lcase( cands[i] ) = lcase( NormalizePath( metaLib & NativePath( "\gadgets" ) ) ) ) then sawLib = true
     next
     AssertFalse( sawLib, "without metadata, a module reached by a target's -i is not a candidate" )
     AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "and no module directory is known" )
@@ -969,14 +1052,14 @@ scope
     AssertFalse( AcceptMetadata( metaWs, "not json" ), "and so is one that is not JSON" )
     AssertTrue ( AcceptMetadata( metaWs, answer ), "the fixture's answer is accepted" )
 
-    dim as string want = NormalizePath( metaLib & "\gadgets" )
+    dim as string want = NormalizePath( metaLib & NativePath( "\gadgets" ) )
     AssertEqStr( lcase( MetadataModuleDir( mainFile, "gadgets" ) ), lcase( want ), _
                  "the module's directory, read against the manifest's directory" )
     AssertEqStr( lcase( MetadataModuleDir( mainFile, "GADGETS" ) ), lcase( want ), _
                  "matched by chain, case-insensitively" )
     AssertEqStr( MetadataModuleDir( mainFile, "./gadgets" ), "", "a relative import is never looked up" )
     AssertEqStr( MetadataModuleDir( mainFile, "nosuch" ), "", "nor is a module no target reaches" )
-    AssertEqStr( MetadataModuleDir( metaLib & "\gadgets\gadgets.tiko", "gadgets" ), "", _
+    AssertEqStr( MetadataModuleDir( metaLib & NativePath( "\gadgets\gadgets.tiko" ), "gadgets" ), "", _
                  "and a file outside the manifest's directory has no package here" )
 
     ModuleCandidates( mainFile, "gadgets", roots, cands )
@@ -986,7 +1069,7 @@ scope
     end if
     dim as long rootAt = -1, wsAt = -1
     for i as long = 0 to cands.Count( ) - 1
-        if( lcase( cands[i] ) = lcase( NormalizePath( metaWs & "\gadgets" ) ) ) then wsAt = i
+        if( lcase( cands[i] ) = lcase( NormalizePath( metaWs & NativePath( "\gadgets" ) ) ) ) then wsAt = i
         if( lcase( cands[i] ) = lcase( want ) andalso i > 0 ) then rootAt = i
     next
     AssertTrue( rootAt > 0, "the -i root the compiler searched is a candidate too" )
@@ -997,7 +1080,7 @@ scope
     AssertEqInt( ir.Count( ), 1, "one -i root" )
     if( ir.Count( ) = 1 ) then AssertEqStr( lcase( ir[0] ), lcase( NormalizePath( metaLib ) ), "../lib, made absolute" )
 
-    AssertEqStr( lcase( MetadataPkgDir( ) ), lcase( NormalizePath( g_Root & "\tests\fixtures\meta\nopkg" ) ), _
+    AssertEqStr( lcase( MetadataPkgDir( ) ), lcase( NormalizePath( g_Root & NativePath( "\tests\fixtures\meta\nopkg" ) ) ), _
                  "the pkg/ the compiler named" )
     AssertTrue( lcase( ToolchainPkgDir( ) ) <> lcase( MetadataPkgDir( ) ), _
                 "but not used as the toolchain's when it is not a directory" )
@@ -1007,7 +1090,7 @@ scope
     dim tinc as PathArray = ToolchainIncDirs( )
     dim as boolean sawToolinc = false
     for i as long = 0 to tinc.Count( ) - 1
-        if( lcase( tinc[i] ) = lcase( NormalizePath( g_Root & "\tests\fixtures\toolinc" ) ) ) then sawToolinc = true
+        if( lcase( tinc[i] ) = lcase( NormalizePath( g_Root & NativePath( "\tests\fixtures\toolinc" ) ) ) ) then sawToolinc = true
     next
     AssertTrue( sawToolinc, "and they are the toolchain include directories when none is configured" )
 
@@ -1017,7 +1100,7 @@ scope
     AssertContains( js, chr(34) & "main" & chr(34) & ":" & chr(34) & "src/main.tiko" & chr(34), _
                     "and the answer as the compiler printed it" )
     AssertTrue ( MetadataFor( "", md, js ), "with no file, the first package known" )
-    AssertFalse( MetadataFor( metaLib & "\gadgets\gadgets.tiko", md, js ), "a file in no known package has none" )
+    AssertFalse( MetadataFor( metaLib & NativePath( "\gadgets\gadgets.tiko" ), md, js ), "a file in no known package has none" )
 
     ClearMetadata( )
     AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "ClearMetadata forgets it all" )
@@ -1029,13 +1112,13 @@ scope
     AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "with no compiler configured, LoadMetadata does nothing" )
 
 #ifdef __FB_WIN32__
-    dim as string fakeExe = g_Root & "\bin\fake_tiko.exe"
+    dim as string fakeExe = g_Root & NativePath( "\bin\fake_tiko.exe" )
 #else
     dim as string fakeExe = g_Root & "/bin/fake_tiko"
 #endif
     SetCompilerPath( fakeExe )
     dim nested as PathArray
-    nested.Push( metaWs & "\src" )
+    nested.Push( metaWs & NativePath( "\src" ) )
     nested.Push( metaWs )
     LoadMetadata( nested )
     AssertEqStr( lcase( MetadataModuleDir( mainFile, "gadgets" ) ), lcase( want ), _
@@ -1043,7 +1126,7 @@ scope
     AssertTrue( MetadataFor( "", md, js ), "and keeps its answer" )
     AssertEqInt( MetadataManifestCount( ), 1, "once: two folders under one manifest ask once" )
 
-    SetCompilerPath( g_Root & "\bin\no_such_tiko.exe" )
+    SetCompilerPath( g_Root & NativePath( "\bin\no_such_tiko.exe" ) )
     LoadMetadata( roots )
     AssertEqStr( MetadataModuleDir( mainFile, "gadgets" ), "", "a compiler that cannot run leaves nothing known" )
     ModuleCandidates( mainFile, "gadgets", roots, cands )
@@ -1062,7 +1145,7 @@ TestGroup( "#cinclude" )
 
 '' The worker's order: every file, the graph, the #cincludes, the graph again.
 private sub BuildCincWs( byref idx as SymbolIndex )
-    dim as string ws = g_Root & "\tests\fixtures\cinc\ws"
+    dim as string ws = g_Root & NativePath( "\tests\fixtures\cinc\ws" )
     dim roots as PathArray
     roots.Push( ws )
     idx.SetSearchPaths( roots )
@@ -1081,7 +1164,7 @@ scope
     dim as SymbolIndex bare
     SetCompilerPath( "" )
     BuildCincWs( bare )
-    dim as long m0 = FileEndingIn( bare, "cinc\ws\main.bas" )
+    dim as long m0 = FileEndingIn( bare, NativePath( "cinc\ws\main.bas" ) )
     AssertTrue ( bare.HasCIncludes( m0 ), "main.bas has #cinclude edges" )
     AssertEqInt( bare.IncludeCount( m0 ), 2, "two of them" )
     AssertTrue ( bare.IncludeAt( m0, 0 ).IsC_ andalso bare.IncludeAt( m0, 1 ).IsC_, "both marked as C" )
@@ -1091,14 +1174,14 @@ scope
     AssertTrue ( bare.HasUnresolvedIncludes( m0 ), "so main.bas's visible set is a lower bound" )
 
 #ifdef __FB_WIN32__
-    SetCompilerPath( g_Root & "\bin\fake_tiko.exe" )
+    SetCompilerPath( g_Root & NativePath( "\bin\fake_tiko.exe" ) )
 #else
     SetCompilerPath( g_Root & "/bin/fake_tiko" )
 #endif
     dim as SymbolIndex idx
     BuildCincWs( idx )
-    dim as long m = FileEndingIn( idx, "cinc\ws\main.bas" )
-    dim as long b = FileEndingIn( idx, "cinc\cache\fake-binding.bi" )
+    dim as long m = FileEndingIn( idx, NativePath( "cinc\ws\main.bas" ) )
+    dim as long b = FileEndingIn( idx, NativePath( "cinc\cache\fake-binding.bi" ) )
     AssertTrue ( b >= 0, "the binding the compiler named is indexed" )
     AssertTrue ( idx.IsExternal( b ), "as an external file" )
     AssertEqInt( idx.IncludeAt( m, 0 ).ToFile, b, "#cinclude ""fake.h"" points at it" )
@@ -1121,10 +1204,10 @@ scope
     AssertFalse( AcceptCIncludes( "{""format"":2}" ), "an answer in another format is refused" )
 
     '' A compiler that cannot run leaves the edges unresolved and nothing broken.
-    SetCompilerPath( g_Root & "\bin\no_such_tiko.exe" )
+    SetCompilerPath( g_Root & NativePath( "\bin\no_such_tiko.exe" ) )
     dim as SymbolIndex gone
     BuildCincWs( gone )
-    AssertEqInt( gone.IncludeAt( FileEndingIn( gone, "cinc\ws\main.bas" ), 0 ).ToFile, -1, _
+    AssertEqInt( gone.IncludeAt( FileEndingIn( gone, NativePath( "cinc\ws\main.bas" ) ), 0 ).ToFile, -1, _
                  "a compiler that cannot run resolves nothing" )
     SetCompilerPath( "" )
     ClearCIncludes( )

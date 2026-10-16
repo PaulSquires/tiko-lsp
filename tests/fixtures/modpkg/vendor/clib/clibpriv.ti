@@ -1,0 +1,2 @@
+'' A header the module includes for itself: not carried, not an importer's.
+declare function clib_private_helper( ) as long

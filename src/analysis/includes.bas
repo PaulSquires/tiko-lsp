@@ -62,6 +62,14 @@ private sub FindPathDirectives( byref text_ as string, byref tokens as TokenArra
         dim as IncludeRef r
         r.Target  = target
         r.Once_   = once_
+        '' `public` before the directive, on its line (the lexer made it one).
+        dim as long b = i - 1
+        while( b >= 0 andalso tokens[b].Kind = TK_COMMENT )
+            b -= 1
+        wend
+        if( b >= 0 ) then
+            r.Public_ = (tokens[b].Kind = TK_KEYWORD andalso tokens[b].Kw = KW_PUBLIC)
+        end if
         r.Start_  = tokens[k].Start_
         r.Length_ = tokens[k].Length_
         out_.Push( r )
@@ -104,7 +112,7 @@ sub FindImports( byref text_ as string, byref tokens as TokenArray, _
         dim as long sl = instrrev( r.Path_, "/" )
         r.Alias_  = lcase( mid( r.Path_, sl + 1 ) )
 
-        '' `as NAME` and `public`, in that order, on the same line.
+        '' `as NAME`, `public` and `link static|dynamic`, in that order, on the same line.
         k += 1
         while( k < tokens.Count( ) )
             dim as Token t = tokens[k]
@@ -118,6 +126,12 @@ sub FindImports( byref text_ as string, byref tokens as TokenArray, _
                 end if
             elseif( w = "public" ) then
                 r.Public_ = true
+            elseif( w = "link" andalso k + 1 < tokens.Count( ) ) then
+                dim as string m = lcase( TokenText( text_, tokens[k + 1] ) )
+                if( m = "static" orelse m = "dynamic" ) then
+                    r.Link_ = m
+                    k += 1
+                end if
             end if
             k += 1
         wend

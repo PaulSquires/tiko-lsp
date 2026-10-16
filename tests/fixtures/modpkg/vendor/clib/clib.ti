@@ -1,0 +1,8 @@
+'' The library's header, translated: every importer sees these names bare.
+extern "C"
+declare function clib_open( byval name_ as zstring ptr ) as long
+end extern
+type clib_handle
+    as long id
+end type
+const CLIB_OK = 0
