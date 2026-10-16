@@ -226,7 +226,11 @@ function StdioTransport.ErrorText( ) as string
 end function
 
 function StdioTransport.ReadMessage( byref payload as string ) as TransportStatus
-    dim as ubyte chunk( 0 to READ_CHUNK_BYTES - 1 )
+    '' THE CHUNK IS ON THE HEAP: 64 KB on the stack overflowed a worker thread's on
+    '' Linux (gdb: SIGSEGV in READMESSAGE, the live-pipe test's reader thread). A string, so it is freed on
+    '' every way out without a deallocate on each.
+    dim as string chunkStr = space( READ_CHUNK_BYTES )
+    dim as ubyte ptr chunk = cast( ubyte ptr, strptr( chunkStr ) )
 
     do
         dim as FrameStatus st = this.m_framer.NextMessage( payload )
@@ -241,7 +245,7 @@ function StdioTransport.ReadMessage( byref payload as string ) as TransportStatu
                 return TRANSPORT_ERROR
         end select
 
-        dim as long got = ReadSomeStdin( @chunk(0), READ_CHUNK_BYTES )
+        dim as long got = ReadSomeStdin( chunk, READ_CHUNK_BYTES )
 
         '' 0 is end of stream -- the editor closed the pipe. Negative is a real
         '' error. Anything else is a short read, which is NORMAL and is the
@@ -253,7 +257,7 @@ function StdioTransport.ReadMessage( byref payload as string ) as TransportStatu
         end if
 
         dim as string block_ = space( got )
-        memcpy( strptr(block_), @chunk(0), got )
+        memcpy( strptr(block_), chunk, got )
         this.m_framer.Feed( block_ )
     loop
 end function
