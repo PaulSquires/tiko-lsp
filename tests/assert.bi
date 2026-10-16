@@ -8,6 +8,21 @@
 
 #pragma once
 
+'' A PATH AS THE TESTS SPELL IT -- Windows' backslashes -- in THIS host's spelling. The
+'' fixtures are written `g_Root & "\tests\fixtures\x"`, and on Linux a backslash is a
+'' character of the file name, so every one of them named nothing there.
+function N( byref p as string ) as string
+#ifdef __FB_WIN32__
+    return p
+#else
+    dim as string s = p
+    for i as long = 0 to len(s) - 1
+        if( s[i] = 92 ) then s[i] = 47
+    next
+    return s
+#endif
+end function
+
 dim shared as long g_TestsRun
 dim shared as long g_TestsFailed
 dim shared as string g_CurrentGroup
