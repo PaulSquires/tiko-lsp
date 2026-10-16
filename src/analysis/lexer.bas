@@ -47,17 +47,23 @@ end function
 
 type KeywordMap as FB.Map( of string, long )
 
-dim shared as KeywordMap    g_Keywords
-dim shared as FB.Array( of string ) g_KeywordNames
+'' POINTERS, MADE BY THE FIRST FILL -- not objects. A shared FB.Map has a constructor of its
+'' own, and on Linux it ran AFTER InitKeywords below had filled it, emptying the table:
+'' no word was a keyword and every lexer test failed there, while Windows ran the two in the
+'' other order. A pointer is zeroed data, with no constructor to run late.
+dim shared as KeywordMap ptr g_Keywords
+dim shared as FB.Array( of string ) ptr g_KeywordNames
 dim shared as boolean       g_KeywordsReady
 
 private sub Register( byref word_ as string, byval kw as FbKeyword )
-    if( g_Keywords.Put( word_, clng(kw) ) ) then g_KeywordNames.Push( word_ )
+    if( g_Keywords->Put( word_, clng(kw) ) ) then g_KeywordNames->Push( word_ )
 end sub
 
 private sub EnsureKeywords( )
     if( g_KeywordsReady ) then exit sub
     g_KeywordsReady = true
+    g_Keywords = new KeywordMap
+    g_KeywordNames = new FB.Array( of string )
 
     '' The split result is bound to a LOCAL first. Iterating the temporary
     '' directly -- `for each w in FB.Split( ... )` -- destroys the array before
@@ -132,7 +138,7 @@ end sub
 function KeywordOf( byref word_ as string ) as FbKeyword
     EnsureKeywords( )
     dim as long kw = 0
-    if( g_Keywords.TryGet( lcase(word_), kw ) ) then return cast( FbKeyword, kw )
+    if( g_Keywords->TryGet( lcase(word_), kw ) ) then return cast( FbKeyword, kw )
     return KW_NONE
 end function
 
@@ -142,7 +148,7 @@ end function
 
 function AllKeywords( ) as FB.Array( of string )
     EnsureKeywords( )
-    return g_KeywordNames
+    return *g_KeywordNames
 end function
 
 '' ############################################################################
