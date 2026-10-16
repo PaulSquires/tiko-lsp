@@ -1,0 +1,4 @@
+'' The satellite's header: its importer sees this bare.
+extern "C"
+declare function clib_ext_version( ) as long
+end extern

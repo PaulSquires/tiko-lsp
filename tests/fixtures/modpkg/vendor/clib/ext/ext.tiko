@@ -1,0 +1,5 @@
+'' A satellite module inside vendor/clib: its own public header, and clib's names
+'' re-exported, so one import brings both.
+#module "ext"
+#import "vendor/clib" public
+public #include once "ext.ti"

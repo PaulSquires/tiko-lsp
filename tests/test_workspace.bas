@@ -701,6 +701,63 @@ scope
     AssertFalse( seesMod, "nor the module's own file, which stays behind its alias" )
 end scope
 
+'' A PUBLIC HEADER REACHES THE IMPORTER, NOT THE IMPORTER'S IMPORTERS (tiko-lang e6e2dfdc):
+'' a module that imports vendor/clib privately keeps clib.ti to itself; one that imports
+'' it `public` -- vendor/clib/ext, as vendor/SDL3/image does vendor/SDL3 -- passes clib's
+'' public header on, with its own.
+scope
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long leak = -1, reex = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        dim as string p = lcase( idx.FilePath( i ) )
+        if( instr( p, NativePath( "vleak\leak.tiko" ) ) > 0 ) then leak = i
+        if( instr( p, NativePath( "vleak\reexport.tiko" ) ) > 0 ) then reex = i
+    next
+    AssertTrue( leak >= 0 andalso reex >= 0, "both vleak roots are indexed" )
+
+    dim files_ as FB.Array( of long )
+    AssertTrue ( idx.ModuleFilesOf( reex, "ext", files_ ), "vendor/clib/ext resolves" )
+    AssertEqInt( files_.Count( ), 1, "to its one file" )
+
+    dim vis as FB.Array( of long )
+    idx.VisibleFrom( leak, vis )
+    dim as boolean leaks = false
+    for each f as long in vis
+        if( right( lcase( idx.FilePath( f ) ), 7 ) = "clib.ti" ) then leaks = true
+    next
+    AssertFalse( leaks, "a private import's public header does not reach the importer's importer" )
+
+    dim as IndexHit hit
+    AssertTrue ( idx.FindDefinitionFrom( reex, "clib_ext_version", hit ), _
+                 "the satellite's own public header reaches its importer" )
+
+    '' Visibility, not FindDefinitionFrom: that one falls back to the whole index.
+    idx.VisibleFrom( reex, vis )
+    dim as boolean seesExt = false, seesClib = false, seesPriv = false, seesMod = false
+    for each f as long in vis
+        dim as string p = lcase( idx.FilePath( f ) )
+        if( right( p, 6 ) = "ext.ti" ) then seesExt = true
+        if( right( p, 7 ) = "clib.ti" ) then seesClib = true
+        if( instr( p, "clibpriv.ti" ) > 0 ) then seesPriv = true
+        if( right( p, 9 ) = "clib.tiko" orelse right( p, 8 ) = "ext.tiko" ) then seesMod = true
+    next
+    AssertTrue ( seesExt, "the importer sees ext.ti" )
+    AssertTrue ( seesClib, "and, through '#import ... public', clib.ti" )
+    AssertFalse( seesPriv, "clib's private header stays behind" )
+    AssertFalse( seesMod, "and so do the modules' own files" )
+end scope
+
 setenviron "TKO_PKG="
 
 '' EXPORTED MACROS: a facade (tiko-lang RFC-0009) is `#define N FB.N` + `#export N`. Its

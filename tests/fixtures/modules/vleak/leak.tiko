@@ -1,0 +1,3 @@
+'' Imports a module that imports vendor/clib privately: clib's names are not visible.
+#import "vleak/wrap"
+print wrap.WrapOpen( )

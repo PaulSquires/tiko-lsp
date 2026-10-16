@@ -1,0 +1,7 @@
+'' A workspace module that uses vendor/clib for itself: the import is not public, so
+'' clib's header stops here and never reaches this module's importers.
+#module "wrap"
+#import "vendor/clib"
+public function WrapOpen( ) as long
+    return clib_open( "w" )
+end function
