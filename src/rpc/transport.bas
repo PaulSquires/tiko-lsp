@@ -44,7 +44,8 @@ private function ReadSomeStdin( byval buf as any ptr, byval maxBytes as long ) a
     #ifdef __FB_WIN32__
         return _read( _fileno( stdin ), buf, maxBytes )
     #else
-        return read( fileno( stdin ), buf, maxBytes )
+        '' READ IS A KEYWORD: crt/linux/unistd.bi declares the C function as read_.
+        return read_( fileno( stdin ), buf, maxBytes )
     #endif
 end function
 
