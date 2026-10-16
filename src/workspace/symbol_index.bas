@@ -342,8 +342,12 @@ end function
 '' has its source files indexed first, so `std` resolves like anything else.
 private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as PathArray, _
                              byref idx as SymbolIndex )
-    dim as long n0 = files_.Count( )
-    for i as long = 0 to n0 - 1
+    '' Over the files indexed DURING the pass too: a module read from pkg/ on demand has
+    '' imports of its own, and its `#import "vendor/SDL3" public` is what carries SDL's
+    '' header to an importer of vendor/SDL3/image (VisibleFrom). Each module directory
+    '' is indexed once, so this ends.
+    dim as long i = 0
+    while( i < files_.Count( ) )
         for k as long = 0 to files_[i].Imports.Count( ) - 1
             files_[i].Imports[k].Dir_ = ""
             files_[i].Imports[k].Files.Clear( )
@@ -376,7 +380,8 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
                 exit for
             next
         next
-    next
+        i += 1
+    wend
 end sub
 
 '' CandidateKey's path, as written: the file is read from it, and its URI is made from it.
@@ -793,22 +798,50 @@ sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of
         next
 
         '' AN IMPORTED MODULE'S PUBLIC HEADERS (tiko-vendor RFC-0002 V1): `#import
-        '' "vendor/sqlite"` makes sqlite3.ti's names this file's, bare, because the module
+        '' "vendor/sqlite3"` makes sqlite3.ti's names this file's, bare, because the module
         '' wrote `public #include once "sqlite3.ti"`. Its other files stay behind their
         '' alias -- only the headers it carries publicly are followed.
+        ''
+        '' And the public headers of what that module RE-EXPORTS with `#import ... public`,
+        '' transitively: vendor/SDL3/image re-exports vendor/SDL3, so one import of the
+        '' satellite brings SDL.ti's names too. A module's plain import is its own business
+        '' and goes no further -- the compiler's rule since tiko-lang e6e2dfdc: a public
+        '' header reaches the importer, never the importer's importers.
+        dim modFiles as FB.Array( of long )
+        dim modSeen as FB.Map( of long, boolean )
         for k as long = 0 to this.m_files[f].Imports.Count( ) - 1
             for each mf as long in this.m_files[f].Imports[k].Files
                 if( mf < 0 orelse mf >= this.m_files.Count( ) ) then continue for
-                for i as long = 0 to this.m_files[mf].Includes.Count( ) - 1
-                    if( this.m_files[mf].Includes[i].Public_ = false ) then continue for
-                    dim as long to_ = this.m_files[mf].Includes[i].ToFile
-                    if( to_ < 0 ) then continue for
-                    if( seen_.Contains( to_ ) ) then continue for
-                    seen_.Put( to_, true )
-                    out_.Push( to_ )
-                next
+                if( modSeen.Contains( mf ) ) then continue for
+                modSeen.Put( mf, true )
+                modFiles.Push( mf )
             next
         next
+
+        dim as long mAt = 0
+        while( mAt < modFiles.Count( ) )
+            dim as long mf = modFiles[mAt]
+            mAt += 1
+
+            for i as long = 0 to this.m_files[mf].Includes.Count( ) - 1
+                if( this.m_files[mf].Includes[i].Public_ = false ) then continue for
+                dim as long to_ = this.m_files[mf].Includes[i].ToFile
+                if( to_ < 0 ) then continue for
+                if( seen_.Contains( to_ ) ) then continue for
+                seen_.Put( to_, true )
+                out_.Push( to_ )
+            next
+
+            for k as long = 0 to this.m_files[mf].Imports.Count( ) - 1
+                if( this.m_files[mf].Imports[k].Public_ = false ) then continue for
+                for each rf as long in this.m_files[mf].Imports[k].Files
+                    if( rf < 0 orelse rf >= this.m_files.Count( ) ) then continue for
+                    if( modSeen.Contains( rf ) ) then continue for
+                    modSeen.Put( rf, true )
+                    modFiles.Push( rf )
+                next
+            next
+        wend
     wend
 end sub
 

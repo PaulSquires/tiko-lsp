@@ -1,0 +1,3 @@
+'' Imports vendor/clib/ext, which re-exports vendor/clib: both headers are visible.
+#import "vendor/clib/ext"
+print clib_ext_version( ), clib_open( "x" )
