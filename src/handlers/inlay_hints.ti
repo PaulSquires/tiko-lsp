@@ -1,0 +1,9 @@
+'' ############################################################################
+''  handlers/inlay_hints.ti -- textDocument/inlayHint
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.ti"
+
+declare sub RegisterInlayHintHandlers( )

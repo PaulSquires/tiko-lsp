@@ -1,0 +1,50 @@
+'' ############################################################################
+''  handlers/semantic_tokens.tiko -- textDocument/semanticTokens/full
+''
+''  The whole file, every time. No deltas, no range variant -- see semantic.ti
+''  for why the encoding is the delicate part and protocol.tiko for why only
+''  `full` is advertised.
+'' ############################################################################
+
+#import "std/containers"
+#include once "semantic_tokens.ti"
+#include once "../analysis/semantic.ti"
+#include once "../utils/logging.ti"
+
+private function OnSemanticTokensFull( byref srv as Server, _
+                                       byref req as RpcMessage, _
+                                       byref rb as JsonBuilder, _
+                                       byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+
+    '' A null result and an empty `data` array mean different things: null is
+    '' "no answer", an empty array is "this file has no tokens" and CLEARS
+    '' whatever the client was showing. For a document we do not have, null.
+    if( doc = 0 ) then return rb.NewNull( )
+
+    dim as double started = timer( )
+
+    dim toks as SemTokenArray
+    ComputeSemanticTokens( doc->Text( ), doc->Index( ), doc->Tokens( ), doc->Symbols( ), toks )
+
+    dim data_ as containers.Array( of long )
+    EncodeSemanticTokens( toks, data_ )
+
+    dim as JsonNode arr = rb.NewArray( )
+    for i as long = 0 to data_.Count( ) - 1
+        rb.PushInt( arr, data_[i] )
+    next
+
+    dim as JsonNode result_ = rb.NewObject( )
+    rb.SetNode( result_, "data", arr )
+
+    LogDebug( "semantic tokens: " & toks.Count( ) & " token(s), " & _
+              data_.Count( ) & " integers, " & int( (timer( ) - started) * 1000 ) & " ms" )
+    return result_
+end function
+
+sub RegisterSemanticTokensHandlers( )
+    RegisterHandler( LSP_SEMANTIC_FULL, @OnSemanticTokensFull )
+end sub

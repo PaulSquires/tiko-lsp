@@ -1,0 +1,148 @@
+'' ############################################################################
+''  analysis/lexer.ti -- tiko tokens
+''
+''  A token carries a BYTE RANGE, not a line and column. Converting to editor
+''  coordinates happens once, at the point where a diagnostic is published, so
+''  the lexer never deals with UTF-16 and a token can be sliced straight out of
+''  the source with MID.
+''
+''  The lexer never fails. Unterminated strings, unterminated block comments,
+''  malformed numbers and bytes that belong to nothing all produce a token AND
+''  a diagnostic, and lexing continues -- a language server sees half-typed
+''  text on every keystroke, and stopping at the first problem would blank the
+''  editor's outline while the user is mid-word.
+'' ############################################################################
+
+#pragma once
+
+#include once "diagnostics.ti"
+
+enum TokenKind
+    TK_EOF      = 0
+    TK_EOL      = 1    '' end of a LOGICAL line: an underscore continuation
+                       '' produces no TK_EOL
+    TK_IDENT    = 2
+    TK_KEYWORD  = 3
+    TK_NUMBER   = 4
+    TK_STRING   = 5
+    TK_COMMENT  = 6    '' ' ... , REM ... , and nesting /' ... '/
+    TK_PP       = 7    '' a #directive, from the # through its name
+    TK_LPAREN   = 8
+    TK_RPAREN   = 9
+    TK_LBRACKET = 10
+    TK_RBRACKET = 11
+    TK_COMMA    = 12
+    TK_COLON    = 13   '' a statement separator, or a label's colon
+    TK_OP       = 14   '' every other operator and punctuator
+    TK_BAD      = 15   '' a byte that cannot begin a token
+end enum
+
+'' Only the keywords the block parser reasons about get their own value.
+'' Every other reserved word -- 200-odd of them -- is KW_OTHER, which is still
+'' enough to say "this identifier is a keyword" for highlighting and for the
+'' completion list phase 5 builds.
+enum FbKeyword
+    KW_NONE = 0
+    KW_OTHER
+
+    '' block openers
+    KW_SUB
+    KW_FUNCTION
+    KW_PROPERTY
+    KW_CONSTRUCTOR
+    KW_DESTRUCTOR
+    KW_OPERATOR
+    KW_TYPE
+    KW_UNION
+    KW_ENUM
+    KW_NAMESPACE
+    KW_SCOPE
+    KW_WITH
+    KW_EXTERN
+    KW_ASM
+    KW_IF
+    KW_SELECT
+    KW_WHILE
+    KW_DO
+    KW_FOR
+
+    '' block closers and clauses
+    KW_END
+    KW_ENDIF
+    KW_WEND
+    KW_LOOP
+    KW_NEXT
+    KW_THEN
+    KW_ELSE
+    KW_ELSEIF
+    KW_CASE
+
+    '' words that change how the statement above them is read
+    KW_DECLARE
+    KW_EXIT
+    KW_CONTINUE
+    KW_AS
+    KW_PRIVATE
+    KW_PUBLIC
+    KW_PROTECTED
+    KW_STATIC
+    KW_VIRTUAL
+    KW_ABSTRACT
+    KW_CONST
+    KW_DIM
+    KW_VAR
+    KW_REDIM
+    KW_DEFINE
+
+    '' preprocessor
+    KW_PP_IF
+    KW_PP_IFDEF
+    KW_PP_IFNDEF
+    KW_PP_ELSE
+    KW_PP_ELSEIF
+    KW_PP_ENDIF
+    KW_PP_MACRO
+    KW_PP_ENDMACRO
+    KW_PP_OTHER
+end enum
+
+type Token
+    Kind    as TokenKind
+    Kw      as FbKeyword   '' KW_NONE unless Kind is TK_KEYWORD or TK_PP
+    Start_  as long        '' byte offset of the first byte
+    Length_ as long        '' in bytes
+end type
+
+type TokenArray as containers.Array( of Token )
+
+'' Tokenises `text_`, appending any lexical problems to `diags`.
+declare sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as DiagnosticArray )
+
+'' The source text of a token. Cheap, and the only way to read a name.
+declare function TokenText( byref text_ as string, byref tok as Token ) as string
+
+'' Reserved-word lookup, lower-cased internally. KW_NONE means "not a keyword".
+declare function KeywordOf( byref word_ as string ) as FbKeyword
+
+'' True for a word fbc reserves. Phase 5's completion list is built from this
+'' same table.
+declare function IsKeyword( byref word_ as string ) as boolean
+
+'' Every reserved word, lower-cased, in table order.
+declare function AllKeywords( ) as containers.Array( of string )
+
+'' tiko-lang's fixed-width type names -- int8 .. uint64, float32, float64. NOT
+'' keywords: they lex as identifiers. Returns the FreeBASIC type the name is a
+'' typedef for ("long" for int32), or "" when the word is not one of them.
+declare function BuiltinTypedefTarget( byref word_ as string ) as string
+
+'' The ten names, lower-cased, narrowest first.
+declare function AllBuiltinTypedefs( ) as containers.Array( of string )
+
+'' tiko-lang's predeclared constants -- nullptr, an `any ptr`. NOT keywords
+'' either: they lex as identifiers. Returns the declaration tiko-lang's prelude
+'' makes ("const nullptr as any ptr = 0"), or "" when the word is not one.
+declare function BuiltinConstantDecl( byref word_ as string ) as string
+
+'' The names, lower-cased.
+declare function AllBuiltinConstants( ) as containers.Array( of string )

@@ -8,13 +8,13 @@ What was built, what it does message by message, and what was actually verified.
 | --- | --- |
 | project structure | `src/{json,rpc,lsp,handlers,utils}`, `tests/`, `build/`, `docs/` |
 | `main.bas` | argument parsing, the message loop, exit codes |
-| stdin/stdout transport | `src/rpc/transport.bas` — `StdioTransport` |
-| `Content-Length` parsing | `src/rpc/transport.bas` — `MessageFramer` |
-| JSON-RPC request/notification handling | `src/rpc/jsonrpc.bas`, `src/lsp/dispatcher.bas` |
-| `initialize` / `initialized` / `shutdown` / `exit` | `src/handlers/lifecycle.bas` |
-| logging to stderr or a file | `src/utils/logging.bas` |
+| stdin/stdout transport | `src/rpc/transport.tiko` — `StdioTransport` |
+| `Content-Length` parsing | `src/rpc/transport.tiko` — `MessageFramer` |
+| JSON-RPC request/notification handling | `src/rpc/jsonrpc.tiko`, `src/lsp/dispatcher.tiko` |
+| `initialize` / `initialized` / `shutdown` / `exit` | `src/handlers/lifecycle.tiko` |
+| logging to stderr or a file | `src/utils/logging.tiko` |
 | build instructions, Windows and Linux | `build/`, and the README |
-| a piped-message test | `tests/session_tool.bas` |
+| a piped-message test | `tests/session_tool.tiko` |
 
 Extras that were cheap and belong to the same state machine: `$/setTrace`,
 `$/cancelRequest`, and `window/logMessage` in the outgoing direction.
@@ -104,6 +104,6 @@ Checked by hand as well:
 ## Next: phase 2
 
 `textDocument/didOpen` / `didChange` / `didSave` / `didClose`, a `TextDocument`
-with a line index, and `utils/position.bas` as the single home for
+with a line index, and `utils/position.tiko` as the single home for
 UTF-16-to-byte-offset conversion. `textDocumentSync` becomes the first entry in
 `LspBuildCapabilities` — after the document store works, not before.

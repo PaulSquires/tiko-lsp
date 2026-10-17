@@ -4,9 +4,9 @@
 
 | Requirement | Where |
 | --- | --- |
-| context detection | `src/analysis/completion.bas` — `CompletionContextAt` |
-| candidate collection | `src/analysis/completion.bas` — `CollectCompletions` |
-| `textDocument/completion` | `src/handlers/completion.bas` |
+| context detection | `src/analysis/completion.tiko` — `CompletionContextAt` |
+| candidate collection | `src/analysis/completion.tiko` — `CollectCompletions` |
+| `textDocument/completion` | `src/handlers/completion.tiko` |
 | capability | `completionProvider { triggerCharacters: [".", ":"], resolveProvider: false }` |
 
 Every item carries `label`, `kind`, `detail`, `documentation`, `insertText`,
@@ -99,7 +99,7 @@ list:
 
 | File | Symbols | Items | Time |
 | --- | --- | --- | --- |
-| `src/analysis/parser.bas` | 305 | 292 | 0.60 ms |
+| `src/analysis/parser.tiko` | 305 | 292 | 0.60 ms |
 | `AfxNova/src/AfxStr.inc` | 423 | 310 | 0.75 ms |
 | `fbc/ir-gas64.bas` | 835 | 480 | 1.42 ms |
 

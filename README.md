@@ -65,7 +65,7 @@ while claiming deltas is what makes a client show stale colours),
 `documentRangeFormattingProvider` and `codeActionProvider` (`quickfix` only).
 Nothing else — `typeDefinitionProvider` would need the type system this server
 does not have, so it is not claimed. See `LspBuildCapabilities` in
-[src/lsp/protocol.bas](src/lsp/protocol.bas). Diagnostics need no capability: they
+[src/lsp/protocol.tiko](src/lsp/protocol.tiko). Diagnostics need no capability: they
 are pushed, and the server publishes them on open, change and save.
 
 The parser was developed against **435,000 lines of real FreeBASIC-compatible
@@ -76,7 +76,7 @@ reject. False positives are the failure mode that matters for a language server;
 see [docs/phase3.md](docs/phase3.md) for the fourteen that were found and fixed.
 
 Positions are UTF-16 code units, handled in one place
-([src/utils/position.bas](src/utils/position.bas)): `中` is one column and three
+([src/utils/position.tiko](src/utils/position.tiko)): `中` is one column and three
 bytes, `😀` is two columns and four bytes.
 
 ## Layout
@@ -176,7 +176,7 @@ sh build/_compile.sh
 ```
 
 There is no Windows-only code outside a single `#ifdef __FB_WIN32__` in
-[src/rpc/transport.bas](src/rpc/transport.bas), where stdin and stdout are put into
+[src/rpc/transport.tiko](src/rpc/transport.tiko), where stdin and stdout are put into
 binary mode. macOS needs the same yyjson step and nothing else.
 
 ## Running

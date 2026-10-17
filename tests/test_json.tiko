@@ -1,0 +1,425 @@
+'' ############################################################################
+''  tests/test_json.tiko -- the JSON facade and the JSON-RPC message model
+''
+''  Serialiser output is checked by PARSING IT BACK rather than by comparing
+''  text, so the tests do not depend on key order or spacing.
+''
+''  Build: build\_run_tests.bat  (or build/_run_tests.sh)
+'' ############################################################################
+
+#import "std/containers"
+#include once "assert.ti"
+#include once "../src/json/json.ti"
+#include once "../src/rpc/jsonrpc.ti"
+
+'' ----------------------------------------------------------------------------
+TestGroup( "parsing" )
+
+scope
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( "{""name"":""tiko"",""n"":42,""ok"":true,""pi"":3.5,""nil"":null}" ), _
+                "a simple object parses" )
+
+    dim as JsonValue root = doc.Root( )
+    AssertTrue( root.IsObject( ), "the root is an object" )
+    AssertEqStr( root.Member( "name" ).AsString( ), "tiko", "string member" )
+    AssertEqInt( root.Member( "n" ).AsLongInt( ), 42, "integer member" )
+    AssertTrue( root.Member( "ok" ).AsBoolean( ), "boolean member" )
+    AssertTrue( abs( root.Member( "pi" ).AsDouble( ) - 3.5 ) < 0.0001, "real member" )
+    AssertTrue( root.Member( "nil" ).IsNull( ), "null member" )
+    AssertEqInt( root.Count( ), 5, "object member count" )
+end scope
+
+scope
+    '' Absence must never fault, at any depth. Handler code depends on this:
+    '' half of an LSP payload is optional.
+    dim as JsonDoc doc
+    doc.Parse( "{""a"":{""b"":1}}" )
+    dim as JsonValue root = doc.Root( )
+
+    AssertFalse( root.Member( "zzz" ).IsValid( ), "a missing member is invalid" )
+    AssertFalse( root.Member( "zzz" ).Member( "yyy" ).IsValid( ), "chaining through a miss is safe" )
+    AssertEqStr( root.Member( "zzz" ).Member( "yyy" ).AsString( "fallback" ), "fallback", "the default survives a chain" )
+    AssertEqInt( root.Member( "a" ).Member( "nope" ).AsLongInt( -7 ), -7, "integer default on a miss" )
+    AssertFalse( root.Has( "zzz" ), "Has() is false for a missing key" )
+    AssertTrue( root.Has( "a" ), "Has() is true for a present key" )
+end scope
+
+scope
+    '' A wrongly-typed member returns the default rather than a coerced value.
+    dim as JsonDoc doc
+    doc.Parse( "{""s"":""text"",""n"":5}" )
+    dim as JsonValue root = doc.Root( )
+    AssertEqInt( root.Member( "s" ).AsLongInt( -1 ), -1, "a string is not read as a number" )
+    AssertEqStr( root.Member( "n" ).AsString( "-" ), "-", "a number is not read as a string" )
+    AssertFalse( root.Member( "n" ).AsBoolean( false ), "a number is not read as a boolean" )
+end scope
+
+scope
+    dim as JsonDoc doc
+    AssertFalse( doc.Parse( "{ this is not json" ), "malformed JSON fails" )
+    AssertTrue( len( doc.ErrorText( ) ) > 0, "a parse failure explains itself" )
+    AssertFalse( doc.IsValid( ), "a failed document is not valid" )
+    AssertFalse( doc.Root( ).IsValid( ), "a failed document has no root" )
+
+    AssertFalse( doc.Parse( "" ), "empty input fails" )
+    AssertContains( doc.ErrorText( ), "empty", "empty input says so" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "arrays" )
+
+scope
+    dim as JsonDoc doc
+    doc.Parse( "{""xs"":[10,20,30],""empty"":[],""notarr"":5}" )
+    dim as JsonValue root = doc.Root( )
+
+    AssertEqInt( root.Member( "xs" ).Count( ), 3, "array length" )
+    AssertEqInt( root.Member( "xs" ).Item( 0 ).AsLongInt( ), 10, "first element" )
+    AssertEqInt( root.Member( "xs" ).Item( 2 ).AsLongInt( ), 30, "last element" )
+    AssertFalse( root.Member( "xs" ).Item( 3 ).IsValid( ), "past the end is invalid" )
+    AssertFalse( root.Member( "xs" ).Item( -1 ).IsValid( ), "a negative index is invalid" )
+
+    dim as longint total = 0
+    for each v in ArrayOf( root.Member( "xs" ) )
+        total += v.AsLongInt( )
+    next
+    AssertEqInt( total, 60, "for-each walks every element" )
+
+    dim as long visits = 0
+    for each v in ArrayOf( root.Member( "empty" ) )
+        visits += 1
+    next
+    AssertEqInt( visits, 0, "an empty array iterates zero times" )
+
+    for each v in ArrayOf( root.Member( "notarr" ) )
+        visits += 1
+    next
+    AssertEqInt( visits, 0, "a non-array iterates zero times" )
+
+    for each v in ArrayOf( root.Member( "missing" ) )
+        visits += 1
+    next
+    AssertEqInt( visits, 0, "an absent member iterates zero times" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "text handling" )
+
+scope
+    dim as JsonDoc doc
+    '' Escapes must be unescaped, and a \u sequence must arrive as UTF-8.
+    doc.Parse( "{""s"":""a\""b\\c\nd"",""u"":""中文""}" )
+    dim as JsonValue root = doc.Root( )
+
+    AssertEqStr( root.Member( "s" ).AsString( ), "a""b\c" & chr(10) & "d", "escapes are unescaped" )
+    AssertEqStr( root.Member( "u" ).AsString( ), chr(228,184,173) & chr(230,150,135), "\u becomes UTF-8" )
+    AssertEqInt( len( root.Member( "u" ).AsString( ) ), 6, "two CJK characters are six bytes" )
+end scope
+
+scope
+    AssertEqStr( JsonQuote( "plain" ), """plain""", "JsonQuote quotes" )
+    AssertEqStr( JsonQuote( "a""b" ), """a\""b""", "JsonQuote escapes a quote" )
+    AssertEqStr( JsonQuote( "a\b" ), """a\\b""", "JsonQuote escapes a backslash" )
+    AssertEqStr( JsonQuote( "a" & chr(10) & "b" ), """a\nb""", "JsonQuote escapes a newline" )
+    AssertEqStr( JsonQuote( chr(1) ), """\u0001""", "JsonQuote escapes a control byte" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "document ownership" )
+
+scope
+    '' A JsonDoc must be copyable without a double free, which means the copy
+    '' owns its own document.
+    dim as JsonDoc original
+    original.Parse( "{""k"":""v""}" )
+
+    dim as JsonDoc copy_ = original
+    AssertEqStr( copy_.Root( ).Member( "k" ).AsString( ), "v", "a copied document reads the same" )
+    AssertTrue( copy_.Root( ).Handle( ) <> original.Root( ).Handle( ), "the copy is a distinct document" )
+
+    dim as JsonDoc assigned
+    assigned.Parse( "{""old"":1}" )
+    assigned = original
+    AssertEqStr( assigned.Root( ).Member( "k" ).AsString( ), "v", "assignment replaces the contents" )
+    AssertFalse( assigned.Root( ).Has( "old" ), "assignment released the old document" )
+
+    original.Clear( )
+    AssertEqStr( copy_.Root( ).Member( "k" ).AsString( ), "v", "the copy outlives the original" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "building" )
+
+scope
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+
+    rb.SetStr   ( root, "s", "hello" )
+    rb.SetInt   ( root, "n", 7 )
+    rb.SetBool  ( root, "b", true )
+    rb.SetDouble( root, "d", 1.5 )
+    rb.SetNull  ( root, "z" )
+
+    dim as JsonNode arr = rb.NewArray( )
+    rb.PushStr ( arr, "one" )
+    rb.PushInt ( arr, 2 )
+    rb.PushNode( arr, rb.NewBool( false ) )
+    rb.SetNode( root, "list", arr )
+
+    dim as JsonNode nested = rb.NewObject( )
+    rb.SetStr( nested, "inner", "yes" )
+    rb.SetNode( root, "obj", nested )
+
+    rb.SetRoot( root )
+    dim as string text_ = rb.Serialize( )
+    AssertTrue( len(text_) > 0, "the builder serialises" )
+
+    dim as JsonDoc back
+    AssertTrue( back.Parse( text_ ), "serialised output parses back" )
+    dim as JsonValue r = back.Root( )
+    AssertEqStr( r.Member( "s" ).AsString( ), "hello", "string round-trips" )
+    AssertEqInt( r.Member( "n" ).AsLongInt( ), 7, "integer round-trips" )
+    AssertTrue( r.Member( "b" ).AsBoolean( ), "boolean round-trips" )
+    AssertTrue( r.Member( "z" ).IsNull( ), "null round-trips" )
+    AssertEqInt( r.Member( "list" ).Count( ), 3, "array round-trips" )
+    AssertEqStr( r.Member( "list" ).Item( 0 ).AsString( ), "one", "array element round-trips" )
+    AssertEqStr( r.Member( "obj" ).Member( "inner" ).AsString( ), "yes", "nested object round-trips" )
+end scope
+
+scope
+    '' Text that must survive the writer's escaping untouched.
+    dim as string nasty = "quote "" backslash \ newline " & chr(10) & " tab " & chr(9) & _
+                          " cjk " & chr(228,184,173)
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "t", nasty )
+    rb.SetRoot( root )
+
+    dim as JsonDoc back
+    AssertTrue( back.Parse( rb.Serialize( ) ), "awkward text serialises and reparses" )
+    AssertEqStr( back.Root( ).Member( "t" ).AsString( ), nasty, "awkward text is unchanged" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "JSON-RPC message parsing" )
+
+scope
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":1,""method"":""initialize"",""params"":{""processId"":99}}", err_ ), _
+                "a request parses" )
+    AssertEqInt( msg.Kind( ), RPC_REQUEST, "kind is request" )
+    AssertEqStr( msg.MethodName( ), "initialize", "method name" )
+    AssertEqInt( msg.Id( ).Kind( ), RPCID_INT, "an integer id stays integer" )
+    AssertEqInt( msg.Id( ).IntValue( ), 1, "id value" )
+    AssertEqInt( msg.Params( ).Member( "processId" ).AsLongInt( ), 99, "params are reachable" )
+end scope
+
+scope
+    '' A string id must NOT be normalised to a number: the response has to
+    '' echo the same JSON type back.
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":""req-7"",""method"":""shutdown""}", err_ ), _
+                "a string-id request parses" )
+    AssertEqInt( msg.Id( ).Kind( ), RPCID_STRING, "a string id stays a string" )
+    AssertEqStr( msg.Id( ).StrValue( ), "req-7", "string id value" )
+end scope
+
+scope
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""method"":""exit""}", err_ ), "a notification parses" )
+    AssertEqInt( msg.Kind( ), RPC_NOTIFICATION, "kind is notification" )
+    AssertTrue( msg.Id( ).IsNone( ), "a notification has no id" )
+    AssertFalse( msg.IsDollarMethod( ), "exit is not a $/ method" )
+end scope
+
+scope
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""method"":""$/setTrace"",""params"":{""value"":""verbose""}}", err_ ), _
+                "a $/ notification parses" )
+    AssertTrue( msg.IsDollarMethod( ), "$/setTrace is recognised as a $/ method" )
+end scope
+
+scope
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":4,""result"":null}", err_ ), "a response parses" )
+    AssertEqInt( msg.Kind( ), RPC_RESPONSE, "kind is response" )
+end scope
+
+scope
+    '' A null id on a message that has a method is a notification, not a
+    '' request with a null id -- JSON-RPC has no such thing.
+    dim as RpcMessage msg
+    dim as RpcError   err_
+    AssertTrue( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":null,""method"":""exit""}", err_ ), _
+                "a null id parses" )
+    AssertEqInt( msg.Kind( ), RPC_NOTIFICATION, "a null id makes it a notification" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "JSON-RPC rejection" )
+
+scope
+    dim as RpcMessage msg
+    dim as RpcError   err_
+
+    AssertFalse( msg.ParseFrom( "not json at all", err_ ), "garbage is rejected" )
+    AssertEqInt( err_.Code( ), RPC_PARSE_ERROR, "garbage is a parse error" )
+
+    AssertFalse( msg.ParseFrom( "[{""jsonrpc"":""2.0"",""method"":""a""}]", err_ ), "a batch is rejected" )
+    AssertEqInt( err_.Code( ), RPC_INVALID_REQUEST, "a batch is an invalid request" )
+
+    AssertFalse( msg.ParseFrom( "42", err_ ), "a bare scalar is rejected" )
+    AssertEqInt( err_.Code( ), RPC_INVALID_REQUEST, "a bare scalar is an invalid request" )
+
+    AssertFalse( msg.ParseFrom( "{""method"":""initialize"",""id"":1}", err_ ), "a missing jsonrpc field is rejected" )
+    AssertFalse( msg.ParseFrom( "{""jsonrpc"":""1.0"",""method"":""a"",""id"":1}", err_ ), "jsonrpc 1.0 is rejected" )
+    AssertFalse( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":1,""method"":42}", err_ ), "a non-string method is rejected" )
+    AssertFalse( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":1,""method"":""""}", err_ ), "an empty method is rejected" )
+    AssertFalse( msg.ParseFrom( "{""jsonrpc"":""2.0"",""id"":{},""method"":""a""}", err_ ), "an object id is rejected" )
+    AssertFalse( msg.ParseFrom( "{""jsonrpc"":""2.0""}", err_ ), "a message with no method and no result is rejected" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "JSON-RPC serialisation" )
+
+scope
+    dim as RpcId id = RpcId( 12L )
+    dim as JsonBuilder rb
+    dim as JsonNode result_ = rb.NewObject( )
+    rb.SetStr( result_, "hello", "world" )
+
+    dim as JsonDoc back
+    AssertTrue( back.Parse( RpcBuildResponse( id, rb, result_ ) ), "a response serialises" )
+    dim as JsonValue r = back.Root( )
+    AssertEqStr( r.Member( "jsonrpc" ).AsString( ), "2.0", "response carries jsonrpc 2.0" )
+    AssertEqInt( r.Member( "id" ).AsLongInt( ), 12, "response echoes the integer id" )
+    AssertEqStr( r.Member( "result" ).Member( "hello" ).AsString( ), "world", "response carries the result" )
+    AssertFalse( r.Has( "error" ), "a success response has no error member" )
+end scope
+
+scope
+    '' shutdown answers with a null result, and "result" must still be present.
+    dim as RpcId id = RpcId( "abc" )
+    dim as JsonBuilder rb
+    dim as JsonDoc back
+    AssertTrue( back.Parse( RpcBuildResponse( id, rb, rb.NewNull( ) ) ), "a null result serialises" )
+    AssertEqStr( back.Root( ).Member( "id" ).AsString( ), "abc", "response echoes the string id" )
+    AssertTrue( back.Root( ).Has( "result" ), "a null result is still present" )
+    AssertTrue( back.Root( ).Member( "result" ).IsNull( ), "the null result is null" )
+end scope
+
+scope
+    dim as RpcId noId
+    dim as JsonDoc back
+    AssertTrue( back.Parse( RpcBuildError( noId, RPC_PARSE_ERROR, "bad json" ) ), "an error serialises" )
+    dim as JsonValue r = back.Root( )
+    AssertTrue( r.Member( "id" ).IsNull( ), "an unknown id serialises as null" )
+    AssertEqInt( r.Member( "error" ).Member( "code" ).AsLongInt( ), RPC_PARSE_ERROR, "error code" )
+    AssertEqStr( r.Member( "error" ).Member( "message" ).AsString( ), "bad json", "error message" )
+    AssertFalse( r.Has( "result" ), "an error response has no result member" )
+end scope
+
+scope
+    dim as JsonBuilder rb
+    dim as JsonNode params = rb.NewObject( )
+    rb.SetInt( params, "type", 3 )
+    rb.SetStr( params, "message", "ready" )
+
+    dim as JsonDoc back
+    AssertTrue( back.Parse( RpcBuildNotification( "window/logMessage", rb, params ) ), "a notification serialises" )
+    dim as JsonValue r = back.Root( )
+    AssertEqStr( r.Member( "method" ).AsString( ), "window/logMessage", "notification method" )
+    AssertFalse( r.Has( "id" ), "a notification carries no id" )
+    AssertEqStr( r.Member( "params" ).Member( "message" ).AsString( ), "ready", "notification params" )
+end scope
+
+scope
+    AssertEqStr( RpcErrorText( RPC_METHOD_NOT_FOUND ), "Method not found", "standard error text" )
+    AssertEqStr( RpcErrorText( RPC_SERVER_NOT_INITIALIZED ), "Server not initialized", "LSP error text" )
+
+    dim as RpcError e
+    AssertFalse( e.IsSet( ), "a fresh RpcError is unset" )
+    e.SetErr( RPC_INVALID_PARAMS, "" )
+    AssertTrue( e.IsSet( ), "a set RpcError reports itself" )
+    AssertEqStr( e.Message_( ), "Invalid params", "an empty message falls back to the standard text" )
+end scope
+
+'' ############################################################################
+''  Invalid UTF-8 on the way out
+''
+''  yyjson refuses to serialise a document containing invalid UTF-8, and
+''  refuses ALL of it -- so one stray byte in one symbol's documentation lost
+''  the entire response, with nothing on the wire and one line in the log.
+''
+''  This was not hypothetical: 155 of AfxNova's 179 source files carry a
+''  Latin-1 `é` in their copyright line, and a completion list drawn through an
+''  #include of any of them was silently unanswerable.
+'' ############################################################################
+TestGroup( "invalid UTF-8 is replaced, not fatal" )
+
+scope
+    '' A lone 0xE9 -- `é` in Latin-1, and the start of a three-byte sequence
+    '' that never arrives in UTF-8.
+    dim as string latin1 = "Copyright " & chr(&hE9) & " somebody"
+
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "message", latin1 )
+    rb.SetRoot( root )
+
+    dim as string text_ = rb.Serialize( )
+    AssertTrue( len(text_) > 0, "a document with a Latin-1 byte still serialises" )
+
+    '' And it comes back as text, with the offending byte replaced rather than
+    '' dropped -- the string keeps its shape.
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( text_ ), "and the result is valid JSON" )
+
+    dim as string back_ = doc.Root( ).Member( "message" ).AsString( )
+    AssertContains( back_, "Copyright ", "the text before it survives" )
+    AssertContains( back_, " somebody", "and the text after it" )
+    AssertContains( back_, chr(&hEF) & chr(&hBF) & chr(&hBD), _
+                    "with U+FFFD where the byte could not be read" )
+end scope
+
+scope
+    '' Valid UTF-8 must pass through untouched, including the two cases the
+    '' position code cares about: a three-byte CJK character and a four-byte
+    '' emoji.
+    dim as string cjk   = chr(228,184,173)
+    dim as string emoji = chr(240,159,152,128)
+
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "a", cjk )
+    rb.SetStr( root, "b", emoji )
+    rb.SetStr( root, "c", "plain ascii" )
+    rb.SetRoot( root )
+
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( rb.Serialize( ) ), "valid UTF-8 serialises and parses" )
+    AssertEqStr( doc.Root( ).Member( "a" ).AsString( ), cjk, "a CJK character is unchanged" )
+    AssertEqStr( doc.Root( ).Member( "b" ).AsString( ), emoji, "an emoji is unchanged" )
+    AssertEqStr( doc.Root( ).Member( "c" ).AsString( ), "plain ascii", "and ASCII is ASCII" )
+end scope
+
+scope
+    '' A truncated sequence at the very end -- the other way a real file goes
+    '' wrong, when it is cut mid-character.
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetStr( root, "t", "ok" & chr(&hE4) & chr(&hB8) )      '' two of three bytes
+    rb.SetRoot( root )
+
+    dim as JsonDoc doc
+    AssertTrue( doc.Parse( rb.Serialize( ) ), "a truncated sequence does not sink the document" )
+    AssertContains( doc.Root( ).Member( "t" ).AsString( ), "ok", "and what came before it is kept" )
+end scope
+
+end TestSummary( "json + jsonrpc" )

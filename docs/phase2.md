@@ -6,13 +6,13 @@ The editor's buffers, and the coordinate system every later phase will use.
 
 | Requirement | Where |
 | --- | --- |
-| in-memory document model | `src/document/document.bas` — `TextDocument` |
-| document store | `src/document/document_manager.bas` — `DocumentManager` |
-| `didOpen` / `didChange` / `didSave` / `didClose` | `src/handlers/text_document.bas` |
+| in-memory document model | `src/document/document.tiko` — `TextDocument` |
+| document store | `src/document/document_manager.tiko` — `DocumentManager` |
+| `didOpen` / `didChange` / `didSave` / `didClose` | `src/handlers/text_document.tiko` |
 | incremental text synchronisation | `TextDocument.ApplyRange` |
-| line index | `src/utils/position.bas` — `LineIndex` |
-| LSP position ↔ byte offset, UTF-16 aware | `src/utils/position.bas` |
-| URI ↔ path | `src/utils/uri.bas` |
+| line index | `src/utils/position.tiko` — `LineIndex` |
+| LSP position ↔ byte offset, UTF-16 aware | `src/utils/position.tiko` |
+| URI ↔ path | `src/utils/uri.tiko` |
 | capability advertised | `textDocumentSync { openClose, change: 2, save }`, `positionEncoding` |
 
 `$/logTrace` was added at the same time (`Server.SendTrace`): document

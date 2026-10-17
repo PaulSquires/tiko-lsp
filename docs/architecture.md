@@ -90,7 +90,7 @@ failure is logged instead, because there is no id to answer.
 ## Analysis
 
 `analysis/` knows nothing about LSP: the lexer and parser work in BYTE OFFSETS
-and produce `Diagnostic` and `SymbolInfo` records, and `lsp/publish.bas` is the
+and produce `Diagnostic` and `SymbolInfo` records, and `lsp/publish.tiko` is the
 only place an offset becomes a line and a UTF-16 character. That is what will let the same
 analyser be driven by a command-line tool, or replaced by the real compiler
 frontend, without touching a handler.
@@ -237,7 +237,7 @@ Worth remembering when a build fails that way.
 ## Position encoding
 
 LSP positions count **UTF-16 code units** unless the client and server agree
-otherwise. `utils/position.bas` is the single place where `line + UTF-16 column`
+otherwise. `utils/position.tiko` is the single place where `line + UTF-16 column`
 becomes a byte offset into UTF-8 source, and no other module does that arithmetic
 — `TextDocument` and every handler call into it.
 

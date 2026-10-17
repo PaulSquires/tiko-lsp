@@ -10,8 +10,8 @@ server was restarted.
 
 | Requirement | Where |
 | --- | --- |
-| `client/registerCapability` (server → client) | `src/handlers/watched_files.bas` — `RequestFileWatching` |
-| `workspace/didChangeWatchedFiles` | `src/handlers/watched_files.bas` |
+| `client/registerCapability` (server → client) | `src/handlers/watched_files.tiko` — `RequestFileWatching` |
+| `workspace/didChangeWatchedFiles` | `src/handlers/watched_files.tiko` |
 | a request from the server | `Server.SendRequest`, `RpcBuildRequest` |
 | capabilities | **none** — see below |
 

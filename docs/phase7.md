@@ -7,14 +7,14 @@ changing it.
 
 | Requirement | Where |
 | --- | --- |
-| `textDocument/prepareRename` | `src/handlers/rename.bas` |
-| `textDocument/rename` | `src/handlers/rename.bas` |
-| `textDocument/signatureHelp` | `src/handlers/signature_help.bas`, `src/analysis/signature.bas` |
-| `textDocument/semanticTokens/full` | `src/handlers/semantic_tokens.bas`, `src/analysis/semantic.bas` |
-| `textDocument/inlayHint` | `src/handlers/inlay_hints.bas` |
-| `textDocument/formatting` | `src/handlers/formatting.bas`, `src/analysis/format.bas` |
+| `textDocument/prepareRename` | `src/handlers/rename.tiko` |
+| `textDocument/rename` | `src/handlers/rename.tiko` |
+| `textDocument/signatureHelp` | `src/handlers/signature_help.tiko`, `src/analysis/signature.tiko` |
+| `textDocument/semanticTokens/full` | `src/handlers/semantic_tokens.tiko`, `src/analysis/semantic.tiko` |
+| `textDocument/inlayHint` | `src/handlers/inlay_hints.tiko` |
+| `textDocument/formatting` | `src/handlers/formatting.tiko`, `src/analysis/format.tiko` |
 | `textDocument/rangeFormatting` | same |
-| `textDocument/codeAction` | `src/handlers/code_action.bas` |
+| `textDocument/codeAction` | `src/handlers/code_action.tiko` |
 | capabilities | `renameProvider.prepareProvider`, `signatureHelpProvider`, `semanticTokensProvider` (full only), `inlayHintProvider`, `documentFormattingProvider`, `documentRangeFormattingProvider`, `codeActionProvider` (quickfix only) |
 
 ## Rename: two modes, and a refusal

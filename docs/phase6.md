@@ -7,11 +7,11 @@ The phase where the server stops being one file at a time.
 | Requirement | Where |
 | --- | --- |
 | workspace folders | `initialize`, plus `workspace/didChangeWorkspaceFolders` |
-| source discovery | `src/workspace/workspace.bas` — `ScanFolder` |
-| workspace symbol index | `src/workspace/symbol_index.bas` |
-| `workspace/symbol` | `src/handlers/workspace_symbols.bas` |
-| cross-file definition | `src/handlers/definition.bas` — falls back to the index |
-| `textDocument/references` | `src/handlers/references.bas` |
+| source discovery | `src/workspace/workspace.tiko` — `ScanFolder` |
+| workspace symbol index | `src/workspace/symbol_index.tiko` |
+| `workspace/symbol` | `src/handlers/workspace_symbols.tiko` |
+| cross-file definition | `src/handlers/definition.tiko` — falls back to the index |
+| `textDocument/references` | `src/handlers/references.tiko` |
 | capabilities | `workspaceSymbolProvider`, `referencesProvider`, `workspace.workspaceFolders` |
 
 ## Discovery

@@ -6,12 +6,12 @@ The first phase an editor user can *see*: an outline pane, a tooltip, and F12.
 
 | Requirement | Where |
 | --- | --- |
-| symbol model | `src/analysis/symbols.bas` — `SymbolInfo`, `SymbolTable` |
-| symbol extraction | `src/analysis/parser.bas` — the same pass that finds block structure |
-| cached per-document analysis | `src/document/document.bas` — `Tokens()`, `Symbols()`, `Diagnostics()` |
-| `textDocument/documentSymbol` | `src/handlers/document_symbols.bas` |
-| `textDocument/hover` | `src/handlers/hover.bas` |
-| `textDocument/definition` | `src/handlers/definition.bas` |
+| symbol model | `src/analysis/symbols.tiko` — `SymbolInfo`, `SymbolTable` |
+| symbol extraction | `src/analysis/parser.tiko` — the same pass that finds block structure |
+| cached per-document analysis | `src/document/document.tiko` — `Tokens()`, `Symbols()`, `Diagnostics()` |
+| `textDocument/documentSymbol` | `src/handlers/document_symbols.tiko` |
+| `textDocument/hover` | `src/handlers/hover.tiko` |
+| `textDocument/definition` | `src/handlers/definition.tiko` |
 | capabilities | `documentSymbolProvider`, `hoverProvider`, `definitionProvider` |
 
 ## What is extracted

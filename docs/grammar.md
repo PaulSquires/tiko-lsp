@@ -21,7 +21,7 @@ the text is coloured.
 **2. Only structural words are keywords.** The other ~200 reserved words are
 identifiers to the parser and are coloured by a `#match?` predicate in
 `queries/highlights.scm`, from the same list as the server's own keyword table
-in `src/analysis/lexer.bas`. The language is case-insensitive, so every keyword
+in `src/analysis/lexer.tiko`. The language is case-insensitive, so every keyword
 is a regex, which switches off tree-sitter's keyword extraction; a 200-word
 `keyword` rule then collides with `identifier` at every turn. Moving the list
 into the query removes the ambiguity rather than fighting it.

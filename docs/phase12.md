@@ -12,11 +12,11 @@ and indexes that like any `#include`d header.
 
 | | Where |
 | --- | --- |
-| reading the directive | `FindCIncludes`, `src/analysis/includes.bas` |
-| `#cinclude` edges in the include graph (`IncludeEdge.IsC_`) | `src/workspace/symbol_index.bas` |
-| asking the compiler, the binding store | `src/workspace/cincludes.bas` |
-| running it on the worker, full build and refresh | `src/workspace/index_builder.bas` |
-| go to definition **on** the header path | `src/handlers/definition.bas` |
+| reading the directive | `FindCIncludes`, `src/analysis/includes.tiko` |
+| `#cinclude` edges in the include graph (`IncludeEdge.IsC_`) | `src/workspace/symbol_index.tiko` |
+| asking the compiler, the binding store | `src/workspace/cincludes.tiko` |
+| running it on the worker, full build and refresh | `src/workspace/index_builder.tiko` |
+| go to definition **on** the header path | `src/handlers/definition.tiko` |
 | the compiler's side: `tiko --print-cincludes` | tiko-lang e23b4080 |
 
 No new capability: the binding is a header like any other, so completion, hover, signature
@@ -77,7 +77,7 @@ cap (256 MB) — windows.h's binding is several times a source file's 4 MB.
 
 ## Verified
 
-- `tests/test_workspace.bas`, group `#cinclude` (20 assertions): edges with and without a
+- `tests/test_workspace.tiko`, group `#cinclude` (20 assertions): edges with and without a
   compiler, the binding external, definition and parameters through it, a failed header, a
   compiler that cannot run. `tests/fake_tiko` answers `--print-cincludes` from a fixture.
 - The `#cinclude` piped session against the real server, and its no-compiler control.

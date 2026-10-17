@@ -1,0 +1,161 @@
+'' ############################################################################
+''  handlers/inlay_hints.tiko -- textDocument/inlayHint
+''
+''  ONE KIND OF HINT: the parameter name at a call site, so `Move( 10, 3 )`
+''  reads as `Move( x: 10, y: 3 )` without the file saying so.
+''
+''  The other classic hint -- the inferred type of a `var` -- is NOT produced,
+''  because inferring it means evaluating the initialiser's type, and this
+''  server has no type system. A hint that guessed would be a wrong type
+''  rendered in the user's code as though it were fact, which is worse than no
+''  hint at all.
+''
+''  Hints are suppressed where they say nothing:
+''
+''    - the argument is already the parameter's name -- `Move( x, y )`;
+''    - the argument is a named argument or an expression whose first token is
+''      not a literal or a simple name;
+''    - the callee does not resolve, or resolves to something without a
+''      parameter list.
+''
+''  The last is what stops an array subscript from being annotated: `data(i)`
+''  looks exactly like a call, and only the symbol table can tell them apart.
+'' ############################################################################
+
+#import "std/containers"
+#include once "inlay_hints.ti"
+#include once "hover.ti"
+#include once "../analysis/signature.ti"
+#include once "../utils/logging.ti"
+
+'' True when this identifier IS a declaration's name rather than a use of it.
+''
+'' `sub Move_( byval x as long )` has exactly the shape of a call -- a name
+'' followed by a parenthesised, comma-separated list -- so without this check
+'' every procedure's own header gets its parameters annotated with their own
+'' names, which is both wrong and absurd.
+private function IsDeclarationSite( byval doc as TextDocumentPtr, byval offset as long ) as boolean
+    for i as long = 0 to doc->Symbols( ).Count( ) - 1
+        if( doc->Symbols( ).Items[i].NameStart = offset ) then return true
+    next
+    return false
+end function
+
+'' A hint is only useful on an argument the reader cannot name for himself.
+'' `Move( x, y )` needs no annotation; `Move( 10, 3 )` does.
+private function WorthHinting( byref text_ as string, byref tok as Token, _
+                               byref paramName as string ) as boolean
+    if( len(paramName) = 0 ) then return false
+
+    select case tok.Kind
+        case TK_NUMBER, TK_STRING
+            return true
+        case TK_KEYWORD
+            '' `true`, `false`, `null` and friends read as literals.
+            return true
+        case TK_IDENT
+            '' A variable whose name already says it.
+            return lcase( TokenText( text_, tok ) ) <> lcase( paramName )
+    end select
+
+    return false
+end function
+
+private function OnInlayHint( byref srv as Server, _
+                              byref req as RpcMessage, _
+                              byref rb as JsonBuilder, _
+                              byref err_ as RpcError ) as JsonNode
+
+    dim as string uriText = req.Params( ).Member( "textDocument" ).Member( "uri" ).AsString( "" )
+    dim as TextDocumentPtr doc = srv.Documents.Find( uriText )
+    if( doc = 0 ) then return rb.NewNull( )
+
+    '' The client asks for the visible range only, and honouring that is the
+    '' difference between a hint pass costing a millisecond and costing the
+    '' whole file on every scroll.
+    dim as JsonValue rangeVal = req.Params( ).Member( "range" )
+    dim as long fromLine = clng( rangeVal.Member( "start" ).Member( "line" ).AsLongInt( 0 ) )
+    dim as long toLine   = clng( rangeVal.Member( "end"   ).Member( "line" ).AsLongInt( 0 ) )
+
+    dim as long fromOffset = clng( doc->PositionToOffset( fromLine, 0 ) )
+    dim as long toOffset   = clng( doc->PositionToOffset( toLine + 1, 0 ) )
+    if( toOffset <= fromOffset ) then toOffset = clng( doc->TextLength( ) )
+
+    dim as string body = doc->Text( )
+
+    dim sites as ArgSiteArray
+    FindArgSites( body, doc->Tokens( ), fromOffset, toOffset, sites )
+
+    dim as JsonNode hints = rb.NewArray( )
+    dim as long made = 0
+
+    '' The callee resolves once per call, not once per argument: the sites of
+    '' one call arrive together, so the last answer is reused.
+    dim as long lastNameTok = -1
+    dim as boolean lastOk   = false
+    dim as string lastLabel
+    dim lastParams as SigParamArray
+
+    for i as long = 0 to sites.Count( ) - 1
+        if( sites[i].NameTok <> lastNameTok ) then
+            lastNameTok = sites[i].NameTok
+            lastOk      = false
+            lastParams.Clear( )
+
+            dim as Token nameTok = doc->Tokens( )[ sites[i].NameTok ]
+            dim as string lowerName = lcase( TokenText( body, nameTok ) )
+
+            dim as long symIndex = -1
+            if( IsDeclarationSite( doc, nameTok.Start_ ) ) then continue for
+            if( IsMemberAccess( body, doc->Tokens( ), sites[i].NameTok ) ) then
+                symIndex = doc->Symbols( ).ResolveMember( lowerName )
+                if( symIndex >= 0 ) then
+                    if( IsCallableKind( doc->Symbols( ).Items[symIndex].Kind_ ) = false ) then symIndex = -1
+                end if
+            else
+                dim as long alternatives = 0
+                symIndex = FindCallable( doc->Symbols( ), lowerName, nameTok.Start_, alternatives )
+
+                '' With several overloads the parameter names may differ
+                '' between them, and annotating from the first would put the
+                '' wrong name in the user's line.
+                if( alternatives > 1 ) then symIndex = -1
+            end if
+
+            if( symIndex >= 0 ) then
+                lastOk = ParseSignature( doc->Symbols( ).Items[symIndex].Name_, _
+                                         doc->Symbols( ).Items[symIndex].Detail_, _
+                                         lastLabel, lastParams )
+            end if
+        end if
+
+        if( lastOk = false ) then continue for
+        if( sites[i].ArgIndex >= lastParams.Count( ) ) then continue for
+
+        dim as Token argTok = doc->Tokens( )[ sites[i].ArgTok ]
+        dim as string paramName = lastParams[ sites[i].ArgIndex ].Name_
+        if( WorthHinting( body, argTok, paramName ) = false ) then continue for
+
+        dim as SourcePosition p = doc->OffsetToPosition( argTok.Start_ )
+
+        dim as JsonNode posNode = rb.NewObject( )
+        rb.SetInt( posNode, "line", p.Line )
+        rb.SetInt( posNode, "character", p.Column )
+
+        dim as JsonNode hint = rb.NewObject( )
+        rb.SetNode( hint, "position", posNode )
+        rb.SetStr ( hint, "label", paramName & ":" )
+        rb.SetInt ( hint, "kind", 2 )               '' InlayHintKind.Parameter
+        rb.SetBool( hint, "paddingRight", true )
+
+        rb.PushNode( hints, hint )
+        made += 1
+    next
+
+    LogDebug( "inlay hints: " & made & " for lines " & fromLine & ".." & toLine )
+    return hints
+end function
+
+sub RegisterInlayHintHandlers( )
+    RegisterHandler( LSP_INLAY_HINT, @OnInlayHint )
+end sub
