@@ -1,0 +1,9 @@
+'' ############################################################################
+''  handlers/signature_help.ti -- textDocument/signatureHelp
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.ti"
+
+declare sub RegisterSignatureHelpHandlers( )

@@ -1,0 +1,283 @@
+'' ############################################################################
+''  rpc/transport.tiko -- framing state machine and stdio plumbing
+'' ############################################################################
+
+#import "std/containers"
+#import "std/strings"
+#include once "crt.bi"
+#include once "transport.ti"
+#include once "../utils/logging.ti"
+
+#ifdef __FB_WIN32__
+    #include once "crt/io.bi"
+    #include once "crt/fcntl.bi"
+#else
+    #include once "crt/unistd.bi"
+#endif
+
+using strings
+
+const CRLF_ = !"\r\n"
+
+'' Once the buffer's consumed prefix passes this, and is at least half the
+'' buffer, the tail is moved down. Compacting on every message would be O(n)
+'' churn; never compacting would grow the buffer without bound.
+const FRAME_COMPACT_THRESHOLD = 64 * 1024
+
+'' Size of one read from stdin. Large enough that a whole didOpen usually
+'' arrives in one or two reads, small enough to stay off the stack limit.
+const READ_CHUNK_BYTES = 64 * 1024
+
+'' ONE READ, WHATEVER HAS ARRIVED.
+''
+'' NOT fread. fread( buf, 1, n, stdin ) does not return until it has n bytes or
+'' the stream ends -- which is fine for a FILE on stdin, where the end comes at
+'' once, and a HANG for a pipe, where the other end is an editor that has sent
+'' one message and is waiting for the answer before it sends another. The
+'' server would read the first message only if it happened to fill the buffer,
+'' and otherwise sit there forever.
+''
+'' This is not a theoretical difference: the piped-session test feeds a FILE,
+'' so it passed throughout while a real editor would have hung on the
+'' `initialize` request. read( ) returns as soon as ANY bytes are available,
+'' which is what the framing state machine was written to expect.
+private function ReadSomeStdin( byval buf as any ptr, byval maxBytes as long ) as long
+    #ifdef __FB_WIN32__
+        return _read( _fileno( stdin ), buf, maxBytes )
+    #else
+        '' READ IS A KEYWORD: crt/linux/unistd.bi declares the C function as read_.
+        return read_( STDIN_FILENO, buf, maxBytes )
+    #endif
+end function
+
+'' ############################################################################
+''  MessageFramer
+'' ############################################################################
+
+constructor MessageFramer( )
+    this.Reset( )
+end constructor
+
+sub MessageFramer.Reset( )
+    this.m_buf     = ""
+    this.m_pos     = 0
+    this.m_err     = ""
+    this.m_haveHdr = false
+    this.m_bodyAt  = 0
+    this.m_bodyLen = 0
+end sub
+
+sub MessageFramer.Feed( byref chunk as string )
+    if( len(chunk) > 0 ) then this.m_buf &= chunk
+end sub
+
+function MessageFramer.ErrorText( ) as string
+    return this.m_err
+end function
+
+function MessageFramer.Pending( ) as long
+    return len(this.m_buf) - this.m_pos
+end function
+
+sub MessageFramer.Compact( )
+    '' Only ever called with no header parse in flight, so there are no cached
+    '' offsets to rebase.
+    if( this.m_pos >= FRAME_COMPACT_THRESHOLD andalso this.m_pos * 2 >= len(this.m_buf) ) then
+        this.m_buf = mid( this.m_buf, this.m_pos + 1 )
+        this.m_pos = 0
+    end if
+end sub
+
+'' Locates and parses the header block starting at m_pos. On FRAME_OK the
+'' m_bodyAt / m_bodyLen / m_haveHdr fields are filled in; the header bytes are
+'' NOT consumed until the body is complete, so a torn message re-enters here
+'' with the cache already set.
+function MessageFramer.ScanHeader( ) as FrameStatus
+    if( this.m_haveHdr ) then return FRAME_OK
+    if( this.m_pos >= len(this.m_buf) ) then return FRAME_NEED_MORE
+
+    '' The spec says CRLF. Some clients and most hand-written test fixtures
+    '' use bare LF, and accepting both costs one comparison.
+    dim as long start_ = this.m_pos + 1                      '' INSTR is 1-based
+    dim as long endCrLf = instr( start_, this.m_buf, CRLF_ & CRLF_ )
+    dim as long endLf   = instr( start_, this.m_buf, chr(10) & chr(10) )
+
+    dim as long termAt  = 0
+    dim as long termLen = 0
+
+    if( endCrLf > 0 andalso (endLf = 0 orelse endCrLf <= endLf) ) then
+        termAt  = endCrLf
+        termLen = 4
+    elseif( endLf > 0 ) then
+        termAt  = endLf
+        termLen = 2
+    else
+        '' No blank line yet. Guard against a peer that never sends one.
+        if( this.Pending( ) > FRAME_MAX_MESSAGE_BYTES ) then
+            this.m_err = "header block exceeds " & FRAME_MAX_MESSAGE_BYTES & " bytes"
+            return FRAME_ERROR
+        end if
+        return FRAME_NEED_MORE
+    end if
+
+    dim as string headerBlock = mid( this.m_buf, start_, termAt - start_ )
+    dim as longint contentLen = -1
+
+    '' Normalise line endings, then one header per line.
+    dim as string normalised = Replace( headerBlock, CRLF_, chr(10) )
+    dim headerLines as containers.Array( of string ) = Split( normalised, chr(10) )
+
+    for each rawLine in headerLines
+        dim as string line_ = trim( rawLine, any chr(13) & chr(10) & " " & chr(9) )
+        if( len(line_) = 0 ) then continue for
+
+        dim as long colonAt = instr( line_, ":" )
+        if( colonAt = 0 ) then
+            this.m_err = "malformed header line: " & line_
+            return FRAME_ERROR
+        end if
+
+        dim as string headerName = lcase( trim( left( line_, colonAt - 1 ) ) )
+        dim as string headerVal  = trim( mid( line_, colonAt + 1 ) )
+
+        select case headerName
+            case "content-length"
+                if( len(headerVal) = 0 ) then
+                    this.m_err = "empty Content-Length"
+                    return FRAME_ERROR
+                end if
+                for i as long = 0 to len(headerVal) - 1
+                    if( headerVal[i] < asc("0") orelse headerVal[i] > asc("9") ) then
+                        this.m_err = "non-numeric Content-Length: " & headerVal
+                        return FRAME_ERROR
+                    end if
+                next
+                contentLen = vallng( headerVal )
+
+            case "content-type"
+                '' The only legal charset is utf-8, and the header is optional.
+                '' Nothing to do with it, so it is accepted and ignored.
+
+            case else
+                '' Unknown headers are ignored, not fatal: the base protocol
+                '' allows extensions.
+                LogTrace( "framer: ignoring header '" & headerName & "'" )
+        end select
+    next
+
+    if( contentLen < 0 ) then
+        this.m_err = "header block has no Content-Length"
+        return FRAME_ERROR
+    end if
+
+    if( contentLen > FRAME_MAX_MESSAGE_BYTES ) then
+        this.m_err = "Content-Length " & contentLen & " exceeds the " & _
+                     FRAME_MAX_MESSAGE_BYTES & " byte limit"
+        return FRAME_ERROR
+    end if
+
+    this.m_bodyAt  = (termAt - 1) + termLen      '' 0-based first payload byte
+    this.m_bodyLen = clng( contentLen )
+    this.m_haveHdr = true
+    return FRAME_OK
+end function
+
+function MessageFramer.NextMessage( byref payload as string ) as FrameStatus
+    payload = ""
+
+    dim as FrameStatus st = this.ScanHeader( )
+    if( st <> FRAME_OK ) then return st
+
+    if( len(this.m_buf) - this.m_bodyAt < this.m_bodyLen ) then return FRAME_NEED_MORE
+
+    if( this.m_bodyLen > 0 ) then
+        payload = mid( this.m_buf, this.m_bodyAt + 1, this.m_bodyLen )
+    end if
+
+    this.m_pos     = this.m_bodyAt + this.m_bodyLen
+    this.m_haveHdr = false
+    this.m_bodyAt  = 0
+    this.m_bodyLen = 0
+    this.Compact( )
+
+    return FRAME_OK
+end function
+
+'' ############################################################################
+''  StdioTransport
+'' ############################################################################
+
+constructor StdioTransport( )
+    #ifdef __FB_WIN32__
+        '' Without this the CRT translates CRLF on the way in and expands LF to
+        '' CRLF on the way out, which corrupts both the framing and any UTF-8
+        '' byte that happens to be 0x0A or 0x1A.
+        _setmode( _fileno( stdin  ), _O_BINARY )
+        _setmode( _fileno( stdout ), _O_BINARY )
+    #endif
+
+    '' Unbuffered stdout: a response must reach the editor when it is written,
+    '' not when a 4 KB buffer happens to fill.
+    setvbuf( stdout, NULL, _IONBF, 0 )
+end constructor
+
+function StdioTransport.ErrorText( ) as string
+    if( len(this.m_err) > 0 ) then return this.m_err
+    return this.m_framer.ErrorText( )
+end function
+
+function StdioTransport.ReadMessage( byref payload as string ) as TransportStatus
+    '' THE CHUNK IS ON THE HEAP: 64 KB on the stack overflowed a worker thread's on
+    '' Linux (gdb: SIGSEGV in READMESSAGE, the live-pipe test's reader thread). A string, so it is freed on
+    '' every way out without a deallocate on each.
+    dim as string chunkStr = space( READ_CHUNK_BYTES )
+    dim as ubyte ptr chunk = cast( ubyte ptr, strptr( chunkStr ) )
+
+    do
+        dim as FrameStatus st = this.m_framer.NextMessage( payload )
+        select case st
+            case FRAME_OK
+                return TRANSPORT_OK
+            case FRAME_ERROR
+                '' Framing errors are unrecoverable: the byte stream is no
+                '' longer aligned to a message boundary and there is no way to
+                '' resynchronise without guessing.
+                this.m_err = this.m_framer.ErrorText( )
+                return TRANSPORT_ERROR
+        end select
+
+        dim as long got = ReadSomeStdin( chunk, READ_CHUNK_BYTES )
+
+        '' 0 is end of stream -- the editor closed the pipe. Negative is a real
+        '' error. Anything else is a short read, which is NORMAL and is the
+        '' whole reason the framer exists.
+        if( got = 0 ) then return TRANSPORT_EOF
+        if( got < 0 ) then
+            this.m_err = "read error on stdin"
+            return TRANSPORT_ERROR
+        end if
+
+        dim as string block_ = space( got )
+        memcpy( strptr(block_), chunk, got )
+        this.m_framer.Feed( block_ )
+    loop
+end function
+
+function StdioTransport.WriteMessage( byref payload as string ) as boolean
+    dim as string header = "Content-Length: " & len(payload) & CRLF_ & CRLF_
+
+    if( fwrite( strptr(header), 1, len(header), stdout ) <> len(header) ) then
+        this.m_err = "short write on stdout (header)"
+        return false
+    end if
+
+    if( len(payload) > 0 ) then
+        if( fwrite( strptr(payload), 1, len(payload), stdout ) <> len(payload) ) then
+            this.m_err = "short write on stdout (payload)"
+            return false
+        end if
+    end if
+
+    fflush( stdout )
+    return true
+end function

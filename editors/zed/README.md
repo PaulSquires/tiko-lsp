@@ -105,7 +105,7 @@ semantic tokens, inlay hints, formatting and quick fixes.
 - **Every feature through the UI.** The run above confirms the wiring and the
   requests Zed made in the first seconds. Hover, completion and rename were
   exercised against the server over a pipe by
-  [the test suite](../../tests/session_tool.bas), not through Zed's interface.
+  [the test suite](../../tests/session_tool.tiko), not through Zed's interface.
 - **macOS and Linux.** The extension has no platform-specific code, and the
   server has never been built for either.
 

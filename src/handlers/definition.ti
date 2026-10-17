@@ -1,0 +1,9 @@
+'' ############################################################################
+''  handlers/definition.ti -- textDocument/definition
+'' ############################################################################
+
+#pragma once
+
+#include once "../lsp/dispatcher.ti"
+
+declare sub RegisterDefinitionHandlers( )

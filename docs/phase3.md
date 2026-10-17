@@ -6,11 +6,11 @@ The first phase that reads tiko rather than just moving it around.
 
 | Requirement | Where |
 | --- | --- |
-| lexer | `src/analysis/lexer.bas` — `LexSource`, 247 reserved words |
-| parser with error recovery | `src/analysis/parser.bas` — `ParseTokens` |
-| diagnostic model | `src/analysis/diagnostics.bas` — offsets, severity, stable codes |
-| `textDocument/publishDiagnostics` | `src/lsp/publish.bas` |
-| published on open, change, save; cleared on close | `src/handlers/text_document.bas` |
+| lexer | `src/analysis/lexer.tiko` — `LexSource`, 247 reserved words |
+| parser with error recovery | `src/analysis/parser.tiko` — `ParseTokens` |
+| diagnostic model | `src/analysis/diagnostics.tiko` — offsets, severity, stable codes |
+| `textDocument/publishDiagnostics` | `src/lsp/publish.tiko` |
+| published on open, change, save; cleared on close | `src/handlers/text_document.tiko` |
 
 No capability was added: diagnostics are **pushed**, and the specification has
 nothing to advertise for that. The pull-based `textDocument/diagnostic` of 3.17
@@ -74,7 +74,7 @@ same syntax -- and the only diagnostics are on files
 fbc itself expects to reject.**
 
 Fourteen distinct false positives were found and fixed that way. Each is now a
-named test in `tests/test_analysis.bas`, because the corpora are not in this
+named test in `tests/test_analysis.tiko`, because the corpora are not in this
 repository:
 
 | What broke | Where it came from |
@@ -128,7 +128,7 @@ Measured on win64/gas64, one full analysis (lex + parse) of a document:
 
 | File | Size | Time |
 | --- | --- | --- |
-| `src/analysis/parser.bas` (893 lines) | 37 KB | 1.0 ms |
+| `src/analysis/parser.tiko` (893 lines) | 37 KB | 1.0 ms |
 | `AfxNova/src/AfxCtl.inc` (5,334 lines) | 355 KB | 9.1 ms |
 | `fbc/ir-gas64.bas` (8,645 lines) | 280 KB | 10.4 ms |
 

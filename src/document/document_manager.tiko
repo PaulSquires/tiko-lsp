@@ -1,0 +1,72 @@
+'' ############################################################################
+''  document/document_manager.tiko -- every buffer the client has open
+'' ############################################################################
+
+#import "std/containers"
+#include once "crt.bi"
+#include once "document_manager.ti"
+#include once "../utils/logging.ti"
+
+constructor DocumentManager( )
+end constructor
+
+destructor DocumentManager( )
+    this.CloseAll( )
+end destructor
+
+function DocumentManager.Open( byref uriText as string, byref langId as string, _
+                               byval version_ as longint, byref text_ as string ) as TextDocumentPtr
+    dim as TextDocumentPtr existing = this.Find( uriText )
+    if( existing <> NULL ) then
+        LogWarn( "didOpen for an already-open document, replacing: " & uriText )
+        existing->Reset( uriText, langId, version_, text_ )
+        return existing
+    end if
+
+    dim as TextDocumentPtr doc = new TextDocument( uriText, langId, version_, text_ )
+    if( doc = NULL ) then
+        LogError( "out of memory opening " & uriText )
+        return NULL
+    end if
+
+    this.m_docs.Put( uriText, doc )
+    return doc
+end function
+
+function DocumentManager.Find( byref uri as string ) as TextDocumentPtr
+    dim as TextDocumentPtr doc = NULL
+    '' TryGet, never m[uri]: the indexer INSERTS a default on a miss, and a
+    '' NULL entry for every unknown URI would linger in the map for good.
+    if( this.m_docs.TryGet( uri, doc ) ) then return doc
+    return NULL
+end function
+
+function DocumentManager.IsOpen( byref uri as string ) as boolean
+    return this.m_docs.Contains( uri )
+end function
+
+function DocumentManager.Close( byref uri as string ) as boolean
+    dim as TextDocumentPtr doc = this.Find( uri )
+    if( doc = NULL ) then return false
+
+    this.m_docs.Remove( uri )
+    delete doc
+    return true
+end function
+
+sub DocumentManager.CloseAll( )
+    '' The map owns the pointers, not the documents: clearing it would leak
+    '' every buffer, so each one is deleted first.
+    for each kv in this.m_docs
+        if( kv.value <> NULL ) then delete kv.value
+    next
+    this.m_docs.Clear( )
+end sub
+
+function DocumentManager.Count( ) as long
+    return this.m_docs.Count( )
+end function
+
+function DocumentManager.OpenUris( ) as containers.Array( of string )
+    return this.m_docs.Keys( )
+end function

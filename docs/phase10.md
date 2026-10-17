@@ -13,12 +13,12 @@ here"*.
 
 | | Where |
 | --- | --- |
-| reading the directives | `src/analysis/includes.bas` |
-| edges, resolution, visibility | `src/workspace/symbol_index.bas` |
-| go to definition **on** an `#include` | `src/handlers/definition.bas` |
+| reading the directives | `src/analysis/includes.tiko` |
+| edges, resolution, visibility | `src/workspace/symbol_index.tiko` |
+| go to definition **on** an `#include` | `src/handlers/definition.tiko` |
 | definition ranked by what a file can see | `SymbolIndex.FindDefinitionFrom` |
-| completion through an include, scope and member | `src/handlers/completion.bas` |
-| rename narrowed to what can see the declaration | `src/handlers/rename.bas` |
+| completion through an include, scope and member | `src/handlers/completion.tiko` |
+| rename narrowed to what can see the declaration | `src/handlers/rename.tiko` |
 
 No new capability: an include-aware answer is the same request answered better.
 
