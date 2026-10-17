@@ -1,0 +1,5 @@
+'' A stand-in for the toolchain's sys/win/gui: sys/ is the toolchain's, as std/ and vendor/ are.
+#module "gui"
+public function CreateMainWindow( ) as long
+    return 0
+end function
