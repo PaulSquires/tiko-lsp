@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "lexer.bi"
 #include once "symbols.bi"
 #include once "../utils/position.bi"
@@ -74,8 +73,8 @@ enum SemTokenModifier
 end enum
 
 '' The legend, in index order, as the strings the specification defines.
-declare function SemanticTypeNames    ( ) as FB.Array( of string )
-declare function SemanticModifierNames( ) as FB.Array( of string )
+declare function SemanticTypeNames    ( ) as containers.Array( of string )
+declare function SemanticModifierNames( ) as containers.Array( of string )
 
 '' ----------------------------------------------------------------------------
 ''  One token, before encoding
@@ -88,7 +87,7 @@ type SemToken
     Mods    as long        '' a bit set of SemTokenModifier
 end type
 
-type SemTokenArray as FB.Array( of SemToken )
+type SemTokenArray as containers.Array( of SemToken )
 
 '' Classifies every token of an analysed document. Output is in source order
 '' and no entry spans a line.
@@ -97,7 +96,7 @@ declare sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex
                                    byref out_ as SemTokenArray )
 
 '' The delta encoding the protocol asks for: five integers per token.
-declare sub EncodeSemanticTokens( byref toks as SemTokenArray, byref data_ as FB.Array( of long ) )
+declare sub EncodeSemanticTokens( byref toks as SemTokenArray, byref data_ as containers.Array( of long ) )
 
 '' The semantic type for a symbol kind, or -1 when it has none.
 declare function SemanticTypeOfKind( byval kind as SymbolKind, byval isLocal as boolean, _

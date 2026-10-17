@@ -2,9 +2,10 @@
 ''  workspace/modules.bas -- where a tiko `#import` leads. See modules.bi.
 '' ############################################################################
 
+#import "std/containers"
+#import "std/fs"
 #include once "modules.bi"
 #include once "metadata.bi"
-#include once "fb/filesystem.bi"
 
 private function DirPart( byref path_ as string ) as string
     for i as long = len(path_) - 1 to 0 step -1
@@ -93,7 +94,7 @@ function ManifestDirAbove( byref dir_ as string ) as string
     dim as string d = dir_
     for guard as long = 0 to 64
         if( len(d) = 0 ) then exit for
-        if( FB.IsFile( d & "\tiko.toml" ) orelse FB.IsFile( d & "/tiko.toml" ) ) then return d
+        if( fs.IsFile( d & "\tiko.toml" ) orelse fs.IsFile( d & "/tiko.toml" ) ) then return d
         dim as string up_ = DirPart( d )
         if( len(up_) = 0 orelse up_ = d ) then exit for
         d = up_
@@ -115,19 +116,19 @@ end sub
 
 function ToolchainPkgDir( ) as string
     for i as long = 0 to g_configuredPackageDirs.Count( ) - 1
-        if( FB.IsDir( g_configuredPackageDirs[i] ) ) then return g_configuredPackageDirs[i]
+        if( fs.IsDir( g_configuredPackageDirs[i] ) ) then return g_configuredPackageDirs[i]
     next
 
     '' The one the configured compiler named (metadata.bi): not a guess.
     dim as string mp = MetadataPkgDir( )
-    if( len(mp) > 0 andalso FB.IsDir( mp ) ) then return mp
+    if( len(mp) > 0 andalso fs.IsDir( mp ) ) then return mp
 
     '' <toolchain>/inc was named, so <toolchain>/pkg is the package tree -- the layout
     '' every packaged toolchain has. Without this a client that configured includePaths
     '' alone found headers but no `#import "std/strings"`.
     for i as long = 0 to g_configuredIncludeDirs.Count( ) - 1
         dim as string cand = JoinNative( g_configuredIncludeDirs[i], "../pkg" )
-        if( FB.IsDir( cand ) ) then return cand
+        if( fs.IsDir( cand ) ) then return cand
     next
 
     dim as string env_ = environ( "TKO_PKG" )
@@ -148,11 +149,11 @@ function ToolchainPkgDir( ) as string
         dim as string d = trim( mid( p, st, en - st ), any chr(34) )
         st = en + 1
         if( len(d) = 0 ) then continue while
-        if( FB.IsFile( d & exe ) = false ) then continue while
+        if( fs.IsFile( d & exe ) = false ) then continue while
         dim as string cand = JoinNative( d, "pkg" )
-        if( FB.IsDir( cand ) ) then return cand
+        if( fs.IsDir( cand ) ) then return cand
         cand = JoinNative( d, "../pkg" )
-        if( FB.IsDir( cand ) ) then return cand
+        if( fs.IsDir( cand ) ) then return cand
     wend
     return ""
 end function
@@ -173,11 +174,11 @@ function ToolchainIncDir( ) as string
         dim as string d = trim( mid( p, st, en - st ), any chr(34) )
         st = en + 1
         if( len(d) = 0 ) then continue while
-        if( FB.IsFile( d & exe ) = false ) then continue while
+        if( fs.IsFile( d & exe ) = false ) then continue while
         dim as string cand = JoinNative( d, "inc" )
-        if( FB.IsDir( cand ) ) then return cand
+        if( fs.IsDir( cand ) ) then return cand
         cand = JoinNative( d, "../inc" )
-        if( FB.IsDir( cand ) ) then return cand
+        if( fs.IsDir( cand ) ) then return cand
     wend
     return ""
 end function
@@ -193,13 +194,13 @@ end sub
 function ToolchainIncDirs( ) as PathArray
     dim out_ as PathArray
     for i as long = 0 to g_configuredIncludeDirs.Count( ) - 1
-        if( FB.IsDir( g_configuredIncludeDirs[i] ) ) then out_.Push( g_configuredIncludeDirs[i] )
+        if( fs.IsDir( g_configuredIncludeDirs[i] ) ) then out_.Push( g_configuredIncludeDirs[i] )
     next
     if( out_.IsEmpty( ) ) then
         '' What the configured compiler compiles the workspace's roots with (metadata.bi).
         dim md as PathArray = MetadataIncludeDirs( )
         for i as long = 0 to md.Count( ) - 1
-            if( FB.IsDir( md[i] ) ) then out_.Push( md[i] )
+            if( fs.IsDir( md[i] ) ) then out_.Push( md[i] )
         next
     end if
     if( out_.IsEmpty( ) ) then

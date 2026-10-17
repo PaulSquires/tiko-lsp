@@ -2,6 +2,7 @@
 ''  handlers/tiko_metadata.bas -- `tiko/metadata`. See tiko_metadata.bi.
 '' ############################################################################
 
+#import "std/containers"
 #include once "tiko_metadata.bi"
 #include once "workspace_symbols.bi"
 #include once "../workspace/metadata.bi"

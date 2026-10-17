@@ -9,10 +9,9 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 
 '' A container held as a FIELD must be a named instantiation.
-type PathArray as FB.Array( of string )
+type PathArray as containers.Array( of string )
 
 '' Caps, so a scan of the wrong folder is slow rather than fatal.
 const WS_MAX_FILES      = 4000

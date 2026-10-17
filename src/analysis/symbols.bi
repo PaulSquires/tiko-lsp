@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "lexer.bi"
 
 '' The values are LSP's SymbolKind and go on the wire unchanged.
@@ -85,7 +84,7 @@ type SymbolInfo
     IsPublic      as boolean
 end type
 
-type SymbolArray as FB.Array( of SymbolInfo )
+type SymbolArray as containers.Array( of SymbolInfo )
 
 '' ----------------------------------------------------------------------------
 ''  SymbolTable

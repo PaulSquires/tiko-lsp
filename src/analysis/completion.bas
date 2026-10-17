@@ -2,6 +2,7 @@
 ''  analysis/completion.bas -- what could be typed here
 '' ############################################################################
 
+#import "std/containers"
 #include once "completion.bi"
 
 '' ############################################################################
@@ -167,7 +168,7 @@ private function TypeNameAfterAs_( byref detail as string ) as string
     if( len(rest) = 0 ) then return ""
 
     '' Take the first name, and stop at anything that is not part of one --
-    '' `Customer ptr`, `FB.Array( of string )` and `long` all end here. A
+    '' `Customer ptr`, `containers.Array( of string )` and `long` all end here. A
     '' DOTTED name is qualified by its namespace, and the type is its LAST
     '' segment: `FB.Result( of boolean, TrkError )` names Result, not FB.
     dim as string word_
@@ -471,7 +472,7 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
     '' 3. tiko-lang's fixed-width type names, which are typedefs rather than
     ''    reserved words -- so a local or a file-level name of the same
     ''    spelling, added above, keeps the slot (AddItem drops the repeat).
-    dim typedefs as FB.Array( of string ) = AllBuiltinTypedefs( )
+    dim typedefs as containers.Array( of string ) = AllBuiltinTypedefs( )
     for i as long = 0 to typedefs.Count( ) - 1
         AddItem( items, typedefs[i], CMP_STRUCT, _
                  "type " & typedefs[i] & " as " & BuiltinTypedefTarget( typedefs[i] ), _
@@ -479,7 +480,7 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
     next
 
     ''    ...and its predeclared constant, nullptr, on the same terms.
-    dim consts as FB.Array( of string ) = AllBuiltinConstants( )
+    dim consts as containers.Array( of string ) = AllBuiltinConstants( )
     for i as long = 0 to consts.Count( ) - 1
         AddItem( items, consts[i], CMP_CONSTANT, BuiltinConstantDecl( consts[i] ), _
                  "", CMPGROUP_KEYWORD )
@@ -487,7 +488,7 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
 
     '' 4. the language. Last, because a reserved word is almost never what the
     ''    user is reaching for, and there are 247 of them.
-    dim words as FB.Array( of string ) = AllKeywords( )
+    dim words as containers.Array( of string ) = AllKeywords( )
     for i as long = 0 to words.Count( ) - 1
         AddItem( items, words[i], CMP_KEYWORD, "keyword", "", CMPGROUP_KEYWORD )
     next

@@ -19,7 +19,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "symbols.bi"
 
 '' LSP's CompletionItemKind, on the wire unchanged.
@@ -75,7 +74,7 @@ type CompletionItem
     LowerLabel as string
 end type
 
-type CompletionItemArray as FB.Array( of CompletionItem )
+type CompletionItemArray as containers.Array( of CompletionItem )
 
 '' What the cursor is sitting in.
 enum CompletionContextKind
@@ -85,7 +84,7 @@ enum CompletionContextKind
 end enum
 
 '' A generic does not instantiate as a TYPE field; its alias does.
-type CompletionChain as FB.Array( of string )
+type CompletionChain as containers.Array( of string )
 
 type CompletionContext
     Kind_      as CompletionContextKind

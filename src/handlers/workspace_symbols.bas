@@ -2,6 +2,7 @@
 ''  handlers/workspace_symbols.bas -- workspace/symbol, and building the index
 '' ############################################################################
 
+#import "std/containers"
 #include once "workspace_symbols.bi"
 #include once "../workspace/workspace.bi"
 #include once "../workspace/index_builder.bi"
@@ -85,7 +86,7 @@ sub EnsureWorkspaceIndex( byref srv as Server )
     '' the editor has open, and every edit made while the scan was running, is
     '' applied here. The buffer wins, which is the rule everywhere else in this
     '' server.
-    dim uris as FB.Array( of string ) = srv.Documents.OpenUris( )
+    dim uris as containers.Array( of string ) = srv.Documents.OpenUris( )
     for i as long = 0 to uris.Count( ) - 1
         dim as TextDocumentPtr doc = srv.Documents.Find( uris[i] )
         if( doc <> 0 ) then srv.Index->IndexText( doc->Uri( ), doc->FilePath( ), doc->Text( ), true )

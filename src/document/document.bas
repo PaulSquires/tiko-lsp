@@ -2,6 +2,7 @@
 ''  document/document.bas -- one open editor buffer
 '' ############################################################################
 
+#import "std/containers"
 #include once "document.bi"
 #include once "../utils/uri.bi"
 

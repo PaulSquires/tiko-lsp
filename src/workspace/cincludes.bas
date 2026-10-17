@@ -2,6 +2,7 @@
 ''  workspace/cincludes.bas -- what a `#cinclude` brings in. See cincludes.bi.
 '' ############################################################################
 
+#import "std/containers"
 #include once "cincludes.bi"
 #include once "metadata.bi"
 #include once "modules.bi"
@@ -9,7 +10,6 @@
 #include once "../utils/process.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
-#include once "fb/map.bi"
 
 '' A COLD import of windows.h is ~19 s and a warm one well under one; the limit is
 '' for a compiler that hangs, not for a slow header.
@@ -18,7 +18,7 @@ const CINCLUDE_TIMEOUT_MS = 120000
 '' THE STORE: "<includer key>|<header, lower-cased>" -> the binding's path. Written by
 '' AcceptCIncludes and ClearCIncludes, under g_cincMutex.
 dim shared as any ptr g_cincMutex
-dim shared as FB.Map( of string, string ) g_cincBinding
+dim shared as containers.Map( of string, string ) g_cincBinding
 
 private sub InitCIncludeMutex constructor
     g_cincMutex = mutexcreate( )
@@ -90,7 +90,7 @@ private function QueryFile( byref idx as SymbolIndex, byref path_ as string ) as
     dim as string cwd = ManifestDirAbove( here )
     if( len(cwd) = 0 ) then cwd = here
 
-    dim args as FB.Array( of string )
+    dim args as containers.Array( of string )
     args.Push( "--print-cincludes" )
     '' The directories an `#include` on the way to a `#cinclude` is found in.
     dim as PathArray incs = ToolchainIncDirs( )

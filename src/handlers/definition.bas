@@ -11,6 +11,7 @@
 ''  into an #included header work.
 '' ############################################################################
 
+#import "std/containers"
 #include once "definition.bi"
 #include once "workspace_symbols.bi"
 #include once "../analysis/includes.bi"
@@ -123,7 +124,7 @@ private function OnDefinition( byref srv as Server, _
         if( onPath >= 0 orelse len(alias_) > 0 ) then
             EnsureWorkspaceIndex( srv )
             dim as long here = srv.Index->IndexOfUri( uriText )
-            dim files_ as FB.Array( of long )
+            dim files_ as containers.Array( of long )
             dim as string wantAlias = iif( onPath >= 0, importRefs[iif( onPath >= 0, onPath, 0 )].Alias_, alias_ )
             if( srv.Index->ModuleFilesOf( here, wantAlias, files_ ) = false orelse files_.Count( ) = 0 ) then
                 LogDebug( "import '" & wantAlias & "' is not a module in the workspace" )

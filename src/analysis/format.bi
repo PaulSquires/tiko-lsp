@@ -26,7 +26,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "parser.bi"
 #include once "../utils/position.bi"
 
@@ -51,7 +50,7 @@ type TextEditRec
     NewText   as string
 end type
 
-type TextEditArray as FB.Array( of TextEditRec )
+type TextEditArray as containers.Array( of TextEditRec )
 
 '' The edits that re-indent lines [firstLine, lastLine] of `text_`.
 ''

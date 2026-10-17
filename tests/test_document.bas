@@ -7,6 +7,7 @@
 ''  after -- silently, and only for the user who typed the offending sequence.
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/utils/uri.bi"
 #include once "../src/document/document.bi"
@@ -252,7 +253,7 @@ scope
     AssertEqInt( mgr.Count( ), 1, "the manager holds one" )
     AssertTrue ( mgr.Find( "file:///a.bas" ) = 0, "the closed document is gone" )
 
-    dim uris as FB.Array( of string ) = mgr.OpenUris( )
+    dim uris as containers.Array( of string ) = mgr.OpenUris( )
     AssertEqInt( uris.Count( ), 1, "OpenUris lists what is open" )
     AssertEqStr( uris[0], "file:///b.bas", "and lists the right one" )
 

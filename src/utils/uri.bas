@@ -2,10 +2,11 @@
 ''  utils/uri.bas -- file: URI <-> filesystem path
 '' ############################################################################
 
-#include once "fb/string.bi"
+#import "std/containers"
+#import "std/strings"
 #include once "uri.bi"
 
-using FB
+using strings
 
 '' Windows wants backslashes; every other target wants what it already has.
 #ifdef __FB_WIN32__

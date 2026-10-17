@@ -8,6 +8,7 @@
 ''  Build: build\_run_tests.bat  (or build/_run_tests.sh)
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/workspace/workspace.bi"
 #include once "../src/workspace/symbol_index.bi"
@@ -231,7 +232,7 @@ scope
                         "print " & chr(34) & "counter" & chr(34) & LF & _
                         "' counter in a comment"
 
-    dim offsets as FB.Array( of long )
+    dim offsets as containers.Array( of long )
     FindIdentifierOffsets( src, "counter", offsets )
 
     '' Three real uses. NOT `counter_total`, NOT the word inside the string,
@@ -257,7 +258,7 @@ scope
     ReadSourceFile( g_Fixture & NativePath( "\shared.bi" ), sharedText )
     ReadSourceFile( g_Fixture & NativePath( "\widgets.bas" ), widgetsText )
 
-    dim offsets as FB.Array( of long )
+    dim offsets as containers.Array( of long )
     FindIdentifierOffsets( sharedText, "widget", offsets )
     AssertEqInt( offsets.Count( ), 2, "shared.bi mentions Widget twice" )
 
@@ -332,7 +333,7 @@ scope
     AssertEqInt( idx.IncludeAt( a, 0 ).Line, 0, "on the line it is written on" )
     AssertFalse( idx.HasUnresolvedIncludes( a ), "and nothing is left dangling" )
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     idx.VisibleFrom( a, visible )
     AssertEqInt( visible.Count( ), 3, "the visible set is TRANSITIVE: a sees b sees c" )
 
@@ -342,7 +343,7 @@ scope
     AssertTrue ( idx.CanSee( a, c ), "a can see c" )
     AssertFalse( idx.CanSee( c, a ), "c cannot see a" )
 
-    dim users as FB.Array( of long )
+    dim users as containers.Array( of long )
     idx.IncludedBy( c, users )
     AssertEqInt( users.Count( ), 3, "everyone that reaches c, however indirectly" )
 
@@ -358,7 +359,7 @@ scope
     Fake( idx, "y.bi", "#include once ""x.bi""" & LF )
     idx.ResolveIncludes( )
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     idx.VisibleFrom( FakeIndex( idx, "x.bi" ), visible )
     AssertEqInt( visible.Count( ), 2, "a cycle terminates, and each file appears once" )
 end scope
@@ -376,7 +377,7 @@ scope
     AssertEqInt( idx.IncludeAt( z, 0 ).ToFile, -1, "and neither resolves" )
     AssertTrue ( idx.HasUnresolvedIncludes( z ), "which the file is marked with" )
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     idx.VisibleFrom( z, visible )
     AssertEqInt( visible.Count( ), 1, "so it sees only itself" )
 end scope
@@ -584,7 +585,7 @@ scope
     AssertTrue( app >= 0 andalso proj >= 0, "both roots are indexed" )
     AssertEqInt( idx.ImportCount( app ), 3, "app/main.bas imports three modules" )
 
-    dim files_ as FB.Array( of long )
+    dim files_ as containers.Array( of long )
     AssertTrue ( idx.ModuleFilesOf( app, "http", files_ ), "'http' is one of its aliases" )
     AssertEqInt( files_.Count( ), 2, "and names a module of two files" )
     AssertTrue ( idx.ModuleFilesOf( app, "e", files_ ), "'e' is esc's alias, by 'as'" )
@@ -678,7 +679,7 @@ scope
     next
     AssertTrue( app >= 0, "the vendor importer is indexed" )
 
-    dim files_ as FB.Array( of long )
+    dim files_ as containers.Array( of long )
     AssertTrue ( idx.ModuleFilesOf( app, "clib", files_ ), "vendor/clib resolves" )
     AssertEqInt( files_.Count( ), 1, "to one file" )
     AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), NativePath( "modpkg\vendor\clib" ) ) > 0, _
@@ -687,7 +688,7 @@ scope
     dim as IndexHit hit
     AssertTrue ( idx.FindDefinitionFrom( app, "clib_open", hit ), "clib_open is found from the importer" )
     AssertTrue ( instr( lcase( idx.FilePath( hit.FileIndex ) ), "clib.ti" ) > 0, "in the public header" )
-    dim vis as FB.Array( of long )
+    dim vis as containers.Array( of long )
     idx.VisibleFrom( app, vis )
     dim as boolean seesPub = false, seesPriv = false, seesMod = false
     for each f as long in vis
@@ -726,11 +727,11 @@ scope
     next
     AssertTrue( leak >= 0 andalso reex >= 0, "both vleak roots are indexed" )
 
-    dim files_ as FB.Array( of long )
+    dim files_ as containers.Array( of long )
     AssertTrue ( idx.ModuleFilesOf( reex, "ext", files_ ), "vendor/clib/ext resolves" )
     AssertEqInt( files_.Count( ), 1, "to its one file" )
 
-    dim vis as FB.Array( of long )
+    dim vis as containers.Array( of long )
     idx.VisibleFrom( leak, vis )
     dim as boolean leaks = false
     for each f as long in vis

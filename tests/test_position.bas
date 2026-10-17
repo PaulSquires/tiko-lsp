@@ -7,6 +7,7 @@
 ''  file that contains one non-Latin character.
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/utils/position.bi"
 

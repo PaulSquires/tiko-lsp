@@ -11,6 +11,7 @@
 ''  saved unchanged, and the reason goes to the log.
 '' ############################################################################
 
+#import "std/containers"
 #include once "formatting.bi"
 #include once "../analysis/format.bi"
 #include once "../utils/logging.bi"

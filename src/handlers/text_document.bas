@@ -2,6 +2,7 @@
 ''  handlers/text_document.bas -- document synchronisation
 '' ############################################################################
 
+#import "std/containers"
 #include once "text_document.bi"
 #include once "../lsp/publish.bi"
 #include once "../workspace/workspace.bi"

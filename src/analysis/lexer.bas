@@ -2,8 +2,8 @@
 ''  analysis/lexer.bas -- tiko tokens
 '' ############################################################################
 
-#include once "fb/map.bi"
-#include once "fb/string.bi"
+#import "std/containers"
+#import "std/strings"
 #include once "lexer.bi"
 
 '' ############################################################################
@@ -45,14 +45,14 @@ private function OtherKeywordText( ) as string
     "wstring xor zstring __fastcall __thiscall"
 end function
 
-type KeywordMap as FB.Map( of string, long )
+type KeywordMap as containers.Map( of string, long )
 
-'' POINTERS, MADE BY THE FIRST FILL -- not objects. A shared FB.Map has a constructor of its
+'' POINTERS, MADE BY THE FIRST FILL -- not objects. A shared containers.Map has a constructor of its
 '' own, and on Linux it ran AFTER InitKeywords below had filled it, emptying the table:
 '' no word was a keyword and every lexer test failed there, while Windows ran the two in the
 '' other order. A pointer is zeroed data, with no constructor to run late.
 dim shared as KeywordMap ptr g_Keywords
-dim shared as FB.Array( of string ) ptr g_KeywordNames
+dim shared as containers.Array( of string ) ptr g_KeywordNames
 dim shared as boolean       g_KeywordsReady
 
 private sub Register( byref word_ as string, byval kw as FbKeyword )
@@ -63,12 +63,12 @@ private sub EnsureKeywords( )
     if( g_KeywordsReady ) then exit sub
     g_KeywordsReady = true
     g_Keywords = new KeywordMap
-    g_KeywordNames = new FB.Array( of string )
+    g_KeywordNames = new containers.Array( of string )
 
     '' The split result is bound to a LOCAL first. Iterating the temporary
-    '' directly -- `for each w in FB.Split( ... )` -- destroys the array before
+    '' directly -- `for each w in strings.Split( ... )` -- destroys the array before
     '' the loop body runs, and the iterator is left pointing into freed memory.
-    dim words as FB.Array( of string ) = FB.Split( OtherKeywordText( ), " " )
+    dim words as containers.Array( of string ) = strings.Split( OtherKeywordText( ), " " )
     for each w in words
         if( len(w) > 0 ) then Register( w, KW_OTHER )
     next
@@ -146,7 +146,7 @@ function IsKeyword( byref word_ as string ) as boolean
     return KeywordOf( word_ ) <> KW_NONE
 end function
 
-function AllKeywords( ) as FB.Array( of string )
+function AllKeywords( ) as containers.Array( of string )
     EnsureKeywords( )
     return *g_KeywordNames
 end function
@@ -178,8 +178,8 @@ function BuiltinTypedefTarget( byref word_ as string ) as string
     return ""
 end function
 
-function AllBuiltinTypedefs( ) as FB.Array( of string )
-    dim out_ as FB.Array( of string )
+function AllBuiltinTypedefs( ) as containers.Array( of string )
+    dim out_ as containers.Array( of string )
     out_.Push( "int8" )
     out_.Push( "uint8" )
     out_.Push( "int16" )
@@ -211,8 +211,8 @@ function BuiltinConstantDecl( byref word_ as string ) as string
     return ""
 end function
 
-function AllBuiltinConstants( ) as FB.Array( of string )
-    dim out_ as FB.Array( of string )
+function AllBuiltinConstants( ) as containers.Array( of string )
+    dim out_ as containers.Array( of string )
     out_.Push( "nullptr" )
     return out_
 end function

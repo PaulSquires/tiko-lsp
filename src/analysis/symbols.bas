@@ -2,6 +2,7 @@
 ''  analysis/symbols.bas -- the symbol table and name resolution
 '' ############################################################################
 
+#import "std/containers"
 #include once "symbols.bi"
 
 function SymbolTable.Count( ) as long

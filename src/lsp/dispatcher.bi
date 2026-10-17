@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "../json/json.bi"
 #include once "../rpc/jsonrpc.bi"
 #include once "../rpc/transport.bi"
@@ -27,7 +26,7 @@
 
 '' A container held as a FIELD must be a named instantiation: fbc cannot
 '' instantiate a generic written inline in a field declaration.
-type StringArray as FB.Array( of string )
+type StringArray as containers.Array( of string )
 
 '' One workspace folder as sent in InitializeParams.
 type WorkspaceFolder
@@ -37,7 +36,7 @@ type WorkspaceFolder
                              '' type that has member procedures.
 end type
 
-type WorkspaceFolderArray as FB.Array( of WorkspaceFolder )
+type WorkspaceFolderArray as containers.Array( of WorkspaceFolder )
 
 enum ServerState
     SRV_UNINITIALIZED = 0   '' before a successful `initialize`

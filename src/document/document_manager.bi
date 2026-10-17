@@ -9,14 +9,13 @@
 
 #pragma once
 
-#include once "fb/map.bi"
 #include once "document.bi"
 
 type TextDocumentPtr as TextDocument ptr
 
 '' A container held as a FIELD must be a named instantiation: fbc cannot
 '' instantiate a generic written inline in a field declaration.
-type DocumentMap as FB.Map( of string, TextDocumentPtr )
+type DocumentMap as containers.Map( of string, TextDocumentPtr )
 
 type DocumentManager
     private:
@@ -42,5 +41,5 @@ type DocumentManager
         declare function Count   ( ) as long
 
         '' A snapshot of the open URIs, for logging and for phase 6's indexer.
-        declare function OpenUris( ) as FB.Array( of string )
+        declare function OpenUris( ) as containers.Array( of string )
 end type

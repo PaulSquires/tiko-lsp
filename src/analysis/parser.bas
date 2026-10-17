@@ -2,6 +2,7 @@
 ''  analysis/parser.bas -- structural analysis
 '' ############################################################################
 
+#import "std/containers"
 #include once "parser.bi"
 
 '' ----------------------------------------------------------------------------
@@ -22,7 +23,7 @@ type BlockFrame
     Bias        as long
 end type
 
-type BlockStack as FB.Array( of BlockFrame )
+type BlockStack as containers.Array( of BlockFrame )
 
 '' The word that opens a block, for messages.
 private function BlockWord( byval kw as FbKeyword ) as string
@@ -97,7 +98,7 @@ type PpFrame
     DepthAtOpen as long        '' block-stack depth when the directive opened
 end type
 
-type PpStack as FB.Array( of PpFrame )
+type PpStack as containers.Array( of PpFrame )
 
 '' A macro whose replacement text BEGINS A BLOCK, which fb/fslink.bi and
 '' fb/string.bi both do:
@@ -115,7 +116,7 @@ type MacroOpener
     Kind_ as FbKeyword
 end type
 
-type MacroOpenerArray as FB.Array( of MacroOpener )
+type MacroOpenerArray as containers.Array( of MacroOpener )
 
 type ParseState
     Stack_   as BlockStack
@@ -394,7 +395,7 @@ end function
 ''
 '' -- a member of ITextRangeVtbl in AfxNova's AfxTOM.bi, not a SELECT block.
 private function HasTopLevelAs( byref tokens as TokenArray, _
-                                byref stmt as FB.Array( of long ), byval from_ as long ) as boolean
+                                byref stmt as containers.Array( of long ), byval from_ as long ) as boolean
     dim as long depth = 0
     for k as long = from_ to stmt.Count( ) - 1
         dim as Token t = tokens[ stmt[k] ]
@@ -427,7 +428,7 @@ end function
 ''  is exactly the false positive it is there to prevent.
 '' ----------------------------------------------------------------------------
 private function IsLambdaHeader( byref text_ as string, byref tokens as TokenArray, _
-                                 byref stmt as FB.Array( of long ), byval at_ as long ) as boolean
+                                 byref stmt as containers.Array( of long ), byval at_ as long ) as boolean
     if( at_ + 1 >= stmt.Count( ) ) then return false
 
     dim as long paramAt = at_ + 1
@@ -569,7 +570,7 @@ end function
 private function CleanDoc( byref raw_ as string ) as string
     dim as string out_
 
-    dim lines_ as FB.Array( of string )
+    dim lines_ as containers.Array( of string )
     dim as string current
     for i as long = 0 to len(raw_) - 1
         if( raw_[i] = 10 ) then
@@ -632,7 +633,7 @@ end function
 '' The index of the first token of a dotted name, and its extent, starting at
 '' `from_`. Returns false when there is no name there.
 private function NameTokens( byref text_ as string, byref tokens as TokenArray, _
-                             byref stmt as FB.Array( of long ), _
+                             byref stmt as containers.Array( of long ), _
                              byval from_ as long, byref firstTok as long, byref lastTok as long ) as boolean
     if( from_ >= stmt.Count( ) ) then return false
 
@@ -696,7 +697,7 @@ end function
 '' parentheses -- an array parameter, a function-pointer parameter -- belong to
 '' the part, not to the split.
 private sub AddParameters( byref st as ParseState, byref text_ as string, _
-                           byref tokens as TokenArray, byref stmt as FB.Array( of long ), _
+                           byref tokens as TokenArray, byref stmt as containers.Array( of long ), _
                            byval from_ as long, byval procIndex as long )
     if( st.Symbols_ = 0 orelse procIndex < 0 ) then exit sub
 
@@ -777,7 +778,7 @@ end sub
 '' name and everything before it is the type, which is what makes `dim as Foo
 '' bar` come out as bar : Foo rather than the other way round.
 private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
-                             byref tokens as TokenArray, byref stmt as FB.Array( of long ), _
+                             byref tokens as TokenArray, byref stmt as containers.Array( of long ), _
                              byval from_ as long, byval kind as SymbolKind, _
                              byval isLocal as boolean )
     if( st.Symbols_ = 0 orelse from_ >= stmt.Count( ) ) then exit sub
@@ -979,7 +980,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
         '' A statement ends at the end of a logical line or at a colon. The
         '' lexer has already joined underscore-continued lines, and comments
         '' are dropped here so `if x then ' note` still ends with THEN.
-        dim stmt as FB.Array( of long )
+        dim stmt as containers.Array( of long )
         dim as long parenDepth = 0
         dim as long openParenAt = -1
         dim as boolean done_ = false

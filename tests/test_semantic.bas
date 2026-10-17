@@ -9,6 +9,7 @@
 ''  Build: build\_run_tests.bat  (or build/_run_tests.sh)
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/analysis/parser.bi"
 #include once "../src/analysis/semantic.bi"
@@ -55,12 +56,12 @@ end function
 private sub TestLegend( )
     TestGroup( "the legend" )
 
-    dim names_ as FB.Array( of string ) = SemanticTypeNames( )
+    dim names_ as containers.Array( of string ) = SemanticTypeNames( )
     AssertEqInt( names_.Count( ), SEMTYPE_COUNT, "one name per type index" )
     AssertEqStr( names_[SEMTYPE_KEYWORD],  "keyword",  "the index IS the wire format" )
     AssertEqStr( names_[SEMTYPE_PARAMETER], "parameter", "and so is this one" )
 
-    dim mods_ as FB.Array( of string ) = SemanticModifierNames( )
+    dim mods_ as containers.Array( of string ) = SemanticModifierNames( )
     AssertEqInt( mods_.Count( ), 3, "three modifiers" )
     AssertEqStr( mods_[0], "declaration", "bit 1 is `declaration`" )
 end sub
@@ -166,7 +167,7 @@ private sub TestEncoding( )
     Analyse( "dim as long alpha = 1" & LF & _
              "dim as long beta = 2" & LF )
 
-    dim data_ as FB.Array( of long )
+    dim data_ as containers.Array( of long )
     EncodeSemanticTokens( g_Toks, data_ )
 
     AssertEqInt( data_.Count( ) mod 5, 0, "five integers per token" )

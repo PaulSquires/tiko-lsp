@@ -12,6 +12,7 @@
 ''  saying so is better than quietly returning half the answers.
 '' ############################################################################
 
+#import "std/containers"
 #include once "references.bi"
 #include once "workspace_symbols.bi"
 #include once "../workspace/workspace.bi"
@@ -22,7 +23,7 @@
 '' has to render for a minute.
 const MAX_REFERENCES = 2000
 
-type OffsetArray_ as FB.Array( of long )
+type OffsetArray_ as containers.Array( of long )
 
 '' Appends one Location per occurrence of `lowerName` in `text_`.
 private sub AddLocations( byref rb as JsonBuilder, byval list_ as JsonNode, _

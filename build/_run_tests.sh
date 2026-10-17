@@ -6,10 +6,10 @@
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-FBC=${TIKO_LSP_FBC:-"$ROOT/../fbc-modern/toolchains/fbc-modern-linux/bin/fbc"}
+TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
 YYJSON=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
 
-[ -x "$FBC" ] || FBC=$(command -v fbc)
+[ -x "$TIKO" ] || TIKO=$(command -v tiko)
 INC="-i $YYJSON/inc -p $YYJSON/lib/linux64"
 FAILED=0
 
@@ -19,25 +19,25 @@ echo "[1/13] building the server"
 sh "$ROOT/build/_compile.sh"
 
 echo "[2/13] framing tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_framing.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_framing.bas" \
     "$ROOT/src/rpc/transport.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_framing"
 "$ROOT/bin/test_framing" || FAILED=1
 
 echo "[3/13] json and json-rpc tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_json.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_json.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/jsonrpc.bas" "$ROOT/src/utils/logging.bas" \
     -x "$ROOT/bin/test_json"
 "$ROOT/bin/test_json" || FAILED=1
 
 echo "[4/13] position tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_position.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_position.bas" \
     "$ROOT/src/utils/position.bas" \
     -x "$ROOT/bin/test_position"
 "$ROOT/bin/test_position" || FAILED=1
 
 echo "[5/13] uri and document tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_document.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_document.bas" \
     "$ROOT/src/document/document.bas" "$ROOT/src/document/document_manager.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
@@ -47,7 +47,7 @@ echo "[5/13] uri and document tests"
 "$ROOT/bin/test_document" || FAILED=1
 
 echo "[6/13] lexer and parser tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_analysis.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_analysis.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
     "$ROOT/src/analysis/diagnostics.bas" \
@@ -57,7 +57,7 @@ echo "[6/13] lexer and parser tests"
 "$ROOT/bin/test_analysis" "$ROOT" || FAILED=1
 
 echo "[7/13] symbol tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_symbols.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_symbols.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
     "$ROOT/src/analysis/diagnostics.bas" \
@@ -65,7 +65,7 @@ echo "[7/13] symbol tests"
 "$ROOT/bin/test_symbols" || FAILED=1
 
 echo "[8/13] completion tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_completion.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_completion.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/completion.bas" \
     "$ROOT/src/analysis/diagnostics.bas" \
@@ -74,8 +74,8 @@ echo "[8/13] completion tests"
 
 echo "[9/13] workspace tests"
 # tests/fake_tiko stands in for `tiko metadata`.
-"$FBC" -w all "$ROOT/tests/fake_tiko.bas" -x "$ROOT/bin/fake_tiko"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_workspace.bas" \
+"$TIKO" -w all "$ROOT/tests/fake_tiko.bas" -x "$ROOT/bin/fake_tiko"
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_workspace.bas" \
     "$ROOT/src/workspace/workspace.bas" "$ROOT/src/workspace/symbol_index.bas" "$ROOT/src/workspace/modules.bas" "$ROOT/src/analysis/includes.bas" \
     "$ROOT/src/workspace/index_builder.bas" "$ROOT/src/workspace/metadata.bas" "$ROOT/src/workspace/cincludes.bas" \
     "$ROOT/src/utils/process.bas" "$ROOT/src/json/json.bas" \
@@ -86,7 +86,7 @@ echo "[9/13] workspace tests"
 "$ROOT/bin/test_workspace" "$ROOT" || FAILED=1
 
 echo "[10/13] signature tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_signature.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_signature.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/signature.bas" \
     "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
@@ -94,7 +94,7 @@ echo "[10/13] signature tests"
 "$ROOT/bin/test_signature" || FAILED=1
 
 echo "[11/13] semantic token tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_semantic.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_semantic.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/semantic.bas" \
     "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
@@ -102,7 +102,7 @@ echo "[11/13] semantic token tests"
 "$ROOT/bin/test_semantic" || FAILED=1
 
 echo "[12/13] formatting tests"
-"$FBC" -w all -mt $INC "$ROOT/tests/test_format.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/test_format.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \
     "$ROOT/src/analysis/symbols.bas" "$ROOT/src/analysis/format.bas" \
     "$ROOT/src/analysis/diagnostics.bas" "$ROOT/src/utils/position.bas" \
@@ -110,7 +110,7 @@ echo "[12/13] formatting tests"
 "$ROOT/bin/test_format" || FAILED=1
 
 echo "[13/13] piped session against the real server"
-"$FBC" -w all -mt $INC "$ROOT/tests/session_tool.bas" \
+"$TIKO" -w all -mt $INC "$ROOT/tests/session_tool.bas" \
     "$ROOT/src/json/json.bas" "$ROOT/src/rpc/transport.bas" "$ROOT/src/rpc/jsonrpc.bas" \
     "$ROOT/src/lsp/protocol.bas" "$ROOT/src/analysis/semantic.bas" \
     "$ROOT/src/analysis/lexer.bas" "$ROOT/src/analysis/parser.bas" \

@@ -2,6 +2,7 @@
 ''  handlers/watched_files.bas -- workspace/didChangeWatchedFiles
 '' ############################################################################
 
+#import "std/containers"
 #include once "watched_files.bi"
 #include once "workspace_symbols.bi"
 #include once "../workspace/workspace.bi"
@@ -9,7 +10,6 @@
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
 #include once "../workspace/metadata.bi"
-#include once "fb/map.bi"
 
 '' FileChangeType, from the specification.
 const FILECHANGE_CREATED = 1
@@ -33,7 +33,7 @@ type WatchedChange
     Kind_ as long
 end type
 
-type WatchedChangeArray as FB.Array( of WatchedChange )
+type WatchedChangeArray as containers.Array( of WatchedChange )
 
 '' ----------------------------------------------------------------------------
 ''  Registering
@@ -140,7 +140,7 @@ private function OnDidChangeWatchedFiles( byref srv as Server, _
     '' Collapsing here rather than acting twice is what makes the count below
     '' mean something.
     dim work_ as WatchedChangeArray
-    dim seen_ as FB.Map( of string, long )
+    dim seen_ as containers.Map( of string, long )
 
     for each change in ArrayOf( req.Params( ).Member( "changes" ) )
         dim as string uriText = change.Member( "uri" ).AsString( "" )

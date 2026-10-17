@@ -2,11 +2,11 @@
 ''  workspace/symbol_index.bas -- every symbol in the workspace
 '' ############################################################################
 
+#import "std/containers"
+#import "std/fs"
 #include once "symbol_index.bi"
 #include once "modules.bi"
 #include once "cincludes.bi"
-#include once "fb/filesystem.bi"
-#include once "fb/map.bi"
 #include once "../utils/uri.bi"
 #include once "../utils/position.bi"
 
@@ -355,18 +355,18 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
             ModuleCandidates( files_[i].Path_, files_[i].Imports[k].Target, roots, cands )
             for c as long = 0 to cands.Count( ) - 1
                 dim as string want = lcase( cands[c] )
-                dim found as FB.Array( of long )
+                dim found as containers.Array( of long )
                 for f as long = 0 to files_.Count( ) - 1
                     if( lcase( DirOf( NormalizePath( files_[f].Path_ ) ) ) <> want ) then continue for
                     if( IsModuleSourceName_( files_[f].Path_ ) ) then found.Push( f )
                 next
-                if( found.Count( ) = 0 andalso FB.IsDir( cands[c] ) ) then
-                    dim entries as FB.Array( of FB.DirEntry )
-                    if( FB.ListDir( cands[c], entries ).IsOk( ) ) then
+                if( found.Count( ) = 0 andalso fs.IsDir( cands[c] ) ) then
+                    dim entries as containers.Array( of fs.DirEntry )
+                    if( fs.ListDir( cands[c], entries ).IsOk( ) ) then
                         for q as long = 0 to entries.Count( ) - 1
                             if( entries[q].IsFile( ) = false ) then continue for
                             if( IsModuleSourceName_( entries[q].Name( ) ) = false ) then continue for
-                            if( idx.IndexPath( FB.PathJoin( cands[c], entries[q].Name( ) ) ) ) then
+                            if( idx.IndexPath( fs.PathJoin( cands[c], entries[q].Name( ) ) ) ) then
                                 found.Push( files_.Count( ) - 1 )
                             end if
                         next
@@ -417,12 +417,12 @@ private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as Symbol
     '' module seed is the one that needs that: a vendor package's sqlite3.ti sits beside
     '' sqlite.tiko in the toolchain's pkg/, read for no other file.
     if( incDirs.IsEmpty( ) ) then everyFile = false
-    dim seen as FB.Map( of string, boolean )
+    dim seen as containers.Map( of string, boolean )
     for i as long = 0 to files_.Count( ) - 1
         seen.Put( files_[i].Key_, true )
     next
 
-    dim work as FB.Array( of long )
+    dim work as containers.Array( of long )
     if( everyFile ) then
         for i as long = 0 to files_.Count( ) - 1
             work.Push( i )
@@ -457,11 +457,11 @@ private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as Symbol
             if( known ) then continue for
 
             dim as string cand = CandidatePath_( here, tgt )
-            if( FB.IsFile( cand ) = false ) then
+            if( fs.IsFile( cand ) = false ) then
                 cand = ""
                 for d as long = 0 to incDirs.Count( ) - 1
                     dim as string c2 = CandidatePath_( incDirs[d], tgt )
-                    if( FB.IsFile( c2 ) ) then
+                    if( fs.IsFile( c2 ) ) then
                         cand = c2
                         exit for
                     end if
@@ -491,14 +491,14 @@ sub SymbolIndex.ResolveIncludes( byval readHeaders as boolean = false )
     '' than a scan. Without this a workspace of n files with e includes each
     '' costs n*e*n comparisons -- seconds, on the tree this server is meant to
     '' keep up with.
-    dim byKey as FB.Map( of string, long )
+    dim byKey as containers.Map( of string, long )
     for i as long = 0 to this.m_files.Count( ) - 1
         byKey.Put( this.m_files[i].Key_, i )
     next
 
     '' And one by FILE NAME, for the last resort below. -1 marks a name two
     '' files share, which is the case where guessing is not allowed.
-    dim byName as FB.Map( of string, long )
+    dim byName as containers.Map( of string, long )
     for i as long = 0 to this.m_files.Count( ) - 1
         dim as string nm = FileNameOf( this.m_files[i].Path_ )
         if( byName.Contains( nm ) ) then
@@ -604,7 +604,7 @@ function SymbolIndex.ImportAt( byval fileIndex as long, byval i as long ) as Imp
 end function
 
 function SymbolIndex.ModuleFilesOf( byval fileIndex as long, byref lowerAlias as string, _
-                                    byref out_ as FB.Array( of long ) ) as boolean
+                                    byref out_ as containers.Array( of long ) ) as boolean
     out_.Clear( )
     if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then return false
     for k as long = 0 to this.m_files[fileIndex].Imports.Count( ) - 1
@@ -620,7 +620,7 @@ end function
 sub SymbolIndex.ModuleMembers( byval fileIndex as long, byref lowerAlias as string, _
                                byref out_ as IndexHitArray )
     out_.Clear( )
-    dim files_ as FB.Array( of long )
+    dim files_ as containers.Array( of long )
     if( this.ModuleFilesOf( fileIndex, lowerAlias, files_ ) = false ) then exit sub
     for each f as long in files_
         for s as long = 0 to this.m_files[f].Symbols.Count( ) - 1
@@ -638,7 +638,7 @@ end sub
 sub SymbolIndex.ModuleExports( byval fileIndex as long, byref lowerAlias as string, _
                                byref out_ as ExportHitArray )
     out_.Clear( )
-    dim files_ as FB.Array( of long )
+    dim files_ as containers.Array( of long )
     if( this.ModuleFilesOf( fileIndex, lowerAlias, files_ ) = false ) then exit sub
     for each f as long in files_
         for x as long = 0 to this.m_files[f].Exports.Count( ) - 1
@@ -662,7 +662,7 @@ function SymbolIndex.ExportTarget( byval exportFile as long, byref e as ExportEd
     out_.FileIndex = -1
     out_.SymIndex = -1
     if( len(e.TargetNs) = 0 orelse len(e.TargetName) = 0 ) then return false
-    dim vis as FB.Array( of long )
+    dim vis as containers.Array( of long )
     this.VisibleFrom( exportFile, vis )
     '' A declaration first: a header declares, and may define further down.
     for pass as long = 0 to 1
@@ -690,16 +690,16 @@ sub SymbolIndex.ModuleExportTargets( byval fileIndex as long, byref lowerAlias a
     this.ModuleExports( fileIndex, lowerAlias, exports )
     '' One map per module file: `ns.name` -> a declaration, else any definition.
     dim as long mapFile = -1
-    dim byName as FB.Map( of string, long )
-    dim hitFile as FB.Array( of long )
-    dim hitSym as FB.Array( of long )
+    dim byName as containers.Map( of string, long )
+    dim hitFile as containers.Array( of long )
+    dim hitSym as containers.Array( of long )
     for each x as ExportHit in exports
         if( x.FileIndex <> mapFile ) then
             mapFile = x.FileIndex
             byName.Clear( )
             hitFile.Clear( )
             hitSym.Clear( )
-            dim vis as FB.Array( of long )
+            dim vis as containers.Array( of long )
             this.VisibleFrom( mapFile, vis )
             for pass as long = 0 to 1
                 for each f as long in vis
@@ -773,14 +773,14 @@ function SymbolIndex.HasUnresolvedIncludes( byval fileIndex as long ) as boolean
     return false
 end function
 
-sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as containers.Array( of long ) )
     out_.Clear( )
     if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then exit sub
 
     '' Breadth first, with the queue and the visited set in one array: an entry
     '' is pushed when it is first seen and read when its turn comes, so a cycle
     '' -- which `#include once` exists to survive -- simply never pushes twice.
-    dim seen_ as FB.Map( of long, boolean )
+    dim seen_ as containers.Map( of long, boolean )
     out_.Push( fileIndex )
     seen_.Put( fileIndex, true )
 
@@ -807,8 +807,8 @@ sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of
         '' satellite brings SDL.ti's names too. A module's plain import is its own business
         '' and goes no further -- the compiler's rule since tiko-lang e6e2dfdc: a public
         '' header reaches the importer, never the importer's importers.
-        dim modFiles as FB.Array( of long )
-        dim modSeen as FB.Map( of long, boolean )
+        dim modFiles as containers.Array( of long )
+        dim modSeen as containers.Map( of long, boolean )
         for k as long = 0 to this.m_files[f].Imports.Count( ) - 1
             for each mf as long in this.m_files[f].Imports[k].Files
                 if( mf < 0 orelse mf >= this.m_files.Count( ) ) then continue for
@@ -845,7 +845,7 @@ sub SymbolIndex.VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of
     wend
 end sub
 
-sub SymbolIndex.IncludedBy( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+sub SymbolIndex.IncludedBy( byval fileIndex as long, byref out_ as containers.Array( of long ) )
     out_.Clear( )
     if( fileIndex < 0 orelse fileIndex >= this.m_files.Count( ) ) then exit sub
 
@@ -854,7 +854,7 @@ sub SymbolIndex.IncludedBy( byval fileIndex as long, byref out_ as FB.Array( of 
     '' other way round: repeatedly, until a pass adds nothing. Include depth is
     '' small (a header of headers is three or four deep), so this converges in
     '' a handful of passes over an array that is already in cache.
-    dim seen_ as FB.Map( of long, boolean )
+    dim seen_ as containers.Map( of long, boolean )
     out_.Push( fileIndex )
     seen_.Put( fileIndex, true )
 
@@ -883,7 +883,7 @@ function SymbolIndex.CanSee( byval fromFile as long, byval targetFile as long ) 
     if( fromFile = targetFile ) then return true
     if( fromFile < 0 orelse targetFile < 0 ) then return false
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     this.VisibleFrom( fromFile, visible )
     for i as long = 0 to visible.Count( ) - 1
         if( visible[i] = targetFile ) then return true
@@ -1013,7 +1013,7 @@ function SymbolIndex.FindDefinitionFrom( byval fromFile as long, byref lowerName
                                         byref hit as IndexHit ) as boolean
     if( fromFile < 0 ) then return this.FindDefinition( lowerName, hit )
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     this.VisibleFrom( fromFile, visible )
 
     dim as long bestFile  = -1
@@ -1056,7 +1056,7 @@ function SymbolIndex.FindDefinitionFrom( byval fromFile as long, byref lowerName
 end function
 
 sub FindIdentifierOffsets( byref text_ as string, byref lowerName as string, _
-                           byref offsets as FB.Array( of long ) )
+                           byref offsets as containers.Array( of long ) )
     offsets.Clear( )
     if( len(lowerName) = 0 ) then exit sub
 

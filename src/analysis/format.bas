@@ -2,6 +2,7 @@
 ''  analysis/format.bas -- re-indenting a document
 '' ############################################################################
 
+#import "std/containers"
 #include once "format.bi"
 #include once "lexer.bi"
 
@@ -57,8 +58,8 @@ end function
 '' The first version of this read the text and missed `& _   '' note`, which is
 '' written on four consecutive lines of this project's own test suite.
 private sub FindContinuations( byref idx as LineIndex, byref tokens as TokenArray, _
-                               byval lineCount as long, byref continued_ as FB.Array( of boolean ) )
-    dim hasEol as FB.Array( of boolean )
+                               byval lineCount as long, byref continued_ as containers.Array( of boolean ) )
+    dim hasEol as containers.Array( of boolean )
     for ln as long = 0 to lineCount - 1
         hasEol.Push( false )
         continued_.Push( false )
@@ -134,7 +135,7 @@ function ComputeFormatEdits( byref text_ as string, byref idx as LineIndex, _
     '' The CONTINUATION lines of a multi-line comment: their leading spaces are
     '' part of a drawing, not of a block structure. The opening line is fair
     '' game, and moves the whole comment with it.
-    dim protected_ as FB.Array( of boolean )
+    dim protected_ as containers.Array( of boolean )
     for ln as long = 0 to lineCount - 1
         protected_.Push( false )
     next
@@ -179,8 +180,8 @@ function ComputeFormatEdits( byref text_ as string, byref idx as LineIndex, _
     end if
 
     '' -- which lines are comment and which are code ---------------------------
-    dim hasCode_ as FB.Array( of boolean )
-    dim hasComment_ as FB.Array( of boolean )
+    dim hasCode_ as containers.Array( of boolean )
+    dim hasComment_ as containers.Array( of boolean )
     for ln as long = 0 to lineCount - 1
         hasCode_.Push( false )
         hasComment_.Push( false )
@@ -203,15 +204,15 @@ function ComputeFormatEdits( byref text_ as string, byref idx as LineIndex, _
     next
 
     '' -- the depth every line wants -------------------------------------------
-    dim want_ as FB.Array( of long )
+    dim want_ as containers.Array( of long )
 
-    dim continued_ as FB.Array( of boolean )
+    dim continued_ as containers.Array( of boolean )
     FindContinuations( idx, tokens, lineCount, continued_ )
 
     '' Whether the line is a CLAUSE -- an ELSE, an ELSEIF, a CASE. It steps out
     '' to its opener and steps back in again, which is what tells it from a
     '' closer (out, and stays out) and from an opener (in from where it is).
-    dim clause_ as FB.Array( of boolean )
+    dim clause_ as containers.Array( of boolean )
 
     dim as long markIdx = 0
     dim as long depth   = 0

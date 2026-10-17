@@ -22,6 +22,7 @@
 ''  looks exactly like a call, and only the symbol table can tell them apart.
 '' ############################################################################
 
+#import "std/containers"
 #include once "inlay_hints.bi"
 #include once "hover.bi"
 #include once "../analysis/signature.bi"

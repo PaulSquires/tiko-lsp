@@ -6,6 +6,7 @@
 ''  under it the way they are written.
 '' ############################################################################
 
+#import "std/containers"
 #include once "document_symbols.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"

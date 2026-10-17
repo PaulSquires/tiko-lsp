@@ -11,6 +11,7 @@
 ''       handed an empty string goes through TextPtr().
 '' ############################################################################
 
+#import "std/containers"
 #include once "crt.bi"
 #include once "json.bi"
 

@@ -2,6 +2,7 @@
 ''  utils/process.bas -- running a tool and keeping what it says. See process.bi.
 '' ############################################################################
 
+#import "std/containers"
 #include once "process.bi"
 
 #ifdef __FB_WIN32__
@@ -52,7 +53,7 @@ private function DrainPipe( byval h as HANDLE, byref acc as string ) as boolean
     return true
 end function
 
-function RunCaptured( byref exe as string, byref args as FB.Array( of string ), _
+function RunCaptured( byref exe as string, byref args as containers.Array( of string ), _
                       byref cwd as string, byval timeoutMs as long ) as ProcessResult
     dim as ProcessResult r
 
@@ -166,7 +167,7 @@ private function DrainFd( byval fd as long, byref acc as string ) as boolean
     return true
 end function
 
-function RunCaptured( byref exe as string, byref args as FB.Array( of string ), _
+function RunCaptured( byref exe as string, byref args as containers.Array( of string ), _
                       byref cwd as string, byval timeoutMs as long ) as ProcessResult
     dim as ProcessResult r
     dim as long po(0 to 1), pe(0 to 1)

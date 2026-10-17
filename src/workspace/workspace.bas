@@ -2,11 +2,12 @@
 ''  workspace/workspace.bas -- finding the source files
 '' ############################################################################
 
-#include once "fb/filesystem.bi"
+#import "std/containers"
+#import "std/fs"
 #include once "workspace.bi"
 #include once "../utils/logging.bi"
 
-using FB
+using fs
 
 function IsSourceFileName( byref name_ as string ) as boolean
     dim as long dotAt = instrrev( name_, "." )
@@ -68,7 +69,7 @@ sub ScanFolder( byref rootPath as string, byref scan as WorkspaceScan )
     '' finds nothing -- so the file IS the workspace. Walking its directory
     '' instead would be worse: opening one file out of C:\dev would index
     '' every project on the disk.
-    if( FB.IsFile( root ) ) then
+    if( fs.IsFile( root ) ) then
         if( IsSourceFileName( root ) ) then scan.Files.Push( root )
         exit sub
     end if

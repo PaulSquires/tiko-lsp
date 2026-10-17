@@ -18,7 +18,7 @@
 ''  JSON but badly framed still fails.
 '' ############################################################################
 
-#include once "fb/array.bi"
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/rpc/transport.bi"
 #include once "../src/json/json.bi"
@@ -471,7 +471,7 @@ private function CheckSession( byref path as string ) as long
     TestGroup( "captured stream framing" )
 
     dim as MessageFramer f
-    dim messages as FB.Array( of string )
+    dim messages as containers.Array( of string )
     f.Feed( captured )
 
     do
@@ -529,8 +529,8 @@ private function CheckSession( byref path as string ) as long
     '' stream; the positional assertions below read what is left.
     TestGroup( "the background scans report in" )
 
-    dim ordered as FB.Array( of string )
-    dim reports as FB.Array( of string )
+    dim ordered as containers.Array( of string )
+    dim reports as containers.Array( of string )
     dim as long firstReportAt = -1
 
     scope
@@ -1305,7 +1305,7 @@ private function WriteIncSession( byref path as string, byref wsRoot as string, 
 end function
 
 '' The answer to request `id`, or "" when the server sent none.
-private function ResponseFor_( byref messages as FB.Array( of string ), byval id as long ) as string
+private function ResponseFor_( byref messages as containers.Array( of string ), byval id as long ) as string
     for i as long = 0 to messages.Count( ) - 1
         dim as JsonDoc d
         if( d.Parse( messages[i] ) = false ) then continue for
@@ -1327,7 +1327,7 @@ private function CheckIncSession( byref path as string ) as long
     TestGroup( "toolchain headers, over the wire" )
 
     dim as MessageFramer f
-    dim messages as FB.Array( of string )
+    dim messages as containers.Array( of string )
     f.Feed( captured )
     do
         dim as string payload
@@ -1568,7 +1568,7 @@ private function CheckMetaSession( byref path as string, byval withCompiler as b
                                   "compiler metadata, over the wire -- the control, with no compiler" ) )
 
     dim as MessageFramer f
-    dim messages as FB.Array( of string )
+    dim messages as containers.Array( of string )
     f.Feed( captured )
     do
         dim as string payload
@@ -1742,7 +1742,7 @@ private function WriteCincSession( byref path as string, byref wsRoot as string,
 end function
 
 '' The `uri` of a definition result, a Location or the first of an array of them.
-private function DefinitionUri_( byref messages as FB.Array( of string ), byval id as long ) as string
+private function DefinitionUri_( byref messages as containers.Array( of string ), byval id as long ) as string
     dim as JsonDoc d
     d.Parse( ResponseFor_( messages, id ) )
     dim as JsonValue r = d.Root( ).Member( "result" )
@@ -1761,7 +1761,7 @@ private function CheckCincSession( byref path as string, byval withCompiler as b
                                   "#cinclude, over the wire -- the control, with no compiler" ) )
 
     dim as MessageFramer f
-    dim messages as FB.Array( of string )
+    dim messages as containers.Array( of string )
     f.Feed( captured )
     do
         dim as string payload

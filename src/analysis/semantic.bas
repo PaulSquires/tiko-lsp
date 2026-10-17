@@ -2,14 +2,14 @@
 ''  analysis/semantic.bas -- semantic tokens
 '' ############################################################################
 
+#import "std/containers"
 #include once "semantic.bi"
-#include once "fb/map.bi"
 
 '' The name a client is sent for each legend index. These are the
 '' specification's own spellings; a client matches them against its theme, so
 '' an invented name simply gets no colour.
-function SemanticTypeNames( ) as FB.Array( of string )
-    dim out_ as FB.Array( of string )
+function SemanticTypeNames( ) as containers.Array( of string )
+    dim out_ as containers.Array( of string )
     out_.Push( "namespace" )
     out_.Push( "type" )
     out_.Push( "struct" )
@@ -31,8 +31,8 @@ function SemanticTypeNames( ) as FB.Array( of string )
     return out_
 end function
 
-function SemanticModifierNames( ) as FB.Array( of string )
-    dim out_ as FB.Array( of string )
+function SemanticModifierNames( ) as containers.Array( of string )
+    dim out_ as containers.Array( of string )
     out_.Push( "declaration" )
     out_.Push( "readonly" )
     out_.Push( "static" )
@@ -88,9 +88,9 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
     out_.Clear( )
 
     '' -- what each NAME is, and where each name is DECLARED -------------------
-    dim byName as FB.Map( of string, long )
-    dim byRank as FB.Map( of string, long )
-    dim declAt as FB.Map( of long, long )
+    dim byName as containers.Map( of string, long )
+    dim byRank as containers.Map( of string, long )
+    dim declAt as containers.Map( of long, long )
 
     for i as long = 0 to symbols.Count( ) - 1
         dim as long type_ = SemanticTypeOfKind( symbols.Items[i].Kind_, _
@@ -203,7 +203,7 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
     next
 end sub
 
-sub EncodeSemanticTokens( byref toks as SemTokenArray, byref data_ as FB.Array( of long ) )
+sub EncodeSemanticTokens( byref toks as SemTokenArray, byref data_ as containers.Array( of long ) )
     data_.Clear( )
 
     dim as long prevLine = 0

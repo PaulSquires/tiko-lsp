@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "lexer.bi"
 
 type IncludeRef
@@ -39,7 +38,7 @@ type IncludeRef
     Length_ as long      '' in bytes, quotes included
 end type
 
-type IncludeRefArray as FB.Array( of IncludeRef )
+type IncludeRefArray as containers.Array( of IncludeRef )
 
 '' ONE `#import "path" [as alias] [public] [link static|dynamic]` LINE (tiko-lang ADR 0017; RFC-0001). The alias
 '' is lower-cased -- names are compared that way -- and is the path's last segment when no
@@ -54,7 +53,7 @@ type ImportRef
     Length_  as long      '' in bytes, quotes included
 end type
 
-type ImportRefArray as FB.Array( of ImportRef )
+type ImportRefArray as containers.Array( of ImportRef )
 
 declare sub FindImports( byref text_ as string, byref tokens as TokenArray, _
                          byref out_ as ImportRefArray )
@@ -74,7 +73,7 @@ type ExportRef
     Length_    as long
 end type
 
-type ExportRefArray as FB.Array( of ExportRef )
+type ExportRefArray as containers.Array( of ExportRef )
 
 declare sub FindExports( byref text_ as string, byref tokens as TokenArray, _
                          byref out_ as ExportRefArray )

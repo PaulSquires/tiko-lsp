@@ -3,7 +3,7 @@
 #  Build a static libyyjson64.a for Linux.
 #
 #  The yyjson repository ships a Windows DLL and its import library only. The
-#  FreeBASIC bindings say `#inclib "yyjson64"`, so on Linux fbc looks for
+#  FreeBASIC bindings say `#inclib "yyjson64"`, so on Linux tiko looks for
 #  libyyjson64.a on the library path -- this script produces exactly that from
 #  the same two C files the Windows DLL is built from.
 #

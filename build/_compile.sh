@@ -3,19 +3,19 @@
 #  Build bin/tiko-lsp (Linux x64).
 #
 #  Requires:
-#    fbc-modern   $FBC or ../fbc-modern/toolchains/fbc-modern-linux/bin/fbc
+#    tiko         $TIKO_LSP_TIKO or ../tiko-lang/toolchains/tiko-linux/bin/tiko
 #    yyjson       $YYJSON with lib/linux64/libyyjson64.a
 #                 (build it once with build/_build_yyjson_linux.sh)
 # ============================================================================
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-FBC=${TIKO_LSP_FBC:-"$ROOT/../fbc-modern/toolchains/fbc-modern-linux/bin/fbc"}
+TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
 YYJSON=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
 
-[ -x "$FBC" ] || FBC=$(command -v fbc || true)
-if [ -z "$FBC" ] || [ ! -x "$FBC" ]; then
-    echo "fbc not found -- set TIKO_LSP_FBC to the fbc-modern compiler." >&2
+[ -x "$TIKO" ] || TIKO=$(command -v tiko || true)
+if [ -z "$TIKO" ] || [ ! -x "$TIKO" ]; then
+    echo "tiko not found -- set TIKO_LSP_TIKO to the tiko compiler." >&2
     exit 1
 fi
 
@@ -27,7 +27,7 @@ fi
 mkdir -p "$ROOT/bin"
 
 echo "Building tiko-lsp"
-"$FBC" -w all -mt \
+"$TIKO" -w all -mt \
     -i "$YYJSON/inc" -p "$YYJSON/lib/linux64" \
     "$ROOT/src/main.bas" \
     "$ROOT/src/json/json.bas" \

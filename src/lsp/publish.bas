@@ -2,6 +2,7 @@
 ''  lsp/publish.bas -- turning diagnostics into notifications
 '' ############################################################################
 
+#import "std/containers"
 #include once "publish.bi"
 #include once "../analysis/parser.bi"
 #include once "../utils/uri.bi"

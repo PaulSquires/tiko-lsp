@@ -2,8 +2,9 @@
 ''  rpc/transport.bas -- framing state machine and stdio plumbing
 '' ############################################################################
 
+#import "std/containers"
+#import "std/strings"
 #include once "crt.bi"
-#include once "fb/string.bi"
 #include once "transport.bi"
 #include once "../utils/logging.bi"
 
@@ -14,7 +15,7 @@
     #include once "crt/unistd.bi"
 #endif
 
-using FB
+using strings
 
 const CRLF_ = !"\r\n"
 
@@ -124,7 +125,7 @@ function MessageFramer.ScanHeader( ) as FrameStatus
 
     '' Normalise line endings, then one header per line.
     dim as string normalised = Replace( headerBlock, CRLF_, chr(10) )
-    dim headerLines as FB.Array( of string ) = Split( normalised, chr(10) )
+    dim headerLines as containers.Array( of string ) = Split( normalised, chr(10) )
 
     for each rawLine in headerLines
         dim as string line_ = trim( rawLine, any chr(13) & chr(10) & " " & chr(9) )

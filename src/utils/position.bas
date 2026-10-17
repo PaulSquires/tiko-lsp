@@ -2,6 +2,7 @@
 ''  utils/position.bas -- line index and UTF-16 <-> byte conversion
 '' ############################################################################
 
+#import "std/containers"
 #include once "position.bi"
 
 '' Bytes in the UTF-8 sequence that starts with `b`. A continuation byte or an

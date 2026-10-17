@@ -1,6 +1,6 @@
 # tiko-lsp
 
-A Language Server Protocol server for **tiko**, written in fbc-modern.
+A Language Server Protocol server for **tiko**, written in tiko and built with the tiko compiler.
 
 tiko is a FreeBASIC-compatible language ([tiko-lang](https://github.com/PaulSquires/tiko-lang)),
 so the syntax this server reads is FreeBASIC's — which is why its parser could be
@@ -142,21 +142,28 @@ Every directory in the sketch now has something real in it.
 
 ## Building
 
+The standard library is tiko's `std` modules (`std/containers`, `std/strings`, `std/fs`).
+tiko takes `#import` only before any code in the compiled file, so every `.bas` imports
+what it needs at its top, and the `.bi` headers use `containers.Array` / `containers.Map`
+without importing anything themselves. A new `.bas` must start with
+`#import "std/containers"`.
+
 ### Windows
 
-Needs the fbc-modern toolchain and a built `yyjson64.dll`:
+Needs the tiko toolchain (`tiko-lang/toolchains/tiko-windows`) and a built `yyjson64.dll`:
 
 ```bash
 build\_compile.bat
 ```
 
-Override the defaults with `TIKO_LSP_FBC` and `TIKO_LSP_YYJSON` if your checkouts
+Override the defaults with `TIKO_LSP_TIKO` and `TIKO_LSP_YYJSON` if your checkouts
 live elsewhere. The build copies `yyjson64.dll` next to the executable, which is
 where the server loads it from.
 
 ### Linux
 
-yyjson ships a Windows DLL only, so build its static library once:
+Needs the tiko toolchain (`tiko-lang/toolchains/tiko-linux`). yyjson ships a Windows DLL
+only, so build its static library once:
 
 ```bash
 sh build/_build_yyjson_linux.sh

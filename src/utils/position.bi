@@ -22,10 +22,9 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 
 '' A container held as a FIELD must be a named instantiation.
-type OffsetArray as FB.Array( of longint )
+type OffsetArray as containers.Array( of longint )
 
 type SourcePosition
     Line   as long      '' 0-based

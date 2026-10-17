@@ -2,6 +2,7 @@
 ''  document/document_manager.bas -- every buffer the client has open
 '' ############################################################################
 
+#import "std/containers"
 #include once "crt.bi"
 #include once "document_manager.bi"
 #include once "../utils/logging.bi"
@@ -66,6 +67,6 @@ function DocumentManager.Count( ) as long
     return this.m_docs.Count( )
 end function
 
-function DocumentManager.OpenUris( ) as FB.Array( of string )
+function DocumentManager.OpenUris( ) as containers.Array( of string )
     return this.m_docs.Keys( )
 end function

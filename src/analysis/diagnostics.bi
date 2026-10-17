@@ -10,7 +10,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 
 '' The values are LSP's DiagnosticSeverity and go on the wire as they are.
 enum DiagSeverity
@@ -47,7 +46,7 @@ type Diagnostic
     Message_    as string
 end type
 
-type DiagnosticArray as FB.Array( of Diagnostic )
+type DiagnosticArray as containers.Array( of Diagnostic )
 
 '' A zero-width range is legal in LSP but invisible in most editors, so a
 '' diagnostic that would be empty is widened to one byte.

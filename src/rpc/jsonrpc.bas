@@ -2,6 +2,7 @@
 ''  rpc/jsonrpc.bas -- JSON-RPC 2.0 message model
 '' ############################################################################
 
+#import "std/containers"
 #include once "jsonrpc.bi"
 #include once "../utils/logging.bi"
 
