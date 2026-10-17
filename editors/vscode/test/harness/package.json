@@ -1,0 +1,11 @@
+{
+  "name": "tiko-test-harness",
+  "displayName": "Tiko test harness",
+  "description": "Runs release/vscode/test.sh's checks inside a clean VS Code profile. Contributes nothing; never published.",
+  "version": "0.0.0",
+  "publisher": "PaulSquires",
+  "private": true,
+  "engines": {
+    "vscode": "^1.82.0"
+  }
+}

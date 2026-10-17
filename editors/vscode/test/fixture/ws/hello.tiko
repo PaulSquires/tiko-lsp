@@ -1,0 +1,12 @@
+type Point
+    x as long
+    y as long
+end type
+
+sub Greet( byval name_ as string )
+    print "hello " & name_
+end sub
+
+dim p as Point
+p.x = 1
+Greet( "world" )

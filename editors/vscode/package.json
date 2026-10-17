@@ -1,7 +1,7 @@
 {
-  "name": "tiko-lsp",
+  "name": "tiko",
   "displayName": "Tiko",
-  "description": "Language support for tiko, served by tiko-lsp.",
+  "description": "Language support for tiko, the FreeBASIC-compatible language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included.",
   "version": "0.1.0",
   "publisher": "PaulSquires",
   "license": "MIT",
@@ -9,11 +9,24 @@
     "type": "git",
     "url": "https://github.com/PaulSquires/tiko-lsp"
   },
+  "homepage": "https://github.com/PaulSquires/tiko-lsp/tree/main/editors/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/PaulSquires/tiko-lsp/issues"
+  },
   "engines": {
     "vscode": "^1.82.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "tiko",
+    "basic",
+    "freebasic",
+    "lsp",
+    "language server"
   ],
   "main": "./extension.js",
   "activationEvents": [],
@@ -34,10 +47,7 @@
         "extensions": [
           ".tiko",
           ".tko",
-          ".ti",
-          ".bas",
-          ".bi",
-          ".inc"
+          ".ti"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -68,7 +78,7 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "Path to `tiko-lsp.exe`. Empty: `tiko-lsp` on the `PATH`, then `bin/tiko-lsp.exe` inside a workspace folder."
+          "markdownDescription": "Path to a `tiko-lsp` executable to use instead of the one included with the extension. Empty: the included server, then `tiko-lsp` on the `PATH`, then `bin/tiko-lsp(.exe)` inside a workspace folder."
         },
         "tiko.server.arguments": {
           "type": "array",
@@ -121,6 +131,6 @@
     "@vscode/vsce": "3.2.1"
   },
   "scripts": {
-    "package": "vsce package --out tiko-lsp.vsix"
+    "package": "vsce package --out tiko.vsix"
   }
 }
