@@ -29,6 +29,7 @@
 ''  name, which is the whole reason that request exists.
 '' ############################################################################
 
+#import "std/containers"
 #include once "rename.bi"
 #include once "workspace_symbols.bi"
 #include once "hover.bi"
@@ -36,13 +37,12 @@
 #include once "../workspace/workspace.bi"
 #include once "../utils/logging.bi"
 #include once "../utils/uri.bi"
-#include once "fb/map.bi"
 
 '' A rename that touches more than this is not something to verify by eye, and
 '' a truncated rename is CORRUPTION -- so the limit refuses rather than trims.
 const MAX_RENAME_EDITS = 5000
 
-type OffsetArrayR_ as FB.Array( of long )
+type OffsetArrayR_ as containers.Array( of long )
 
 function IsRenameableIdentifier( byref name_ as string ) as boolean
     if( len(name_) = 0 ) then return false
@@ -100,7 +100,7 @@ end function
 '' does what it always did: the whole workspace, by name.
 private function BuildRenameScope( byref srv as Server, byval doc as TextDocumentPtr, _
                                    byref lowerName as string, _
-                                   byref scopeFiles as FB.Array( of long ) ) as boolean
+                                   byref scopeFiles as containers.Array( of long ) ) as boolean
     scopeFiles.Clear( )
 
     dim as long docFile = srv.Index->IndexOfUri( doc->Uri( ) )
@@ -111,7 +111,7 @@ private function BuildRenameScope( byref srv as Server, byval doc as TextDocumen
     srv.Index->IncludedBy( hit.FileIndex, scopeFiles )
     if( scopeFiles.IsEmpty( ) ) then return false
 
-    dim seen_ as FB.Map( of long, boolean )
+    dim seen_ as containers.Map( of long, boolean )
     for i as long = 0 to scopeFiles.Count( ) - 1
         seen_.Put( scopeFiles[i], true )
     next
@@ -188,7 +188,7 @@ function RenameRefusal( byref srv as Server, byval doc as TextDocumentPtr, _
         end if
     end if
 
-    dim scopeFiles as FB.Array( of long )
+    dim scopeFiles as containers.Array( of long )
     dim as boolean scoped = BuildRenameScope( srv, doc, lowerName, scopeFiles )
 
     for k as long = 0 to iif( scoped, scopeFiles.Count( ), srv.Index->FileCount( ) ) - 1
@@ -390,7 +390,7 @@ private function OnRename( byref srv as Server, _
         '' -- everything else: by name, every file that CAN SEE it --------------
         dim as long files_ = 0
 
-        dim scopeFiles as FB.Array( of long )
+        dim scopeFiles as containers.Array( of long )
         dim as boolean scoped = BuildRenameScope( srv, doc, lowerName, scopeFiles )
 
         if( scoped ) then

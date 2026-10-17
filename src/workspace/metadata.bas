@@ -2,12 +2,13 @@
 ''  workspace/metadata.bas -- what the compiler says about a package. See metadata.bi.
 '' ############################################################################
 
+#import "std/containers"
+#import "std/fs"
 #include once "metadata.bi"
 #include once "modules.bi"
 #include once "../json/json.bi"
 #include once "../utils/process.bi"
 #include once "../utils/logging.bi"
-#include once "fb/filesystem.bi"
 
 const METADATA_TIMEOUT_MS = 30000
 
@@ -19,11 +20,11 @@ dim shared as string    g_compiler
 dim shared as PathArray g_manDirs         '' one per manifest
 dim shared as PathArray g_manJson         '' ...and what the compiler printed for it
 
-dim shared as FB.Array( of long ) g_modMan
+dim shared as containers.Array( of long ) g_modMan
 dim shared as PathArray g_modChain        '' lower-cased
 dim shared as PathArray g_modDir
 
-dim shared as FB.Array( of long ) g_rootMan
+dim shared as containers.Array( of long ) g_rootMan
 dim shared as PathArray g_rootDir
 
 dim shared as string    g_pkgDir
@@ -170,7 +171,7 @@ sub LoadMetadata( byref roots as PathArray )
         '' Run IN the manifest's directory, naming it as '.': a target's `-i` options are
         '' read against the current directory, and every path that comes back is then
         '' relative to the one directory Resolve reads it against.
-        dim args as FB.Array( of string )
+        dim args as containers.Array( of string )
         args.Push( "metadata" )
         args.Push( "--manifest" )
         args.Push( "." )

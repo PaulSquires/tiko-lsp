@@ -2,8 +2,8 @@
 ''  analysis/includes.bas -- what a file pulls in
 '' ############################################################################
 
+#import "std/containers"
 #include once "includes.bi"
-#include once "fb/map.bi"
 
 '' The text of a string token without its quotes, and without the escape
 '' processing a `!"..."` literal would need -- an include path is a path, and
@@ -156,8 +156,8 @@ sub FindExports( byref text_ as string, byref tokens as TokenArray, _
     out_.Clear( )
 
     '' Every `#define NAME ...`, by lower-cased name: where the name is, and the body.
-    dim defs as FB.Map( of string, long )
-    dim defNames as FB.Array( of ExportRef )
+    dim defs as containers.Map( of string, long )
+    dim defNames as containers.Array( of ExportRef )
     for i as long = 0 to tokens.Count( ) - 1
         if( tokens[i].Kind <> TK_PP ) then continue for
         if( lcase( TokenText( text_, tokens[i] ) ) <> "#define" ) then continue for
@@ -182,7 +182,7 @@ sub FindExports( byref text_ as string, byref tokens as TokenArray, _
         '' The body: to the end of the line, comments aside.
         dim as long first_ = -1, last_ = -1
 
-        dim bodyToks as FB.Array( of long )
+        dim bodyToks as containers.Array( of long )
         while( b < tokens.Count( ) )
             if( tokens[b].Kind = TK_EOL orelse tokens[b].Kind = TK_EOF ) then exit while
             if( tokens[b].Kind <> TK_COMMENT ) then

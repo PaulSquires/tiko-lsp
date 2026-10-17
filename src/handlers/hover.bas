@@ -2,6 +2,7 @@
 ''  handlers/hover.bas -- textDocument/hover
 '' ############################################################################
 
+#import "std/containers"
 #include once "hover.bi"
 #include once "workspace_symbols.bi"
 #include once "completion.bi"
@@ -106,7 +107,7 @@ private function MemberHover_( byref srv as Server, byval doc as TextDocumentPtr
         if( len(typeName) = 0 ) then return ""
     end if
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     VisibleWithImports( srv, here, visible )
     dim as string want = FinalTypeName( srv, visible, typeName )
 

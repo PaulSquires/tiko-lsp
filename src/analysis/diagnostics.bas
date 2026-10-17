@@ -2,6 +2,7 @@
 ''  analysis/diagnostics.bas
 '' ############################################################################
 
+#import "std/containers"
 #include once "diagnostics.bi"
 
 sub AddDiagnostic( byref diags as DiagnosticArray, _

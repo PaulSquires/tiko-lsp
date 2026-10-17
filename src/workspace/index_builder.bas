@@ -2,6 +2,7 @@
 ''  workspace/index_builder.bas -- the workspace scan, off the message loop
 '' ############################################################################
 
+#import "std/containers"
 #include once "index_builder.bi"
 #include once "metadata.bi"
 #include once "cincludes.bi"

@@ -11,8 +11,9 @@
 ''  STDOUT BELONGS TO THE PROTOCOL. Nothing in this program prints to it.
 '' ############################################################################
 
+#import "std/containers"
+#import "std/strings"
 #include once "crt.bi"
-#include once "fb/string.bi"
 
 #include once "utils/logging.bi"
 #include once "json/json.bi"
@@ -38,7 +39,7 @@
 #include once "handlers/tiko_metadata.bi"
 #include once "workspace/index_builder.bi"
 
-using FB
+using strings
 
 '' ----------------------------------------------------------------------------
 ''  Command line

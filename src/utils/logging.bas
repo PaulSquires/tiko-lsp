@@ -2,11 +2,12 @@
 ''  utils/logging.bas -- implementation of the logging facade
 '' ############################################################################
 
+#import "std/containers"
+#import "std/strings"
 #include once "crt.bi"
-#include once "fb/string.bi"
 #include once "logging.bi"
 
-using FB
+using strings
 
 '' ----------------------------------------------------------------------------
 ''  Module state.

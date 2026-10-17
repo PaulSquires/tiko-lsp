@@ -26,6 +26,7 @@
 ''  enough to be worse than silence.
 '' ############################################################################
 
+#import "std/containers"
 #include once "code_action.bi"
 #include once "../lsp/publish.bi"
 #include once "../utils/logging.bi"

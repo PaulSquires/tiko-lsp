@@ -13,6 +13,7 @@
 ''  about what is known.
 '' ############################################################################
 
+#import "std/containers"
 #include once "signature_help.bi"
 #include once "hover.bi"
 #include once "completion.bi"

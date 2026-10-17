@@ -3,22 +3,22 @@ rem ===========================================================================
 rem  Build bin\tiko-lsp.exe (Windows x64).
 rem
 rem  Requires:
-rem    fbc-modern   C:\dev\fbc-modern\toolchains\fbc-modern-windows\fbc64.exe
+rem    tiko         C:\dev\tiko-lang\toolchains\tiko-windows\tiko.exe
 rem    yyjson       C:\dev\yyjson  (bin\yyjson64.dll must already be built)
 rem
-rem  Override either with TIKO_LSP_FBC / TIKO_LSP_YYJSON.
+rem  Override either with TIKO_LSP_TIKO / TIKO_LSP_YYJSON.
 rem ===========================================================================
 setlocal
 
 set ROOT=%~dp0..
-set FBC=C:\dev\fbc-modern\toolchains\fbc-modern-windows\fbc64.exe
+set TIKO=C:\dev\tiko-lang\toolchains\tiko-windows\tiko.exe
 set YYJSON=C:\dev\yyjson
 
-if not "%TIKO_LSP_FBC%"==""    set FBC=%TIKO_LSP_FBC%
+if not "%TIKO_LSP_TIKO%"==""   set TIKO=%TIKO_LSP_TIKO%
 if not "%TIKO_LSP_YYJSON%"=="" set YYJSON=%TIKO_LSP_YYJSON%
 
-if not exist "%FBC%" (
-    echo Compiler not found: %FBC%
+if not exist "%TIKO%" (
+    echo Compiler not found: %TIKO%
     exit /b 1
 )
 if not exist "%YYJSON%\bin\yyjson64.dll" (
@@ -75,7 +75,7 @@ set SOURCES=^
  "%ROOT%\src\utils\uri.bas"
 
 echo Building tiko-lsp.exe
-"%FBC%" -w all -mt -i "%YYJSON%\inc" -p "%YYJSON%\lib\win64" %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
+"%TIKO%" -w all -mt -i "%YYJSON%\inc" -p "%YYJSON%\lib\win64" %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
 if errorlevel 1 (
     echo.
     echo BUILD FAILED

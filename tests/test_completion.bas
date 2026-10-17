@@ -12,6 +12,7 @@
 ''  Build: build\_run_tests.bat  (or build/_run_tests.sh)
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/analysis/parser.bi"
 #include once "../src/analysis/completion.bi"

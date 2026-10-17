@@ -2,6 +2,7 @@
 ''  analysis/signature.bas -- calls, and the parameters they are filling in
 '' ############################################################################
 
+#import "std/containers"
 #include once "signature.bi"
 #include once "../utils/position.bi"
 

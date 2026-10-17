@@ -53,7 +53,7 @@ type IndentMark
     NextDepth as long    '' the indent of the lines after it
 end type
 
-type IndentTrace as FB.Array( of IndentMark )
+type IndentTrace as containers.Array( of IndentMark )
 
 '' Tokens in, diagnostics out, and symbols too when a table is supplied.
 '' `text_` is needed for identifier names.

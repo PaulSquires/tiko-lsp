@@ -8,6 +8,7 @@
 ''  Build: build\_run_tests.bat  (or build/_run_tests.sh)
 '' ############################################################################
 
+#import "std/containers"
 #include once "assert.bi"
 #include once "../src/rpc/transport.bi"
 #include once "crt.bi"

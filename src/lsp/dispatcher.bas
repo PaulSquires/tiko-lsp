@@ -2,7 +2,7 @@
 ''  lsp/dispatcher.bas -- lifecycle state machine and method registry
 '' ############################################################################
 
-#include once "fb/map.bi"
+#import "std/containers"
 #include once "dispatcher.bi"
 #include once "../utils/logging.bi"
 
@@ -10,7 +10,7 @@
 ''  Method registry
 '' ############################################################################
 
-type HandlerMap as FB.Map( of string, LspHandler )
+type HandlerMap as containers.Map( of string, LspHandler )
 
 dim shared as HandlerMap g_Handlers
 

@@ -12,6 +12,7 @@
 '' `--print-cincludes [-i dir]... file`: the bindings of file's #cinclude lines, from
 '' cinclude-answer.txt beside it -- one `header<TAB>binding` per line, the binding relative
 '' to that folder and empty for a header that cannot be imported (tiko then exits 1).
+#import "std/containers"
 private function JsonText( byref s as string ) as string
     dim as string o = ""
     for i as long = 0 to len( s ) - 1

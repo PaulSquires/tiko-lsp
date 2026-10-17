@@ -6,6 +6,7 @@
 ''  `full` is advertised.
 '' ############################################################################
 
+#import "std/containers"
 #include once "semantic_tokens.bi"
 #include once "../analysis/semantic.bi"
 #include once "../utils/logging.bi"
@@ -28,7 +29,7 @@ private function OnSemanticTokensFull( byref srv as Server, _
     dim toks as SemTokenArray
     ComputeSemanticTokens( doc->Text( ), doc->Index( ), doc->Tokens( ), doc->Symbols( ), toks )
 
-    dim data_ as FB.Array( of long )
+    dim data_ as containers.Array( of long )
     EncodeSemanticTokens( toks, data_ )
 
     dim as JsonNode arr = rb.NewArray( )

@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "lexer.bi"
 #include once "symbols.bi"
 
@@ -42,7 +41,7 @@ type SigParam
     LabelEnd   as long
 end type
 
-type SigParamArray as FB.Array( of SigParam )
+type SigParamArray as containers.Array( of SigParam )
 
 '' Splits a procedure's Detail_ into parameters.
 ''
@@ -94,7 +93,7 @@ type ArgSite
     ArgTok   as long       '' first token of the argument itself
 end type
 
-type ArgSiteArray as FB.Array( of ArgSite )
+type ArgSiteArray as containers.Array( of ArgSite )
 
 '' Collects the arguments of every call whose callee identifier lies within
 '' [startOffset, endOffset). Used by inlay hints, which are asked for one

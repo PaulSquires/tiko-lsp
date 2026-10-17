@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "workspace.bi"
 #include once "../analysis/parser.bi"
 #include once "../analysis/includes.bi"
@@ -34,7 +33,7 @@ type IndexedRange
     EndChar   as long
 end type
 
-type IndexedRangeArray as FB.Array( of IndexedRange )
+type IndexedRangeArray as containers.Array( of IndexedRange )
 
 '' Where a symbol is: which file, and which entry of that file's table.
 type IndexHit
@@ -43,7 +42,7 @@ type IndexHit
     Score     as long        '' higher is a better match; see Query
 end type
 
-type IndexHitArray as FB.Array( of IndexHit )
+type IndexHitArray as containers.Array( of IndexHit )
 
 '' ----------------------------------------------------------------------------
 ''  The include graph
@@ -81,7 +80,7 @@ type IncludeEdge
     EndChar   as long
 end type
 
-type IncludeEdgeArray as FB.Array( of IncludeEdge )
+type IncludeEdgeArray as containers.Array( of IncludeEdge )
 
 '' ONE `#import` (tiko-lang ADR 0017; the resolution rules are workspace/modules.bi). The
 '' import edges, like the include edges, are resolved by ResolveIncludes -- but not only
@@ -92,7 +91,7 @@ type IncludeEdgeArray as FB.Array( of IncludeEdge )
 '' resolved to, and that module's files in the index. A module is a directory, so an
 '' import is an edge to SEVERAL files; an unresolved one has Dir_ "" and no files.
 '' Aliased before use in a field: a generic will not instantiate as a TYPE field.
-type ImportFileArray as FB.Array( of long )
+type ImportFileArray as containers.Array( of long )
 
 type ImportEdge
     Alias_    as string    '' lower-cased: the path's last segment, or what `as` says
@@ -105,7 +104,7 @@ type ImportEdge
     Files     as ImportFileArray
 end type
 
-type ImportEdgeArray as FB.Array( of ImportEdge )
+type ImportEdgeArray as containers.Array( of ImportEdge )
 
 '' ONE `#export`ed MACRO of a module file (analysis/includes.bi, ExportRef), its name's
 '' range converted as the symbols' are. NOT A SYMBOL, and kept apart from them on purpose:
@@ -122,7 +121,7 @@ type ExportEdge
     EndChar    as long
 end type
 
-type ExportEdgeArray as FB.Array( of ExportEdge )
+type ExportEdgeArray as containers.Array( of ExportEdge )
 
 '' An exported macro, by file and entry.
 type ExportHit
@@ -130,7 +129,7 @@ type ExportHit
     ExportIndex as long
 end type
 
-type ExportHitArray as FB.Array( of ExportHit )
+type ExportHitArray as containers.Array( of ExportHit )
 
 type IndexedFile
     Uri        as string
@@ -156,7 +155,7 @@ type IndexedFile
     External_  as boolean
 end type
 
-type IndexedFileArray as FB.Array( of IndexedFile )
+type IndexedFileArray as containers.Array( of IndexedFile )
 
 type SymbolIndex
     private:
@@ -226,7 +225,7 @@ type SymbolIndex
         '' The files of the module `lowerAlias` names in that file -- false when it is
         '' no alias of the file's imports.
         declare function ModuleFilesOf( byval fileIndex as long, byref lowerAlias as string, _
-                                        byref out_ as FB.Array( of long ) ) as boolean
+                                        byref out_ as containers.Array( of long ) ) as boolean
 
         '' WHAT `alias.` MAY NAME: the module's file-level declarations marked `public`.
         declare sub ModuleMembers( byval fileIndex as long, byref lowerAlias as string, _
@@ -263,11 +262,11 @@ type SymbolIndex
         '' those include, transitively. Cycles terminate -- a file already
         '' visited is not visited again, which is also what `#include once`
         '' means.
-        declare sub VisibleFrom( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+        declare sub VisibleFrom( byval fileIndex as long, byref out_ as containers.Array( of long ) )
 
         '' The reverse: every file that can see `fileIndex`. This is the set a
         '' rename of something declared there could possibly touch.
-        declare sub IncludedBy( byval fileIndex as long, byref out_ as FB.Array( of long ) )
+        declare sub IncludedBy( byval fileIndex as long, byref out_ as containers.Array( of long ) )
 
         '' True when `fromFile` can see `targetFile` -- the question everything
         '' above is really asking.
@@ -314,4 +313,4 @@ end type
 '' is tens of megabytes to hold and to keep current, and a "find references" is
 '' a deliberate action a user waits for, not something typed against.
 declare sub FindIdentifierOffsets( byref text_ as string, byref lowerName as string, _
-                                   byref offsets as FB.Array( of long ) )
+                                   byref offsets as containers.Array( of long ) )

@@ -6,6 +6,7 @@
 ''  told explicitly.
 '' ############################################################################
 
+#import "std/containers"
 #include once "completion.bi"
 #include once "workspace_symbols.bi"
 #include once "../workspace/index_builder.bi"
@@ -38,14 +39,14 @@ private function AddIncludedSymbols( byref srv as Server, byval doc as TextDocum
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return false
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     srv.Index->VisibleFrom( here, visible )
     if( visible.Count( ) <= 1 ) then return false
 
     '' The labels already offered, lower-cased once. The list is a few hundred
     '' items and the visible set can be thousands of symbols, so this is the
     '' difference between a millisecond and a hundred.
-    dim seen_ as FB.Map( of string, boolean )
+    dim seen_ as containers.Map( of string, boolean )
     for i as long = 0 to items.Count( ) - 1
         seen_.Put( items[i].LowerLabel, true )
     next
@@ -125,7 +126,7 @@ private sub AddModuleMembers( byref srv as Server, byval doc as TextDocumentPtr,
     if( here < 0 ) then exit sub
     dim hits as IndexHitArray
     srv.Index->ModuleMembers( here, lcase( alias_ ), hits )
-    dim seen_ as FB.Map( of string, boolean )
+    dim seen_ as containers.Map( of string, boolean )
     for i as long = 0 to hits.Count( ) - 1
         dim as SymbolInfo sym = srv.Index->SymbolAt( hits[i].FileIndex, hits[i].SymIndex )
         if( seen_.Contains( sym.LowerName ) ) then continue for
@@ -172,16 +173,16 @@ end sub
 '' fb/logger.bi, which logs.bas includes) and through nothing this file
 '' #includes, so a type search over its includes alone finds nothing.
 sub VisibleWithImports( byref srv as Server, byval here as long, _
-                        byref out_ as FB.Array( of long ) )
+                        byref out_ as containers.Array( of long ) )
     srv.Index->VisibleFrom( here, out_ )
-    dim seen_ as FB.Map( of long, boolean )
+    dim seen_ as containers.Map( of long, boolean )
     for i as long = 0 to out_.Count( ) - 1
         seen_.Put( out_[i], true )
     next
     for k as long = 0 to srv.Index->ImportCount( here ) - 1
         dim as ImportEdge e = srv.Index->ImportAt( here, k )
         for each mf as long in e.Files
-            dim more as FB.Array( of long )
+            dim more as containers.Array( of long )
             srv.Index->VisibleFrom( mf, more )
             for each f as long in more
                 if( seen_.Contains( f ) ) then continue for
@@ -198,7 +199,7 @@ end sub
 '' and the members are Result's, in the toolchain's fb/result.bi. Looked for in
 '' the asking file as well -- an alias is often declared beside its use.
 '' Bounded, so `type A as B` / `type B as A` cannot loop.
-function FinalTypeName( byref srv as Server, byref visible as FB.Array( of long ), _
+function FinalTypeName( byref srv as Server, byref visible as containers.Array( of long ), _
                         byref typeName as string ) as string
     dim as string want = lcase( typeName )
     for hop as long = 1 to 8
@@ -235,12 +236,12 @@ private function AddIncludedMembers( byref srv as Server, byval doc as TextDocum
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return false
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     VisibleWithImports( srv, here, visible )
 
     dim as string want = FinalTypeName( srv, visible, typeName )
 
-    dim seen_ as FB.Map( of string, boolean )
+    dim seen_ as containers.Map( of string, boolean )
     for i as long = 0 to items.Count( ) - 1
         seen_.Put( items[i].LowerLabel, true )
     next
@@ -294,7 +295,7 @@ end function
 '' those, `preferTyped` takes the first that HAS a type -- `Warn( ) as
 '' LogEvent` over `sub Warn( m )` -- since only that one continues a chain;
 '' otherwise the first declared.
-private function IndexMemberOf_( byref srv as Server, byref visible as FB.Array( of long ), _
+private function IndexMemberOf_( byref srv as Server, byref visible as containers.Array( of long ), _
                                  byref typeName as string, byref lowerName as string, _
                                  byval preferTyped as boolean, byref out_ as SymbolInfo, _
                                  byref count as long ) as boolean
@@ -347,7 +348,7 @@ end function
 '' is the previous type's member, by its declared or return type.
 private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
                                  byref ctx as CompletionContext, _
-                                 byref visible as FB.Array( of long ) ) as string
+                                 byref visible as containers.Array( of long ) ) as string
     if( len(ctx.BaseName) = 0 ) then return ""
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return ""
@@ -411,7 +412,7 @@ function ResolveChainMember( byref srv as Server, byval doc as TextDocumentPtr, 
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return false
 
-    dim visible as FB.Array( of long )
+    dim visible as containers.Array( of long )
     VisibleWithImports( srv, here, visible )
     dim as string typeName = ChainTypeName_( srv, doc, ctx, visible )
     if( len(typeName) = 0 ) then return false
@@ -475,7 +476,7 @@ private function OnCompletion( byref srv as Server, _
         '' CollectCompletions offered: that saw this file alone, and for a type
         '' it could not resolve, guessed every member in the file.
         EnsureWorkspaceIndex( srv )
-        dim visible as FB.Array( of long )
+        dim visible as containers.Array( of long )
         dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
         if( here >= 0 ) then VisibleWithImports( srv, here, visible )
         dim as string typeName = ChainTypeName_( srv, doc, ctx, visible )

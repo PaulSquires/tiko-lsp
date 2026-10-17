@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 #include once "diagnostics.bi"
 
 enum TokenKind
@@ -114,7 +113,7 @@ type Token
     Length_ as long        '' in bytes
 end type
 
-type TokenArray as FB.Array( of Token )
+type TokenArray as containers.Array( of Token )
 
 '' Tokenises `text_`, appending any lexical problems to `diags`.
 declare sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as DiagnosticArray )
@@ -130,7 +129,7 @@ declare function KeywordOf( byref word_ as string ) as FbKeyword
 declare function IsKeyword( byref word_ as string ) as boolean
 
 '' Every reserved word, lower-cased, in table order.
-declare function AllKeywords( ) as FB.Array( of string )
+declare function AllKeywords( ) as containers.Array( of string )
 
 '' tiko-lang's fixed-width type names -- int8 .. uint64, float32, float64. NOT
 '' keywords: they lex as identifiers. Returns the FreeBASIC type the name is a
@@ -138,7 +137,7 @@ declare function AllKeywords( ) as FB.Array( of string )
 declare function BuiltinTypedefTarget( byref word_ as string ) as string
 
 '' The ten names, lower-cased, narrowest first.
-declare function AllBuiltinTypedefs( ) as FB.Array( of string )
+declare function AllBuiltinTypedefs( ) as containers.Array( of string )
 
 '' tiko-lang's predeclared constants -- nullptr, an `any ptr`. NOT keywords
 '' either: they lex as identifiers. Returns the declaration tiko-lang's prelude
@@ -146,4 +145,4 @@ declare function AllBuiltinTypedefs( ) as FB.Array( of string )
 declare function BuiltinConstantDecl( byref word_ as string ) as string
 
 '' The names, lower-cased.
-declare function AllBuiltinConstants( ) as FB.Array( of string )
+declare function AllBuiltinConstants( ) as containers.Array( of string )

@@ -12,7 +12,6 @@
 
 #pragma once
 
-#include once "fb/array.bi"
 
 '' What came back. `Exit_` is the child's exit code; `Started` is false when it
 '' could not be run at all, and `TimedOut` true when it was killed for taking
@@ -28,5 +27,5 @@ end type
 '' Runs `exe` with `args` -- each passed as ONE argument, quoted here as the
 '' platform needs -- in the directory `cwd` ("" = the server's own), and waits for
 '' it, at most `timeoutMs`. Paths are UTF-8.
-declare function RunCaptured( byref exe as string, byref args as FB.Array( of string ), _
+declare function RunCaptured( byref exe as string, byref args as containers.Array( of string ), _
                               byref cwd as string, byval timeoutMs as long ) as ProcessResult

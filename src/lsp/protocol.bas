@@ -2,6 +2,7 @@
 ''  lsp/protocol.bas -- LSP constants and the capability document
 '' ############################################################################
 
+#import "std/containers"
 #include once "protocol.bi"
 
 function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
@@ -118,14 +119,14 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     dim as JsonNode legend = rb.NewObject( )
 
     dim as JsonNode typeNames = rb.NewArray( )
-    dim names_ as FB.Array( of string ) = SemanticTypeNames( )
+    dim names_ as containers.Array( of string ) = SemanticTypeNames( )
     for i as long = 0 to names_.Count( ) - 1
         rb.PushStr( typeNames, names_[i] )
     next
     rb.SetNode( legend, "tokenTypes", typeNames )
 
     dim as JsonNode modNames = rb.NewArray( )
-    dim mods_ as FB.Array( of string ) = SemanticModifierNames( )
+    dim mods_ as containers.Array( of string ) = SemanticModifierNames( )
     for i as long = 0 to mods_.Count( ) - 1
         rb.PushStr( modNames, mods_[i] )
     next

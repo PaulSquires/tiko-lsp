@@ -2,13 +2,14 @@
 ''  handlers/lifecycle.bas -- initialize / initialized / shutdown / exit
 '' ############################################################################
 
+#import "std/containers"
+#import "std/fs"
 #include once "lifecycle.bi"
 #include once "workspace_symbols.bi"
 #include once "watched_files.bi"
 #include once "../workspace/index_builder.bi"
 #include once "../workspace/modules.bi"
 #include once "../workspace/metadata.bi"
-#include once "fb/filesystem.bi"
 #include once "../utils/logging.bi"
 
 '' ----------------------------------------------------------------------------
@@ -114,9 +115,9 @@ private function OnInitialize( byref srv as Server, _
     SetCompilerPath( "" )
     if( len(comp) > 0 ) then
 #ifdef __FB_WIN32__
-        if( FB.IsFile( comp ) = false andalso FB.IsFile( comp & ".exe" ) ) then comp &= ".exe"
+        if( fs.IsFile( comp ) = false andalso fs.IsFile( comp & ".exe" ) ) then comp &= ".exe"
 #endif
-        if( FB.IsFile( comp ) ) then
+        if( fs.IsFile( comp ) ) then
             SetCompilerPath( NormalizePath( comp ) )
             LogInfo( "compiler: " & CompilerPath( ) & " -- tiko metadata is read for each workspace manifest" )
         else
