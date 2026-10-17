@@ -25,7 +25,10 @@ set YYJSON=C:\dev\yyjson
 if not "%TIKO_LSP_TIKO%"==""   set TIKO=%TIKO_LSP_TIKO%
 if not "%TIKO_LSP_YYJSON%"=="" set YYJSON=%TIKO_LSP_YYJSON%
 
-set INC=-i "%YYJSON%\inc" -p "%YYJSON%\lib\win64"
+rem TIKO_LSP_YYJSON_LIB: see _compile.bat. The suite links what the server links.
+set YYLIB=%YYJSON%\lib\win64
+if not "%TIKO_LSP_YYJSON_LIB%"=="" set YYLIB=%TIKO_LSP_YYJSON_LIB%
+set INC=-i "%YYJSON%\inc" -p "%YYLIB%"
 set FAILED=0
 
 if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"

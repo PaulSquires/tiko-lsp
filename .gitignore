@@ -5,3 +5,4 @@ obj/
 *.log
 session.bin
 captured.bin
+dist/
