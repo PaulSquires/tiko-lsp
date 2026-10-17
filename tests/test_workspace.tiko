@@ -702,6 +702,64 @@ scope
     AssertFalse( seesMod, "nor the module's own file, which stays behind its alias" )
 end scope
 
+'' sys/ IS THE TOOLCHAIN'S, AS std/ AND vendor/ ARE (tiko-lang: modresolve Reserved_):
+'' `#import "sys/win/gui"` resolves to the toolchain's pkg/ alone; the workspace's own
+'' sys/win/gui is never a candidate, nor is any -i root's.
+setenviron g_pkgEnv
+scope
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
+    dim as SymbolIndex idx
+    dim roots as PathArray
+    roots.Push( fx )
+    idx.SetSearchPaths( roots )
+    dim as WorkspaceScan scan
+    ScanFolder( fx, scan )
+    for i as long = 0 to scan.Files.Count( ) - 1
+        idx.IndexPath( scan.Files[i] )
+    next
+    idx.ResolveIncludes( )
+
+    dim as long app = -1
+    for i as long = 0 to idx.FileCount( ) - 1
+        if( instr( lcase( idx.FilePath( i ) ), NativePath( "sysapp\main.tiko" ) ) > 0 ) then app = i
+    next
+    AssertTrue( app >= 0, "the sys importer is indexed" )
+
+    dim files_ as containers.Array( of long )
+    AssertTrue ( idx.ModuleFilesOf( app, "gui", files_ ), "sys/win/gui resolves" )
+    AssertEqInt( files_.Count( ), 1, "to one file" )
+    if( files_.Count( ) = 1 ) then
+        AssertTrue ( instr( lcase( idx.FilePath( files_[0] ) ), NativePath( "modpkg\sys\win\gui" ) ) > 0, _
+                     "in the toolchain's pkg/, not the workspace's sys/" )
+    end if
+    dim hits as IndexHitArray
+    idx.ModuleMembers( app, "gui", hits )
+    dim as string names_ = ""
+    for i as long = 0 to hits.Count( ) - 1
+        names_ &= " " & idx.SymbolAt( hits[i].FileIndex, hits[i].SymIndex ).LowerName
+    next
+    AssertTrue ( instr( names_, " createmainwindow" ) > 0, "gui. offers CreateMainWindow" )
+    AssertFalse( instr( names_, " shadowed" ) > 0, "and not the workspace decoy's Shadowed" )
+
+    '' The candidate list itself: the toolchain's directory, and no root's.
+    dim cands as PathArray
+    dim as string mainFile = fx & NativePath( "\sysapp\main.tiko" )
+    dim as string want = lcase( NormalizePath( g_Root & NativePath( "\tests\fixtures\modpkg\sys\win\gui" ) ) )
+    dim as string fxn = lcase( NormalizePath( fx ) )
+    dim as string mods_( 0 to 2 ) = { "sys/win/gui", "SYS/win/gui", "sys/win" }
+    dim as boolean sawPkg = false, sawRoot = false
+    for m as long = 0 to 2
+        ModuleCandidates( mainFile, mods_( m ), roots, cands )
+        for i as long = 0 to cands.Count( ) - 1
+            dim as string c = lcase( cands[i] )
+            if( c = want ) then sawPkg = true
+            if( left( c, len( fxn ) ) = fxn ) then sawRoot = true
+        next
+    next
+    AssertTrue ( sawPkg, "the toolchain's pkg/sys/win/gui is a candidate" )
+    AssertFalse( sawRoot, "and no workspace folder is, whatever the case of 'sys'" )
+end scope
+
 '' A PUBLIC HEADER REACHES THE IMPORTER, NOT THE IMPORTER'S IMPORTERS (tiko-lang e6e2dfdc):
 '' a module that imports vendor/clib privately keeps clib.ti to itself; one that imports
 '' it `public` -- vendor/clib/ext, as vendor/SDL3/image does vendor/SDL3 -- passes clib's

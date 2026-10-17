@@ -1,0 +1,5 @@
+'' NOT the toolchain's sys/win/gui: a workspace directory named sys cannot shadow it.
+#module "gui"
+public function Shadowed( ) as long
+    return 1
+end function

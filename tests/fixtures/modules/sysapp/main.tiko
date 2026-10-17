@@ -1,0 +1,3 @@
+'' A root importing the toolchain's sys/win/gui.
+#import "sys/win/gui"
+print gui.CreateMainWindow( )
