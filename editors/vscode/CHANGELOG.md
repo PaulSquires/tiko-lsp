@@ -2,6 +2,15 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## 0.1.2
+
+- A long editing session stays fast. Opening, editing and closing a file used to get
+  slower with every file the session had seen, until each took several hundred
+  milliseconds; it now stays flat (about 25-40 ms per file over 1,200 files).
+- Files opened after the first eight are no longer lost by the server: their edits,
+  closes and diagnostics are tracked again. (The fault was in the tiko toolchain's
+  `std/containers` Map, which the server is now built with fixed.)
+
 ## 0.1.1
 
 - The extension's icon is the tiko mascot.

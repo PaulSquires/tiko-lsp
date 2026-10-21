@@ -2,7 +2,7 @@
   "name": "tiko",
   "displayName": "Tiko",
   "description": "Language support for tiko, the FreeBASIC-compatible language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "PaulSquires",
   "license": "MIT",
   "icon": "images/icon.png",
