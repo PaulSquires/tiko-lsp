@@ -30,10 +30,35 @@
 
 #include once "workspace.ti"
 
+'' THE MANIFESTS ONE PASS HAS ALREADY FOUND AND READ. ModuleCandidates walks up from the
+'' importer to the nearest tiko.toml -- two stats a level -- and reads it, for every import
+'' of every file; ResolveImports_ runs that over the whole index on every didOpen,
+'' didChange and didClose, so a package of a few dozen files (tracks-2026) cost ~1,900
+'' walks and reads, 170 ms, per keystroke. A memo lives for one pass and no longer: an
+'' edited manifest is read again by the next one, and the worker's pass and the message
+'' loop's each have their own.
+type ManifestStringMap as containers.Map( of string, string )
+type ManifestMemo
+    '' a directory -> the manifest directory above it, "" for none
+    as ManifestStringMap above_
+    '' a manifest directory -> its [package] name, then each dependency's name and path,
+    '' every field ended by chr(1)
+    as ManifestStringMap read_
+    '' ToolchainPkgDir, asked once a pass: it stats each configured directory, and
+    '' every import that is not relative asks for it.
+    as boolean pkgKnown_ = false
+    as string pkgDir_
+end type
+
 '' The directories `importPath`, imported from the file at `importerPath`, may
 '' name, first choice first. Native, absolute, not necessarily there.
+''
+'' `memo`, when given, keeps the manifest found above each directory and what it says,
+'' so a pass over the whole index finds and reads each tiko.toml once -- see
+'' ManifestMemo. Without one, every call walks up and reads the file.
 declare sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
-                              byref roots as PathArray, byref outDirs as PathArray )
+                              byref roots as PathArray, byref outDirs as PathArray, _
+                              byval memo as ManifestMemo ptr = 0 )
 
 '' The nearest directory at or above `dir_` holding a tiko.toml, or "".
 declare function ManifestDirAbove( byref dir_ as string ) as string
@@ -43,6 +68,11 @@ declare function ManifestDirAbove( byref dir_ as string ) as string
 '' the configured compiler's own (metadata.ti), then a `pkg` BESIDE a configured include directory (a packaged toolchain is <dir>/inc and
 '' <dir>/pkg, so naming the one finds the other), then TKO_PKG, then beside a `tiko` on PATH.
 declare function ToolchainPkgDir( ) as string
+
+'' Walks PATH for a `tiko` once and keeps what ToolchainPkgDir and ToolchainIncDir find
+'' beside it, for the rest of the session. Called once, from `initialize`, before the
+'' index worker starts; until it is, each of them walks PATH on every call.
+declare sub CacheToolchainOnPath( )
 
 '' Records the client's `packagePaths`. Same rule as SetConfiguredIncludeDirs: called once,
 '' from `initialize`, before the index worker starts.

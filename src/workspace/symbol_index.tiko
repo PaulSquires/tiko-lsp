@@ -340,8 +340,46 @@ end function
 '' candidate directory that holds a file of the index wins. A candidate the index knows
 '' nothing of but that exists -- the toolchain's pkg/, which no workspace folder covers --
 '' has its source files indexed first, so `std` resolves like anything else.
+'' THE MODULE FILES BY DIRECTORY, for ResolveImports_: a chain per directory key --
+'' first and last file in the maps, the rest through nextOf -- in INDEX ORDER, which is
+'' the order the walk over every file it replaces found them in. Files from f on that
+'' are not yet registered are added; a file that is not a module source is skipped.
+private sub RegisterModuleFiles_( byref files_ as IndexedFileArray, _
+                                  byref dirFirst as containers.Map( of string, long ), _
+                                  byref dirLast as containers.Map( of string, long ), _
+                                  byref nextOf as containers.Array( of long ) )
+    while( nextOf.Count( ) < files_.Count( ) )
+        dim as long f = nextOf.Count( )
+        nextOf.Push( -1 )
+        if( IsModuleSourceName_( files_[f].Path_ ) = false ) then continue while
+        dim as string d = lcase( DirOf( NormalizePath( files_[f].Path_ ) ) )
+        dim as long tail_ = -1
+        if( dirLast.TryGet( d, tail_ ) ) then
+            nextOf[tail_] = f
+        else
+            dirFirst.Put( d, f )
+        end if
+        dirLast.Put( d, f )
+    wend
+end sub
+
 private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as PathArray, _
                              byref idx as SymbolIndex )
+    '' ONE PASS OVER THE FILES, then a probe per candidate. This runs on every didOpen,
+    '' didChange and didClose, and it used to walk every indexed file for every candidate
+    '' of every import of every file, normalising each path as it went -- quadratic in the
+    '' index once a toolchain makes std's candidates real. A directory's existence is asked
+    '' once per pass, and each manifest found and read once (ManifestMemo), for the same
+    '' reason: a session used to slow with every file it had ever opened -- 29 ms per
+    '' didOpen at 50 files, 548 ms at 300, most of it a PATH walk per import
+    '' (CacheToolchainOnPath).
+    dim dirFirst as containers.Map( of string, long )
+    dim dirLast as containers.Map( of string, long )
+    dim nextOf as containers.Array( of long )
+    dim isDirSeen as containers.Map( of string, boolean )
+    dim manifests as ManifestMemo
+    RegisterModuleFiles_( files_, dirFirst, dirLast, nextOf )
+
     '' Over the files indexed DURING the pass too: a module read from pkg/ on demand has
     '' imports of its own, and its `#import "vendor/SDL3" public` is what carries SDL's
     '' header to an importer of vendor/SDL3/image (VisibleFrom). Each module directory
@@ -352,15 +390,25 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
             files_[i].Imports[k].Dir_ = ""
             files_[i].Imports[k].Files.Clear( )
             dim cands as PathArray
-            ModuleCandidates( files_[i].Path_, files_[i].Imports[k].Target, roots, cands )
+            ModuleCandidates( files_[i].Path_, files_[i].Imports[k].Target, roots, cands, @manifests )
             for c as long = 0 to cands.Count( ) - 1
                 dim as string want = lcase( cands[c] )
                 dim found as containers.Array( of long )
-                for f as long = 0 to files_.Count( ) - 1
-                    if( lcase( DirOf( NormalizePath( files_[f].Path_ ) ) ) <> want ) then continue for
-                    if( IsModuleSourceName_( files_[f].Path_ ) ) then found.Push( f )
-                next
-                if( found.Count( ) = 0 andalso fs.IsDir( cands[c] ) ) then
+                dim as long f = -1
+                if( dirFirst.TryGet( want, f ) ) then
+                    while( f >= 0 )
+                        found.Push( f )
+                        f = nextOf[f]
+                    wend
+                end if
+                dim as boolean candIsDir = false
+                if( found.Count( ) = 0 ) then
+                    if( isDirSeen.TryGet( want, candIsDir ) = false ) then
+                        candIsDir = fs.IsDir( cands[c] )
+                        isDirSeen.Put( want, candIsDir )
+                    end if
+                end if
+                if( found.Count( ) = 0 andalso candIsDir ) then
                     dim entries as containers.Array( of fs.DirEntry )
                     if( fs.ListDir( cands[c], entries ).IsOk( ) ) then
                         for q as long = 0 to entries.Count( ) - 1
@@ -371,6 +419,9 @@ private sub ResolveImports_( byref files_ as IndexedFileArray, byref roots as Pa
                             end if
                         next
                     end if
+                    '' What was just read is a module directory from now on, for the
+                    '' imports still to come in this pass.
+                    RegisterModuleFiles_( files_, dirFirst, dirLast, nextOf )
                 end if
                 if( found.Count( ) = 0 ) then continue for
                 files_[i].Imports[k].Dir_ = cands[c]
@@ -422,15 +473,23 @@ private sub IndexHeaders_( byref files_ as IndexedFileArray, byref idx as Symbol
         seen.Put( files_[i].Key_, true )
     next
 
+    '' EACH FILE ONCE. A module is imported by many files, and each importer used to
+    '' queue its files again: std/containers' thirteen once per file that imports it --
+    '' 11,636 entries for 1,162 files, every one of them re-checking all its includes,
+    '' on every didOpen, didChange and didClose.
     dim work as containers.Array( of long )
+    dim queued as containers.Map( of long, boolean )
     if( everyFile ) then
         for i as long = 0 to files_.Count( ) - 1
             work.Push( i )
+            queued.Put( i, true )
         next
     else
         for i as long = 0 to files_.Count( ) - 1
             for k as long = 0 to files_[i].Imports.Count( ) - 1
                 for each f as long in files_[i].Imports[k].Files
+                    if( queued.Contains( f ) ) then continue for
+                    queued.Put( f, true )
                     work.Push( f )
                 next
             next
