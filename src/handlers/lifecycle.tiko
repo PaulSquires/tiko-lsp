@@ -99,6 +99,7 @@ private function OnInitialize( byref srv as Server, _
         next
     end if
     SetConfiguredPackageDirs( pkgPaths )
+    CacheToolchainOnPath( )
     dim as string pkgDir = ToolchainPkgDir( )
     if( len(pkgDir) > 0 ) then
         LogInfo( "toolchain packages from " & pkgDir )
