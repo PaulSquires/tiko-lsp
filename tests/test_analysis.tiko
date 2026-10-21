@@ -215,6 +215,12 @@ AssertOneCode( "x = 1.2.3", DIAGCODE_INVALID_NUMBER, "two decimal points is an e
 AssertOneCode( "x = &hzz", DIAGCODE_INVALID_NUMBER, "hex with no digits is an error" )
 AssertOneCode( "x = 12abc", DIAGCODE_INVALID_NUMBER, "a number running into a word is an error" )
 
+'' SDL3's binding: a #define body is not code until it is expanded, and neither
+'' is a #macro's -- tiko accepts both with no expansion in sight.
+AssertClean( "#define SDL_TriggerBreakpoint() ( _asm ( long 0x03 ) )", "a malformed number in a #define body is not reported" )
+AssertClean( "#macro M( )" & LF & "x = 0x03" & LF & "#endmacro", "a malformed number in a #macro body is not reported" )
+AssertOneCode( "#define A 1" & LF & "x = 0x03", DIAGCODE_INVALID_NUMBER, "the line after a #define is code again" )
+
 '' ----------------------------------------------------------------------------
 TestGroup( "lexer: line structure" )
 
@@ -290,6 +296,16 @@ AssertClean( "if x then ' why" & LF & "print 1" & LF & "end if", _
              "a trailing comment does not stop THEN ending the line" )
 AssertClean( "select case x" & LF & "case 1" & LF & "print 1" & LF & "case else" & LF & "end select", _
              "select case" )
+
+'' std/tasks: `select channel` waits on several channels; its arms are not CASE
+'' expressions but receive/send/timeout clauses.
+AssertClean( "select channel" & LF & "case receive v from ch : print v" & LF & _
+             "case send 2 to ch : print 2" & LF & "case timeout 10" & LF & "case else" & LF & "end select", _
+             "select channel opens a SELECT" )
+AssertClean( "do" & LF & "SELECT Channel   ' wait" & LF & "case receive from ctx.Done( ) : exit do" & LF & _
+             "end select" & LF & "loop", "select channel is case-insensitive and takes a comment" )
+AssertClean( "dim as long channel" & LF & "select case channel" & LF & "case 1" & LF & "end select", _
+             "a variable called channel still selects" )
 AssertClean( "while x" & LF & "wend", "while/wend" )
 AssertClean( "do" & LF & "loop until x", "do/loop" )
 AssertClean( "do while x" & LF & "loop", "do while/loop" )
@@ -361,6 +377,17 @@ AssertClean( "type ITextRangeVtbl" & LF & _
              "end type", "a field named `Select` is not a SELECT block" )
 AssertClean( "type T" & LF & "With_ as long" & LF & "Do_ as long" & LF & "end type", _
              "fields named after block keywords are fields" )
+
+'' Bindings #cinclude/c2t write keep C's names, keywords included: cJSON's list link
+'' and SDL3's assertion record.
+AssertClean( "type cJSON" & LF & "next as cJSON ptr" & LF & "prev as cJSON ptr" & LF & "end type", _
+             "a field named `next` closes no FOR" )
+AssertClean( "type SDL_AssertData" & LF & "function as const zstring ptr" & LF & "line as int32" & LF & "end type", _
+             "a field named `function` opens no body" )
+AssertClean( "union U" & LF & "loop as long" & LF & "wend as long" & LF & "end union", _
+             "fields named after loop closers, in a union" )
+AssertOneCode( "sub F( )" & LF & "next as long" & LF & "end sub", DIAGCODE_UNEXPECTED_END, _
+               "outside a TYPE, `next as` is still a NEXT" )
 
 '' fbc's fslink.bi and string.bi: a macro that expands to a block opener.
 AssertClean( "#define FBEXTERN extern " & DQ & "C" & DQ & LF & _
