@@ -162,7 +162,6 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 - **Not done:**
   - the A.4 run on Linux (no VS Code in WSL yet);
   - the interactive A.4 rows;
-  - the icon (O7);
   - everything that needs your accounts (A.1, A.5–A.8).
 
 ### A. Decisions
@@ -216,8 +215,9 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
     `Formatters`, `galleryBanner`, `bugs` and `homepage` (A-D5);
   - `extensions` → `.tiko`, `.tko`, `.ti` (A-D2).
 
-  **Done**, except `icon` (O7) and `galleryBanner`, which wait for artwork. The lockfile's
-  `name` follows the rename.
+  **Done.** The icon is the tiko mascot, `images/icon.png`, copied from tiko-lang's
+  `brand/png/tiko-mascot-512.png` (SVG isn't allowed). `galleryBanner` is `#1E1838`,
+  dark. The lockfile's `name` follows the rename.
 - `extension.js`:
   - add the bundled lookup, `context.asAbsolutePath('server/tiko-lsp[.exe]')` (A-D3);
   - on Linux, `fs.chmodSync(path, 0o755)` before starting it, because a VSIX packed on
@@ -631,7 +631,7 @@ feeds that number.
 | O4 | Entra ID publishing with a personal Microsoft account. | A.8 item 4; deadline 2026-12-01 |
 | O5 | Zero-config toolchain discovery (P1-D4). | the "no setting" goal for Win32/std completions |
 | O6 | Code signing for the Windows exe. | nothing, unless a scan flags it |
-| O7 | A PNG icon (at least 128×128) for the listings. | A.8 item 6 |
+| O7 | ~~A PNG icon (at least 128×128) for the listings.~~ **Done**: the tiko mascot, 512×512. | — |
 | O8 | `--version` says "built with FreeBASIC 1.20.0" (from `__FB_VERSION__`). In a public listing it should name tiko. Server change: `src/main.tiko`. | nothing; cosmetic |
 
 ## Sources (read 2026-10-16)
