@@ -96,6 +96,18 @@ private sub TestIndent( )
                  "end select" & LF, _
                  "CASE is indented inside its SELECT, and its arm one further" )
 
+    AssertEqStr( Fmt( "select channel" & LF & _
+                      "case receive v from ch" & LF & _
+                      "print v" & LF & _
+                      "case timeout 10 : print 0" & LF & _
+                      "end select" & LF ), _
+                 "select channel" & LF & _
+                 "    case receive v from ch" & LF & _
+                 "        print v" & LF & _
+                 "    case timeout 10 : print 0" & LF & _
+                 "end select" & LF, _
+                 "select channel indents like select case" )
+
     AssertEqStr( Fmt( "type Widget" & LF & _
                       "Count as long" & LF & _
                       "end type" & LF ), _
