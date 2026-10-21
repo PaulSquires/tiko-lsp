@@ -114,6 +114,50 @@ sub SetConfiguredPackageDirs( byref dirs as PathArray )
     next
 end sub
 
+'' <dir>/<sub> or <dir>/../<sub> beside the first `tiko` on PATH that has one, or "":
+'' <dir>/pkg and <dir>/inc in a packaged toolchain, <dir>/../pkg and <dir>/../inc in the
+'' tiko-lang repository. Found without running it.
+private function BesideTikoOnPath_( byref sub_ as string ) as string
+    dim as string p = environ( "PATH" )
+#ifdef __FB_WIN32__
+    dim as string sep = ";", exe = "\tiko.exe"
+#else
+    dim as string sep = ":", exe = "/tiko"
+#endif
+    dim as long st = 1
+    while( st <= len(p) )
+        dim as long en = instr( st, p, sep )
+        if( en = 0 ) then en = len(p) + 1
+        dim as string d = trim( mid( p, st, en - st ), any chr(34) )
+        st = en + 1
+        if( len(d) = 0 ) then continue while
+        if( fs.IsFile( d & exe ) = false ) then continue while
+        dim as string cand = JoinNative( d, sub_ )
+        if( fs.IsDir( cand ) ) then return cand
+        cand = JoinNative( d, "../" & sub_ )
+        if( fs.IsDir( cand ) ) then return cand
+    wend
+    return ""
+end function
+
+'' THE PATH WALK, ONCE A SESSION. It stats <dir>\tiko.exe in every PATH entry -- about a
+'' millisecond on a developer's machine -- and ModuleCandidates asks ToolchainPkgDir once
+'' per import of every indexed file, on every didOpen, didChange and didClose: with
+'' nothing configured, a session that had opened 300 files spent ~0.5 s in this walk per
+'' didOpen, and the time grew with every file. Neither PATH nor an installed toolchain
+'' moves during a session, so CacheToolchainOnPath takes both answers when `initialize`
+'' arrives, before the index worker starts; until then -- the unit tests -- each call
+'' walks, as before.
+dim shared as boolean g_pathWalked = false
+dim shared as string g_pathPkgDir
+dim shared as string g_pathIncDir
+
+sub CacheToolchainOnPath( )
+    g_pathPkgDir = BesideTikoOnPath_( "pkg" )
+    g_pathIncDir = BesideTikoOnPath_( "inc" )
+    g_pathWalked = true
+end sub
+
 function ToolchainPkgDir( ) as string
     for i as long = 0 to g_configuredPackageDirs.Count( ) - 1
         if( fs.IsDir( g_configuredPackageDirs[i] ) ) then return g_configuredPackageDirs[i]
@@ -136,51 +180,15 @@ function ToolchainPkgDir( ) as string
 
     '' BESIDE A `tiko` ON PATH, found without running it: <dir>/pkg in a packaged
     '' toolchain, <dir>/../pkg in the tiko-lang repository.
-    dim as string p = environ( "PATH" )
-#ifdef __FB_WIN32__
-    dim as string sep = ";", exe = "\tiko.exe"
-#else
-    dim as string sep = ":", exe = "/tiko"
-#endif
-    dim as long st = 1
-    while( st <= len(p) )
-        dim as long en = instr( st, p, sep )
-        if( en = 0 ) then en = len(p) + 1
-        dim as string d = trim( mid( p, st, en - st ), any chr(34) )
-        st = en + 1
-        if( len(d) = 0 ) then continue while
-        if( fs.IsFile( d & exe ) = false ) then continue while
-        dim as string cand = JoinNative( d, "pkg" )
-        if( fs.IsDir( cand ) ) then return cand
-        cand = JoinNative( d, "../pkg" )
-        if( fs.IsDir( cand ) ) then return cand
-    wend
-    return ""
+    if( g_pathWalked ) then return g_pathPkgDir
+    return BesideTikoOnPath_( "pkg" )
 end function
 
 function ToolchainIncDir( ) as string
     dim as string env_ = environ( "TKO_INCLUDE" )
     if( len(env_) > 0 ) then return NormalizePath( env_ )
-    dim as string p = environ( "PATH" )
-#ifdef __FB_WIN32__
-    dim as string sep = ";", exe = "\tiko.exe"
-#else
-    dim as string sep = ":", exe = "/tiko"
-#endif
-    dim as long st = 1
-    while( st <= len(p) )
-        dim as long en = instr( st, p, sep )
-        if( en = 0 ) then en = len(p) + 1
-        dim as string d = trim( mid( p, st, en - st ), any chr(34) )
-        st = en + 1
-        if( len(d) = 0 ) then continue while
-        if( fs.IsFile( d & exe ) = false ) then continue while
-        dim as string cand = JoinNative( d, "inc" )
-        if( fs.IsDir( cand ) ) then return cand
-        cand = JoinNative( d, "../inc" )
-        if( fs.IsDir( cand ) ) then return cand
-    wend
-    return ""
+    if( g_pathWalked ) then return g_pathIncDir
+    return BesideTikoOnPath_( "inc" )
 end function
 
 sub SetConfiguredIncludeDirs( byref dirs as PathArray )
@@ -210,8 +218,56 @@ function ToolchainIncDirs( ) as PathArray
     return out_
 end function
 
+'' The manifest above `here` and what it says, through `memo` when there is one.
+private sub ManifestFor_( byref here as string, byval memo as ManifestMemo ptr, _
+                          byref md as string, byref pkgName as string, _
+                          byref depNames as PathArray, byref depPaths as PathArray )
+    depNames.Clear( )
+    depPaths.Clear( )
+    pkgName = ""
+    if( memo = 0 ) then
+        md = ManifestDirAbove( here )
+        if( len(md) > 0 ) then ReadManifest( md, pkgName, depNames, depPaths )
+        exit sub
+    end if
+
+    if( memo->above_.TryGet( here, md ) = false ) then
+        md = ManifestDirAbove( here )
+        memo->above_.Put( here, md )
+    end if
+    if( len(md) = 0 ) then exit sub
+
+    dim as string packed
+    if( memo->read_.TryGet( md, packed ) = false ) then
+        ReadManifest( md, pkgName, depNames, depPaths )
+        packed = pkgName & chr(1)
+        for i as long = 0 to depNames.Count( ) - 1
+            packed &= depNames[i] & chr(1) & depPaths[i] & chr(1)
+        next
+        memo->read_.Put( md, packed )
+        exit sub
+    end if
+
+    '' Unpacked in the order it was packed: the name, then name/path pairs.
+    dim as long st = 1, field_ = 0
+    while( st <= len(packed) )
+        dim as long en = instr( st, packed, chr(1) )
+        dim as string v = mid( packed, st, en - st )
+        if( field_ = 0 ) then
+            pkgName = v
+        elseif( (field_ and 1) = 1 ) then
+            depNames.Push( v )
+        else
+            depPaths.Push( v )
+        end if
+        field_ += 1
+        st = en + 1
+    wend
+end sub
+
 sub ModuleCandidates( byref importerPath as string, byref importPath as string, _
-                      byref roots as PathArray, byref outDirs as PathArray )
+                      byref roots as PathArray, byref outDirs as PathArray, _
+                      byval memo as ManifestMemo ptr = 0 )
     outDirs.Clear( )
     dim as string p = importPath
     if( len(p) = 0 ) then exit sub
@@ -237,12 +293,11 @@ sub ModuleCandidates( byref importerPath as string, byref importPath as string, 
     '' package, a dependency or an -i root.
     if( first_ <> "std" andalso first_ <> "vendor" andalso first_ <> "sys" ) then
         '' 2 and 3: the importing file's package, and its manifest's dependencies.
-        dim as string md = ManifestDirAbove( here )
+        dim as string md, pkgName
+        dim depNames as PathArray
+        dim depPaths as PathArray
+        ManifestFor_( here, memo, md, pkgName, depNames, depPaths )
         if( len(md) > 0 ) then
-            dim as string pkgName
-            dim depNames as PathArray
-            dim depPaths as PathArray
-            ReadManifest( md, pkgName, depNames, depPaths )
             if( pkgName = first_ ) then outDirs.Push( JoinNative( md, rest ) )
             for i as long = 0 to depNames.Count( ) - 1
                 if( depNames[i] = first_ ) then outDirs.Push( JoinNative( depPaths[i], rest ) )
@@ -262,6 +317,15 @@ sub ModuleCandidates( byref importerPath as string, byref importPath as string, 
     end if
 
     '' 5. the toolchain.
-    dim as string pk = ToolchainPkgDir( )
+    dim as string pk
+    if( memo = 0 ) then
+        pk = ToolchainPkgDir( )
+    else
+        if( memo->pkgKnown_ = false ) then
+            memo->pkgDir_ = ToolchainPkgDir( )
+            memo->pkgKnown_ = true
+        end if
+        pk = memo->pkgDir_
+    end if
     if( len(pk) > 0 ) then outDirs.Push( JoinNative( pk, p ) )
 end sub

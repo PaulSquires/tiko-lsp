@@ -1329,4 +1329,57 @@ scope
     ClearCIncludes( )
 end scope
 
+'' A LONG SESSION STAYS AS FAST AS A SHORT ONE. ResolveIncludes runs over the whole index on
+'' every didOpen, didChange and didClose, and three costs in it grew with every file a
+'' session had seen: a PATH walk per import, the tiko.toml above the importer found and
+'' read per import, and each module's files re-queued for the header pass by every
+'' importer. The caches that removed them must change nothing but the cost.
+scope
+    dim as string fx = g_Root & NativePath( "\tests\fixtures\modules" )
+    dim roots as PathArray
+    roots.Push( fx )
+
+    '' A pass's ManifestMemo: filled by the first call for a directory, read back by the
+    '' rest. From two directories under one manifest, the package's own module, a path
+    '' dependency, a std module, a relative import and an unknown one -- twice over, so
+    '' the second round is answered entirely from the memo.
+    dim as ManifestMemo memo
+    dim as string importers( 0 to 1 ) = { fx & NativePath( "\pkgproj\main.bas" ), _
+                                          fx & NativePath( "\pkgproj\util\util.bas" ) }
+    dim as string imps( 0 to 4 ) = { "proj/util", "libz/core", "std/strings", "./util", "nosuch/x" }
+    dim as long same = 0, total = 0
+    dim as boolean depSeen = false
+    dim as string wantDep = lcase( NormalizePath( fx & NativePath( "\pkglib\core" ) ) )
+    for round_ as long = 1 to 2
+        for a as long = 0 to 1
+            for m as long = 0 to 4
+                dim plain as PathArray
+                dim memod as PathArray
+                ModuleCandidates( importers( a ), imps( m ), roots, plain )
+                ModuleCandidates( importers( a ), imps( m ), roots, memod, @memo )
+                dim as string pj = "", mj = ""
+                for i as long = 0 to plain.Count( ) - 1
+                    pj &= plain[i] & "|"
+                    if( lcase( plain[i] ) = wantDep ) then depSeen = true
+                next
+                for i as long = 0 to memod.Count( ) - 1
+                    mj &= memod[i] & "|"
+                next
+                total += 1
+                if( pj = mj ) then same += 1
+            next
+        next
+    next
+    AssertTrue ( depSeen, "the path dependency libz/core is a candidate (the manifest was read)" )
+    AssertEqInt( same, total, "every memoised candidate list equals the plain one, both rounds" )
+    AssertEqInt( memo.read_.Count( ), 1, "the one manifest was read once" )
+    AssertEqInt( memo.above_.Count( ), 2, "and found once from each of the two directories" )
+
+    '' The PATH walk, taken once at `initialize`: the same answers before and after.
+    dim as string pkgBefore = ToolchainPkgDir( ), incBefore = ToolchainIncDir( )
+    CacheToolchainOnPath( )
+    AssertEqStr( ToolchainPkgDir( ), pkgBefore, "ToolchainPkgDir answers as it did before the cache" )
+    AssertEqStr( ToolchainIncDir( ), incBefore, "and ToolchainIncDir too" )
+end scope
+
 end TestSummary( "workspace" )
