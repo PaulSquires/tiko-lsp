@@ -428,6 +428,13 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
     '' REM is only a comment there.
     dim as boolean atLineStart = true
 
+    '' A #define's body, and the lines between #macro and #endmacro, are not
+    '' code until an expansion makes them code, so a malformed number there is
+    '' not reported: SDL3's binding defines SDL_TriggerBreakpoint( ) as
+    '' `( _asm ( long 0x03 ) )`, which tiko accepts because nothing expands it.
+    dim as boolean inDefine = false
+    dim as boolean inMacro = false
+
     while( i < n )
         dim as ubyte c = text_[i]
 
@@ -504,6 +511,7 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
             end if
             Emit( tokens, TK_EOL, start_, i - start_ )
             atLineStart = true
+            inDefine = false
             continue while
         end if
 
@@ -711,7 +719,7 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
                 wend
             end if
 
-            if( bad ) then
+            if( bad andalso (inDefine = false) andalso (inMacro = false) ) then
                 AddDiagnostic( diags, DIAG_ERROR, start_, i, _
                                DIAGCODE_INVALID_NUMBER, _
                                "invalid numeric literal '" & mid( text_, start_ + 1, i - start_ ) & "'" )
@@ -736,6 +744,11 @@ sub LexSource( byref text_ as string, byref tokens as TokenArray, byref diags as
             wend
             dim as string word_ = mid( text_, start_ + 2, i - start_ - 1 )
             Emit( tokens, TK_PP, start_, i - start_, PpKeywordOf( word_ ) )
+            select case lcase( word_ )
+                case "define"   : inDefine = true
+                case "macro"    : inMacro = true
+                case "endmacro" : inMacro = false
+            end select
             atLineStart = false
             continue while
         end if

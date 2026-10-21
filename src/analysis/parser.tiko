@@ -1273,6 +1273,18 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
 
         if( head.Kind <> TK_KEYWORD ) then head.Kw = KW_NONE
 
+        '' A FIELD named after a keyword. Inside a TYPE or UNION body, a keyword
+        '' followed directly by AS is a field's name -- the C names a #cinclude/c2t
+        '' binding keeps: cJSON's `next as cJSON ptr`, SDL3's `function as const
+        '' zstring ptr`. Read as statements, `next` closed a FOR that was never
+        '' opened and `function` opened a body that `end type` then cut short.
+        '' Dropping the keyword sends the line to the field rule below, which reads
+        '' it by its top-level AS. `type as int32` already reads as a field.
+        if( head.Kw <> KW_NONE andalso head.Kw <> KW_TYPE andalso nextKw = KW_AS ) then
+            dim as FbKeyword fieldHost = CurrentContainerKind( st )
+            if( fieldHost = KW_TYPE orelse fieldHost = KW_UNION ) then head.Kw = KW_NONE
+        end if
+
         select case head.Kw
             '' -- things that look like openers but are not ---------------------
             case KW_DECLARE
@@ -1591,10 +1603,20 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 PushBlock( st, KW_FOR, "", head )
 
             case KW_SELECT
-                '' tiko spells it `select case expr`. Without the CASE
-                '' this is a field or a variable that happens to be named
-                '' `select`.
-                if( nextKw = KW_CASE ) then PushBlock( st, KW_SELECT, "", head )
+                '' tiko spells it `select case expr`, or `select channel` for
+                '' std/tasks' wait on several channels, whose arms are
+                '' `case receive v from ch`, `case send x to ch`, `case timeout
+                '' N` and `case else`, closed by `end select`. `channel` is no
+                '' reserved word, so it is matched by spelling, alone on the
+                '' line. Anything else is a field or a variable that happens to
+                '' be named `select`.
+                dim as boolean opensSelect = ( nextKw = KW_CASE )
+                if( (opensSelect = false) andalso hasNext andalso (stmt.Count( ) = first_ + 2) ) then
+                    if( nextTok.Kind = TK_IDENT ) then
+                        opensSelect = ( lcase( TokenText( text_, nextTok ) ) = "channel" )
+                    end if
+                end if
+                if( opensSelect ) then PushBlock( st, KW_SELECT, "", head )
 
             case KW_SCOPE, KW_WITH, KW_ASM, KW_WHILE, KW_DO
                 if( HasTopLevelAs( tokens, stmt, first_ + 1 ) = false ) then
