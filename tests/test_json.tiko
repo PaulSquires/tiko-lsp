@@ -202,6 +202,100 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "what cJSON needed the facade to add" )
+
+scope
+    '' A cJSON number is a double printed with %1.15g: 2^53 + 1 cannot be one, and
+    '' 10^15 and up print in exponent form. NewInt writes the integer's own digits.
+    dim as JsonBuilder rb
+    dim as JsonNode root = rb.NewObject( )
+    rb.SetInt( root, "big", 9007199254740993 )
+    rb.SetInt( root, "neg", -1234567890123456789 )
+    rb.SetInt( root, "zero", 0 )
+    rb.SetRoot( root )
+    dim as string text_ = rb.Serialize( )
+    AssertContains( text_, """big"":9007199254740993", "an int64 beyond 2^53 is written exactly" )
+    AssertContains( text_, """neg"":-1234567890123456789", "and a large negative one" )
+    AssertContains( text_, """zero"":0", "and zero" )
+end scope
+
+scope
+    '' Strict: nothing may follow the value -- but a scalar may BE the value.
+    dim as JsonDoc d
+    AssertFalse( d.Parse( "{} x" ), "trailing text after the value is refused" )
+    AssertFalse( d.Parse( "[1,]" ), "a trailing comma is refused" )
+    AssertFalse( d.Parse( "{""a"":1} // c" ), "a trailing comment is refused" )
+    AssertTrue ( len( d.ErrorText( ) ) > 0, "with a reason" )
+    AssertTrue ( d.Parse( "{} " & chr(13, 10) ), "trailing whitespace is fine" )
+    AssertTrue ( d.Parse( "42" ), "a scalar root parses" )
+    AssertEqInt( d.Root( ).AsLongInt( ), 42, "and reads back" )
+end scope
+
+scope
+    '' A builder frees what it made even when nothing was attached: a handler
+    '' that builds half a reply and returns early. Exercised many times over, so
+    '' a double free or a stray read of freed memory would not go unnoticed.
+    for k as long = 1 to 200
+        dim as JsonBuilder rb
+        dim as JsonNode stray = rb.NewObject( )
+        rb.SetStr( stray, "s", "never attached" )          '' a child of a stray
+        dim as JsonNode lone = rb.NewArray( )
+        rb.PushInt( lone, k )
+        dim as JsonNode root = rb.NewObject( )
+        rb.SetInt( root, "k", k )
+        rb.NewString( "also never attached" )
+        rb.SetRoot( root )
+        if( k = 200 ) then AssertEqStr( rb.Serialize( ), "{""k"":200}", "only the root's tree is written" )
+    next
+    AssertTrue( true, "200 builders with stray nodes destroyed cleanly" )
+
+    dim as JsonBuilder unused
+    AssertEqStr( unused.Serialize( ), "", "a builder with no root writes nothing" )
+end scope
+
+scope
+    '' One node attached twice -- the definition handler's start/end -- and
+    '' pushed twice into an array. A cJSON node lives in one list, so the second
+    '' attachment must be a copy, or the list becomes a cycle.
+    dim as JsonBuilder rb
+    dim as JsonNode pos_ = rb.NewObject( )
+    rb.SetInt( pos_, "line", 3 )
+    dim as JsonNode range_ = rb.NewObject( )
+    rb.SetNode( range_, "start", pos_ )
+    rb.SetNode( range_, "end", pos_ )
+    dim as JsonNode arr = rb.NewArray( )
+    rb.PushNode( arr, pos_ )
+    rb.PushNode( arr, pos_ )
+    rb.SetNode( range_, "list", arr )
+    rb.SetRoot( range_ )
+    AssertEqStr( rb.Serialize( ), _
+                 "{""start"":{""line"":3},""end"":{""line"":3},""list"":[{""line"":3},{""line"":3}]}", _
+                 "a node attached twice is written twice" )
+end scope
+
+scope
+    '' PushStr used to skip the sanitiser; now every string out is checked once
+    '' more as a whole in Serialize, which also covers values copied in.
+    dim as JsonBuilder rb
+    dim as JsonNode arr = rb.NewArray( )
+    rb.PushStr( arr, "caf" & chr( &hE9 ) )
+    rb.SetRoot( arr )
+    dim as string text_ = rb.Serialize( )
+    AssertContains( text_, "caf" & chr( &hEF, &hBF, &hBD ), "invalid UTF-8 pushed into an array becomes U+FFFD" )
+
+    dim as JsonDoc src
+    AssertTrue( src.Parse( "{""raw"":""x" & chr( &hFF ) & "y""}" ), "invalid UTF-8 in input is read, not refused" )
+    dim as JsonBuilder rb2
+    dim as JsonNode root = rb2.NewObject( )
+    rb2.SetNode( root, "copy", rb2.CopyOf( src.Root( ) ) )
+    rb2.SetRoot( root )
+    dim as JsonDoc back
+    AssertTrue( back.Parse( rb2.Serialize( ) ), "a copied value with a stray byte still serialises" )
+    AssertEqStr( back.Root( ).Member( "copy" ).Member( "raw" ).AsString( ), "x" & chr( &hEF, &hBF, &hBD ) & "y", _
+                 "and the stray byte is U+FFFD" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "JSON-RPC message parsing" )
 
 scope
@@ -353,9 +447,12 @@ end scope
 '' ############################################################################
 ''  Invalid UTF-8 on the way out
 ''
-''  yyjson refuses to serialise a document containing invalid UTF-8, and
-''  refuses ALL of it -- so one stray byte in one symbol's documentation lost
-''  the entire response, with nothing on the wire and one line in the log.
+''  The JSON library the server used before cJSON refused to serialise a
+''  document containing invalid UTF-8, and refused ALL of it -- so one stray
+''  byte in one symbol's documentation lost the entire response, with nothing
+''  on the wire and one line in the log. cJSON writes the bytes as they are,
+''  which a strict client may refuse instead; either way the facade replaces
+''  them first.
 ''
 ''  This was not hypothetical: 155 of AfxNova's 179 source files carry a
 ''  Latin-1 `é` in their copyright line, and a completion list drawn through an

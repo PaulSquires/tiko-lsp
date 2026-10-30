@@ -86,8 +86,7 @@ impl zed::Extension for TikoLspExtension {
                 format!(
                     "tiko-lsp was not found. Put it on your PATH, or set it in Zed's \
                      settings:\n\n  \"lsp\": {{ \"{SERVER_NAME}\": {{ \"binary\": {{ \
-                     \"path\": \"C:/path/to/{SERVER_NAME}.exe\" }} }} }}\n\n\
-                     On Windows, yyjson64.dll must sit beside the executable."
+                     \"path\": \"C:/path/to/{SERVER_NAME}.exe\" }} }} }}"
                 )
             })?,
         };

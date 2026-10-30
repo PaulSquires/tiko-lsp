@@ -1,7 +1,7 @@
 """Pack one release archive into dist/.
 
-    python3 release/pack.py windows <tiko-lsp.exe> <toolchain-licences-dir> <yyjson-dir>
-    python3 release/pack.py linux   <tiko-lsp>     <toolchain-licences-dir> <yyjson-dir>
+    python3 release/pack.py windows <tiko-lsp.exe> <toolchain-root>
+    python3 release/pack.py linux   <tiko-lsp>     <toolchain-root>
 
 Writes dist/tiko-lsp-windows-x86_64.zip or dist/tiko-lsp-linux-x86_64.tar.gz.
 The names carry no version on purpose: releases/latest/download/<name> is then
@@ -13,7 +13,7 @@ P1-D3). Members sit at the archive root:
     THIRD-PARTY-NOTICES.txt   what is linked into the binary, and its terms
 
 THIRD-PARTY-NOTICES.txt is assembled here from the licence files themselves --
-yyjson's two, and tiko-rt's from the toolchain that built the binary -- so it
+cJSON's and tiko-rt's, both from the toolchain that built the binary -- so it
 cannot drift from what was actually linked.
 """
 import io
@@ -32,9 +32,9 @@ THIRD-PARTY NOTICES for tiko-lsp
 tiko-lsp is licensed under the MIT licence (see LICENSE). The binary also
 contains the following software, linked statically, under the terms below.
 
-  1. yyjson                       MIT        JSON reading and writing
-  2. yyjson FreeBASIC bindings    MIT        the wrappers tiko-lsp calls yyjson through
-  3. tiko-rt                      LGPL-2.1+  the tiko runtime library, with the
+  1. cJSON                        MIT        JSON reading and writing (tiko's
+                                             vendor/cJSON package)
+  2. tiko-rt                      LGPL-2.1+  the tiko runtime library, with the
                                              static-linking exception quoted in it
 """
 
@@ -45,11 +45,11 @@ def section(n, title, path):
     return "\n%s\n%d. %s\n%s\n\n%s\n" % (rule, n, title, rule, text)
 
 
-def notices(licences, yyjson):
+def notices(toolchain):
     return (HEADER
-            + section(1, "yyjson (github.com/ibireme/yyjson)",Path(yyjson) / "LICENSE-yyjson")
-            + section(2, "yyjson FreeBASIC bindings", Path(yyjson) / "LICENSE")
-            + section(3, "tiko-rt", Path(licences) / "LICENSE-tiko-rt"))
+            + section(1, "cJSON (github.com/DaveGamble/cJSON)",
+                      Path(toolchain) / "pkg" / "vendor" / "cJSON" / "LICENSE")
+            + section(2, "tiko-rt", Path(toolchain) / "licences" / "LICENSE-tiko-rt"))
 
 
 def text_bytes(text, crlf):
@@ -60,10 +60,10 @@ def text_bytes(text, crlf):
 
 
 def main(argv):
-    if len(argv) != 5 or argv[1] not in ("windows", "linux"):
+    if len(argv) != 4 or argv[1] not in ("windows", "linux"):
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
-    plat, binary, licences, yyjson = argv[1], Path(argv[2]), argv[3], argv[4]
+    plat, binary, toolchain = argv[1], Path(argv[2]), argv[3]
     if not binary.is_file():
         print("no such binary: %s" % binary, file=sys.stderr)
         return 1
@@ -72,7 +72,7 @@ def main(argv):
     members = [
         ("tiko-lsp.exe" if plat == "windows" else "tiko-lsp", binary.read_bytes(), 0o755),
         ("LICENSE", text_bytes((ROOT / "LICENSE").read_text(encoding="utf-8"), crlf), 0o644),
-        ("THIRD-PARTY-NOTICES.txt", text_bytes(notices(licences, yyjson), crlf), 0o644),
+        ("THIRD-PARTY-NOTICES.txt", text_bytes(notices(toolchain), crlf), 0o644),
     ]
 
     DIST.mkdir(exist_ok=True)

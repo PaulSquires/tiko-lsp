@@ -10,7 +10,7 @@
 ''
 ''      #include once "shared.bi"     yes
 ''      #include "..\other.bi"        yes
-''      #inclib "yyjson64"            NO -- a library, not a source file
+''      #inclib "user32"              NO -- a library, not a source file
 ''      #include SOME_MACRO           NO -- the path is not a literal, and
 ''                                    expanding it needs a preprocessor
 ''

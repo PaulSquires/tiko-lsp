@@ -22,17 +22,25 @@ rpc/jsonrpc         jsonrpc / id / method / params / result / error
 rpc/transport       Content-Length framing; stdin and stdout
   |                 knows bytes, does not know JSON
 json/json           JsonDoc, JsonValue, JsonBuilder, JsonNode
-                    the ONLY place yyjson is named
+                    the ONLY place cJSON is named
 ```
 
 The direction that matters is the one that is missing: no lower layer calls
-upwards, and no handler touches a byte or a yyjson symbol.
+upwards, and no handler touches a byte or a cJSON symbol.
 
 ### Why the JSON library is behind a facade
 
-`json.bi` and `json.bas` are the only two files that include `yyjson.bi`. Replacing
-yyjson means rewriting those two and nothing else. The facade also enforces two
-yyjson rules that are silent when broken — see "Traps that cost a run" below.
+`json.tiko` is the only file that imports `vendor/cJSON`, and `json.ti` names no cJSON
+type at all — its handles are `any ptr`, because a header cannot `#import` and a cJSON
+type there would make all 26 files that include it import cJSON themselves. Replacing
+the library means rewriting `json.tiko` and nothing else, which is how yyjson became
+cJSON (2026-10-30). The facade also enforces the library's rules that are silent when
+broken — see "Traps that cost a run" below.
+
+What cJSON does not do, and the server accepts: a number is a double, so a PARSED
+integer above 2^53 loses precision (LSP's ids, positions and lengths are far below
+it; integers WRITTEN are exact, see below); a string is NUL-terminated, so an escaped
+`\u0000` ends it; invalid UTF-8 in an incoming message is read rather than refused.
 
 ### Why the compiler frontend is not here yet
 
@@ -46,9 +54,9 @@ there is no place in the design where a process boundary would fit.
 
 | Type | Owns | Rule |
 | --- | --- | --- |
-| `JsonDoc` | one parsed `yyjson_doc` | frees it; copy and assignment deep-copy |
+| `JsonDoc` | one parsed cJSON tree | frees it; copy and assignment deep-copy |
 | `JsonValue` | nothing | borrows a node; dies with its `JsonDoc` |
-| `JsonBuilder` | one `yyjson_mut_doc` | frees it and every node in it |
+| `JsonBuilder` | the tree under construction, and every node it made | frees the root's tree and every node it made but never attached |
 | `JsonNode` | nothing | borrows a node; dies with its `JsonBuilder` |
 | `RpcMessage` | its `JsonDoc` | `Params()` is derived, never stored, so a copied message never views the original |
 | `MessageFramer` | its byte buffer | compacts once the consumed prefix passes 64 KB |
@@ -171,21 +179,39 @@ the dispatcher's only shared state is the `Server` object and the handler regist
 Recorded here because each one fails **silently** — no crash, no error return, a
 plausible-looking wrong result.
 
-**yyjson does not copy object keys.** `yyjson_mut_obj_add_sint( doc, obj, "code", n )`
-stores the key *pointer*. A FreeBASIC string literal at a call site is a temporary,
-so the key dangles and the document serialises as `{"{\"{\\":-32700}` — the value is
-right, the key is garbage, and nothing reports an error. Every writer in
-`JsonBuilder` therefore goes through `SetNode`, which copies the key with
-`yyjson_mut_strncpy`. The `_strcpy` variants copy the *value* only and do not fix
-this.
+**A cJSON node lives in exactly one list.** Attaching the same `JsonNode` twice — the
+definition handler sets one position object as a range's `start` and its `end` —
+links it into a second parent through its own `next`/`prev`, and the child list
+becomes a cycle: `Serialize` runs to cJSON's circular limit and returns nothing
+("failed to serialise response"), and freeing the tree frees the node twice (heap
+corruption at exit). yyjson tolerated it. `SetNode`/`PushNode` therefore attach a
+deep copy of any node that is already attached, or is the root.
 
-**`STRPTR()` on an empty FreeBASIC string is NULL**, and yyjson reads NULL as
-"invalid parameter" rather than "empty". Everything that could receive an empty
-string goes through `TextPtr()`, which substitutes a one-byte static.
+**cJSON has no arena.** A node that was made and never attached is freed by nobody.
+`JsonBuilder` records every node its factories return and, in its destructor, frees
+the ones with no `prev` (never attached) before freeing the root — deciding all of
+them before deleting any, since a stray's child is recorded too.
 
-**A writer buffer belongs to yyjson's heap.** `yyjson_free_buf`, never
-`DEALLOCATE`; the wrong one corrupts the process heap. Only `Serialize()` ever
-holds such a buffer.
+**A cJSON number prints with `%1.15g`**, so 10^15 and up come out in exponent form,
+and a double cannot hold every int64. `NewInt` writes a RAW node holding the
+integer's own digits.
+
+**Parsing is strict only with the terminator counted.** `cJSON_ParseWithLengthOpts`
+with require-null-terminated refuses trailing text — but only if the length includes
+the string's NUL; given `len( text )` it refuses every document. Where it stopped
+comes back through the `return_parse_end` argument, not `cJSON_GetErrorPtr`, which
+is one global and documents are parsed on the index workers too.
+
+**`STRPTR()` on an empty FreeBASIC string is NULL**, and cJSON reads a NULL string
+as a failure rather than as "". Everything that could receive an empty string goes
+through `TextPtr()`, which substitutes a one-byte static.
+
+**Printed text belongs to cJSON's allocator.** `cJSON_free`, never `DEALLOCATE`.
+Only `Serialize()` ever holds such a buffer.
+
+**Outgoing text is sanitised as a whole.** `Serialize` replaces any byte that is not
+well-formed UTF-8 with U+FFFD, so a value copied from another program's JSON
+(`CopyOf`) is covered as well as every `NewString`.
 
 **FreeBASIC cannot resolve a circular by-value return between two types.** An
 iterator whose `Value()` returns `JsonValue` cannot be reached from a

@@ -10,8 +10,7 @@ and the path to a binary. Everything a user sees comes from the server.
 ## Install
 
 1. **Build the server** ([../../build/_compile.bat](../../build/_compile.bat)),
-   so `bin\tiko-lsp.exe` exists. On Windows `yyjson64.dll` must sit beside it —
-   the build script copies it there.
+   so `bin\tiko-lsp.exe` exists.
 2. In Zed: `zed: install dev extension` from the command palette
    (`ctrl-shift-p`), and choose this folder — `editors/zed`.
 
