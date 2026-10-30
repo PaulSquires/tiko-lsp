@@ -45,8 +45,7 @@ In order:
 3. `bin/tiko-lsp.exe` under the project root -- so opening the tiko-lsp
    repository itself works after a build.
 
-If none of those finds it, it says so once. On Windows, `yyjson64.dll` must
-sit beside the executable.
+If none of those finds it, it says so once.
 
 ## Options
 

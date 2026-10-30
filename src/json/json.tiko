@@ -1,17 +1,27 @@
 '' ############################################################################
-''  json/json.tiko -- implementation of the JSON facade over yyjson
+''  json/json.tiko -- implementation of the JSON facade over cJSON
 ''
-''  Two yyjson rules are load-bearing here and are enforced in exactly one
-''  place each:
+''  cJSON is tiko's `vendor/cJSON` package (cJSON 1.7.19), linked STATICALLY:
+''  the server stays one file, and nothing has to be built or installed beside
+''  the toolchain. This is the only file that names it.
 ''
-''    1. A writer buffer comes from the DLL's heap and must be released with
-''       yyjson_free_buf, never DEALLOCATE. Only Serialize() ever holds one.
-''    2. STRPTR() on an empty FreeBASIC string is NULL, and yyjson reads NULL
-''       as "invalid parameter" rather than "empty". Every call that could be
-''       handed an empty string goes through TextPtr().
+''  Four cJSON rules are load-bearing here and are kept in exactly one place
+''  each:
+''
+''    1. Text cJSON prints is cJSON's to free -- cJSON_free, never DEALLOCATE.
+''       Only Serialize() ever holds any.
+''    2. STRPTR() on an empty FreeBASIC string is NULL, and cJSON reads a NULL
+''       string as a failure, not as "". Every call that could be handed an
+''       empty string goes through TextPtr().
+''    3. cJSON has no arena: a node that was never attached to anything is
+''       freed by nobody. The builder records what it made (Made_) and frees the
+''       strays itself.
+''    4. A number is a double, printed with %1.15g -- 1e15 and up comes out in
+''       exponent form. NewInt therefore writes the integer's own digits.
 '' ############################################################################
 
 #import "std/containers"
+#import "vendor/cJSON" link static
 #include once "crt.bi"
 #include once "json.ti"
 
@@ -24,23 +34,22 @@ private function TextPtr( byref s as string ) as zstring ptr
     return strptr(s)
 end function
 
+private function J_( byval p as any ptr ) as cJSON ptr
+    return cast( cJSON ptr, p )
+end function
+
 '' ############################################################################
 ''  Invalid UTF-8 on the way out
 ''
-''  yyjson REFUSES to serialise a string that is not valid UTF-8, and it
-''  refuses the whole document: one stray byte anywhere and the entire response
-''  is lost. What the server did about that was log "failed to serialise" and
-''  answer nothing -- so the request simply never completed, in an editor that
-''  showed no error and waited.
+''  LSP says content is UTF-8; real files predate the machine that says so. 155
+''  of AfxNova's 179 source files carry a Latin-1 `é` in their copyright line.
+''  A client that receives a stray byte may reject the whole message -- and
+''  the library that came before cJSON refused to write one at all, so a
+''  completion list drawn from any of those files was silently unanswerable.
 ''
-''  This is not a hypothetical. 155 of AfxNova's 179 source files carry a
-''  Latin-1 `é` in their copyright line, and a completion list drawn from any
-''  of them was silently unanswerable. LSP says content is UTF-8; real files
-''  predate the machine that says so.
-''
-''  So every string that goes out is checked, and a byte that cannot be part of
-''  a valid sequence becomes U+FFFD. The user sees one replacement character in
-''  a copyright line instead of a feature that does not work.
+''  So everything that goes out is checked, and a byte that cannot be part of a
+''  valid sequence becomes U+FFFD. The user sees one replacement character in a
+''  copyright line instead of a feature that does not work.
 '' ############################################################################
 
 '' How long a UTF-8 sequence starting with this byte should be, or 0 when the
@@ -119,11 +128,11 @@ private function SanitiseUtf8( byref s as string ) as string
     return out_
 end function
 
-'' Builds a FreeBASIC string from a pointer/length pair. yyjson strings are
-'' counted, not NUL-terminated in the FB sense: an escaped u0000 unescapes to
-'' a real zero byte inside the text, and LEFT(*p, n) would stop early on it.
-private function TextFrom( byval p as const zstring ptr, byval n as uinteger ) as string
-    if( p = NULL orelse n = 0 ) then return ""
+'' A FreeBASIC string from a NUL-terminated C string; "" for NULL.
+private function TextOf( byval p as const zstring ptr ) as string
+    if( p = NULL ) then return ""
+    dim as uinteger n = strlen( p )
+    if( n = 0 ) then return ""
     dim as string s = space( n )
     memcpy( strptr(s), p, n )
     return s
@@ -137,11 +146,11 @@ constructor JsonValue( )
     this.m_val = NULL
 end constructor
 
-constructor JsonValue( byval v as yyjson_val ptr )
+constructor JsonValue( byval v as any ptr )
     this.m_val = v
 end constructor
 
-function JsonValue.Handle( ) as yyjson_val ptr
+function JsonValue.Handle( ) as any ptr
     return this.m_val
 end function
 
@@ -151,76 +160,75 @@ end function
 
 function JsonValue.IsNull( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_null( this.m_val )
+    return cJSON_IsNull( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.IsObject( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_obj( this.m_val )
+    return cJSON_IsObject( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.IsArray( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_arr( this.m_val )
+    return cJSON_IsArray( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.IsString( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_str( this.m_val )
+    return cJSON_IsString( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.IsNumber( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_num( this.m_val )
+    return cJSON_IsNumber( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.IsBool( ) as boolean
     if( this.m_val = NULL ) then return false
-    return yyjson_is_bool( this.m_val )
+    return cJSON_IsBool( J_( this.m_val ) ) <> 0
 end function
 
 function JsonValue.Has( byref key as string ) as boolean
     if( this.IsObject( ) = false ) then return false
-    return yyjson_obj_getn( this.m_val, TextPtr(key), len(key) ) <> NULL
+    return cJSON_GetObjectItemCaseSensitive( J_( this.m_val ), TextPtr(key) ) <> NULL
 end function
 
 function JsonValue.Member( byref key as string ) as JsonValue
     if( this.IsObject( ) = false ) then return JsonValue( )
-    return JsonValue( yyjson_obj_getn( this.m_val, TextPtr(key), len(key) ) )
+    return JsonValue( cJSON_GetObjectItemCaseSensitive( J_( this.m_val ), TextPtr(key) ) )
 end function
 
+'' cJSON keeps an object's members in the same child list as an array's
+'' elements, so one count serves both.
 function JsonValue.Count( ) as long
-    if( this.m_val = NULL ) then return 0
-    if( yyjson_is_arr( this.m_val ) ) then return clng( yyjson_arr_size( this.m_val ) )
-    if( yyjson_is_obj( this.m_val ) ) then return clng( yyjson_obj_size( this.m_val ) )
-    return 0
+    if( this.IsArray( ) = false andalso this.IsObject( ) = false ) then return 0
+    return cJSON_GetArraySize( J_( this.m_val ) )
 end function
 
 function JsonValue.Item( byval idx as long ) as JsonValue
     if( this.IsArray( ) = false ) then return JsonValue( )
     if( idx < 0 orelse idx >= this.Count( ) ) then return JsonValue( )
-    return JsonValue( yyjson_arr_get( this.m_val, culng(idx) ) )
+    return JsonValue( cJSON_GetArrayItem( J_( this.m_val ), idx ) )
 end function
 
 function JsonValue.AsString( byref dflt as string = "" ) as string
     if( this.IsString( ) = false ) then return dflt
-    return TextFrom( yyjson_get_str( this.m_val ), yyjson_get_len( this.m_val ) )
+    return TextOf( J_( this.m_val )->valuestring )
 end function
 
 function JsonValue.AsLongInt( byval dflt as longint = 0 ) as longint
     if( this.IsNumber( ) = false ) then return dflt
-    if( yyjson_is_real( this.m_val ) ) then return clngint( yyjson_get_num( this.m_val ) )
-    return yyjson_get_sint( this.m_val )
+    return clngint( J_( this.m_val )->valuedouble )
 end function
 
 function JsonValue.AsDouble( byval dflt as double = 0.0 ) as double
     if( this.IsNumber( ) = false ) then return dflt
-    return yyjson_get_num( this.m_val )
+    return J_( this.m_val )->valuedouble
 end function
 
 function JsonValue.AsBoolean( byval dflt as boolean = false ) as boolean
     if( this.IsBool( ) = false ) then return dflt
-    return yyjson_get_bool( this.m_val )
+    return cJSON_IsTrue( J_( this.m_val ) ) <> 0
 end function
 
 '' ############################################################################
@@ -228,34 +236,26 @@ end function
 '' ############################################################################
 
 constructor JsonArrayIterator( )
-    this.m_arr = NULL
-    this.m_idx = 0
-    this.m_max = 0
+    this.m_cur = NULL
 end constructor
 
-constructor JsonArrayIterator( byval arr as yyjson_val ptr )
-    this.m_arr = NULL
-    this.m_idx = 0
-    this.m_max = 0
+constructor JsonArrayIterator( byval arr as any ptr )
+    this.m_cur = NULL
     if( arr <> NULL ) then
-        if( yyjson_is_arr( arr ) ) then
-            this.m_arr = arr
-            this.m_max = clng( yyjson_arr_size( arr ) )
-        end if
+        if( cJSON_IsArray( J_( arr ) ) <> 0 ) then this.m_cur = J_( arr )->child
     end if
 end constructor
 
 function JsonArrayIterator.IsValid( ) as boolean
-    return this.m_idx < this.m_max
+    return this.m_cur <> NULL
 end function
 
 function JsonArrayIterator.Value( ) as JsonValue
-    if( this.IsValid( ) = false ) then return JsonValue( )
-    return JsonValue( yyjson_arr_get( this.m_arr, culng(this.m_idx) ) )
+    return JsonValue( this.m_cur )
 end function
 
 sub JsonArrayIterator.MoveNext( )
-    this.m_idx += 1
+    if( this.m_cur <> NULL ) then this.m_cur = J_( this.m_cur )->next
 end sub
 
 constructor JsonArray( )
@@ -263,12 +263,12 @@ constructor JsonArray( )
 end constructor
 
 constructor JsonArray( byval v as JsonValue )
-    this.m_arr = iif( v.IsArray( ), v.Handle( ), cast( yyjson_val ptr, NULL ) )
+    this.m_arr = iif( v.IsArray( ), v.Handle( ), cast( any ptr, NULL ) )
 end constructor
 
 function JsonArray.Count( ) as long
     if( this.m_arr = NULL ) then return 0
-    return clng( yyjson_arr_size( this.m_arr ) )
+    return cJSON_GetArraySize( J_( this.m_arr ) )
 end function
 
 function JsonArray.GetIterator( ) as JsonArrayIterator
@@ -284,34 +284,20 @@ end function
 '' ############################################################################
 
 constructor JsonDoc( )
-    this.m_doc = NULL
+    this.m_root = NULL
 end constructor
 
 constructor JsonDoc( byref rhs as JsonDoc )
-    this.m_doc = NULL
+    this.m_root = NULL
     this.m_err = rhs.m_err
-    if( rhs.m_doc <> NULL ) then
-        '' yyjson has no immutable-to-immutable clone, so the copy goes out
-        '' through the mutable form and back.
-        dim as yyjson_mut_doc ptr tmp = yyjson_doc_mut_copy( rhs.m_doc, NULL )
-        if( tmp <> NULL ) then
-            this.m_doc = yyjson_mut_doc_imut_copy( tmp, NULL )
-            yyjson_mut_doc_free( tmp )
-        end if
-    end if
+    if( rhs.m_root <> NULL ) then this.m_root = cJSON_Duplicate( J_( rhs.m_root ), 1 )
 end constructor
 
 operator JsonDoc.let( byref rhs as JsonDoc )
     if( @rhs = @this ) then exit operator
     this.Clear( )
     this.m_err = rhs.m_err
-    if( rhs.m_doc <> NULL ) then
-        dim as yyjson_mut_doc ptr tmp = yyjson_doc_mut_copy( rhs.m_doc, NULL )
-        if( tmp <> NULL ) then
-            this.m_doc = yyjson_mut_doc_imut_copy( tmp, NULL )
-            yyjson_mut_doc_free( tmp )
-        end if
-    end if
+    if( rhs.m_root <> NULL ) then this.m_root = cJSON_Duplicate( J_( rhs.m_root ), 1 )
 end operator
 
 destructor JsonDoc( )
@@ -319,9 +305,9 @@ destructor JsonDoc( )
 end destructor
 
 sub JsonDoc.Clear( )
-    if( this.m_doc <> NULL ) then
-        yyjson_doc_free( this.m_doc )
-        this.m_doc = NULL
+    if( this.m_root <> NULL ) then
+        cJSON_Delete( J_( this.m_root ) )
+        this.m_root = NULL
     end if
     this.m_err = ""
 end sub
@@ -334,15 +320,21 @@ function JsonDoc.Parse( byref text_ as string ) as boolean
         return false
     end if
 
-    dim as yyjson_read_err rerr
-    '' Strict RFC 8259: no comments, no trailing commas, no NaN. A client that
-    '' sends those is broken, and accepting them would hide the bug.
-    this.m_doc = yyjson_read_opts( strptr(text_), len(text_), YYJSON_READ_NOFLAG, NULL, @rerr )
+    '' Strict RFC 8259: no comments, no trailing commas, no NaN, and NOTHING
+    '' after the value. A client that sends those is broken, and accepting them
+    '' would hide the bug. The length counts the string's terminating NUL, which
+    '' is what lets cJSON's require-the-terminator check see the true end: given
+    '' len( text_ ) alone, it would refuse every document.
+    ''
+    '' Where it stopped comes back through `endp`, not cJSON_GetErrorPtr: that is
+    '' one global, and documents are parsed on the index workers too.
+    dim as const zstring ptr endp = NULL
+    this.m_root = cJSON_ParseWithLengthOpts( strptr(text_), len(text_) + 1, @endp, 1 )
 
-    if( this.m_doc = NULL ) then
-        dim as string detail = ""
-        if( rerr.msg <> NULL ) then detail = *rerr.msg
-        this.m_err = detail & " (at byte " & rerr.pos & ")"
+    if( this.m_root = NULL ) then
+        dim as long at_ = 0
+        if( endp <> NULL ) then at_ = clng( cast( ubyte ptr, endp ) - cast( ubyte ptr, strptr(text_) ) )
+        this.m_err = "invalid JSON (at byte " & at_ & ")"
         return false
     end if
 
@@ -350,12 +342,11 @@ function JsonDoc.Parse( byref text_ as string ) as boolean
 end function
 
 function JsonDoc.IsValid( ) as boolean
-    return this.m_doc <> NULL
+    return this.m_root <> NULL
 end function
 
 function JsonDoc.Root( ) as JsonValue
-    if( this.m_doc = NULL ) then return JsonValue( )
-    return JsonValue( yyjson_doc_get_root( this.m_doc ) )
+    return JsonValue( this.m_root )
 end function
 
 function JsonDoc.ErrorText( ) as string
@@ -370,11 +361,11 @@ constructor JsonNode( )
     this.m_val = NULL
 end constructor
 
-constructor JsonNode( byval v as yyjson_mut_val ptr )
+constructor JsonNode( byval v as any ptr )
     this.m_val = v
 end constructor
 
-function JsonNode.Handle( ) as yyjson_mut_val ptr
+function JsonNode.Handle( ) as any ptr
     return this.m_val
 end function
 
@@ -387,89 +378,122 @@ end function
 '' ############################################################################
 
 constructor JsonBuilder( )
-    this.m_doc = yyjson_mut_doc_new( NULL )
+    this.m_root = NULL
+    this.m_made = NULL
+    this.m_madeCount = 0
+    this.m_madeCap = 0
 end constructor
 
-destructor JsonBuilder( )
-    if( this.m_doc <> NULL ) then
-        '' Frees the document and every node carved out of it. Any JsonNode
-        '' still held by the caller dangles from here on -- by design, and the
-        '' reason nodes are never stored beyond the request that built them.
-        yyjson_mut_doc_free( this.m_doc )
-        this.m_doc = NULL
+'' Every node a factory hands out is recorded here, so the destructor can find
+'' the ones nobody attached. A NULL (cJSON out of memory) is recorded as nothing.
+function JsonBuilder.Made_( byval p as any ptr ) as JsonNode
+    if( p = NULL ) then return JsonNode( )
+    if( this.m_madeCount = this.m_madeCap ) then
+        dim as long cap = iif( this.m_madeCap = 0, 32, this.m_madeCap * 2 )
+        dim as any ptr ptr grown = reallocate( this.m_made, cap * sizeof( any ptr ) )
+        if( grown = NULL ) then
+            cJSON_Delete( J_( p ) )
+            return JsonNode( )
+        end if
+        this.m_made = grown
+        this.m_madeCap = cap
     end if
+    this.m_made[this.m_madeCount] = p
+    this.m_madeCount += 1
+    return JsonNode( p )
+end function
+
+destructor JsonBuilder( )
+    '' THE STRAYS FIRST. cJSON links a node into its parent through `prev`,
+    '' which a fresh node has NULL: a recorded node with no `prev` that is not
+    '' the root was never attached, so nothing else will free it, and its own
+    '' children go with it. ALL are decided before ANY is freed -- a stray's
+    '' child is recorded too, and asking it after its parent was deleted would
+    '' read freed memory. Strays are never inside one another (each has no
+    '' parent), so deleting the marked ones frees nothing twice. Then the root,
+    '' which takes everything attached under it.
+    for i as long = 0 to this.m_madeCount - 1
+        dim as any ptr p = this.m_made[i]
+        if( p = this.m_root orelse J_( p )->prev <> NULL ) then this.m_made[i] = NULL
+    next
+    for i as long = 0 to this.m_madeCount - 1
+        if( this.m_made[i] <> NULL ) then cJSON_Delete( J_( this.m_made[i] ) )
+    next
+    if( this.m_root <> NULL ) then cJSON_Delete( J_( this.m_root ) )
+    this.m_root = NULL
+    if( this.m_made <> NULL ) then deallocate( this.m_made )
+    this.m_made = NULL
+    this.m_madeCount = 0
+    this.m_madeCap = 0
 end destructor
 
 function JsonBuilder.IsValid( ) as boolean
-    return this.m_doc <> NULL
+    return true
 end function
 
 function JsonBuilder.NewObject( ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_obj( this.m_doc ) )
-end function
-
-function JsonBuilder.CopyOf( byval v as JsonValue ) as JsonNode
-    if( this.m_doc = NULL orelse v.Handle( ) = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_val_mut_copy( this.m_doc, v.Handle( ) ) )
+    return this.Made_( cJSON_CreateObject( ) )
 end function
 
 function JsonBuilder.NewArray( ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_arr( this.m_doc ) )
+    return this.Made_( cJSON_CreateArray( ) )
 end function
 
-'' EVERY string value on the wire passes through here, which is why the
-'' sanitising happens here and nowhere else.
+function JsonBuilder.CopyOf( byval v as JsonValue ) as JsonNode
+    if( v.Handle( ) = NULL ) then return JsonNode( )
+    return this.Made_( cJSON_Duplicate( J_( v.Handle( ) ), 1 ) )
+end function
+
+'' cJSON copies the value, so the FB string may be a temporary that dies
+'' before the document is serialised. Sanitised here for the reply's sake;
+'' Serialize sanitises again for the strings that arrive by other paths.
 function JsonBuilder.NewString( byref v as string ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    '' strncpy, not str: the FB string may be a temporary that dies before the
-    '' document is serialised. And sanitised: yyjson refuses to write a
-    '' document containing invalid UTF-8, and refuses ALL of it.
     dim as string clean_ = SanitiseUtf8( v )
-    return JsonNode( yyjson_mut_strncpy( this.m_doc, TextPtr(clean_), len(clean_) ) )
+    return this.Made_( cJSON_CreateString( TextPtr(clean_) ) )
 end function
 
+'' A cJSON number is a double and prints with %1.15g, so 10^15 and beyond come
+'' out in exponent form -- valid JSON, but not an integer to a strict reader.
+'' A RAW node holds the integer's own decimal digits, which print verbatim.
 function JsonBuilder.NewInt( byval v as longint ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_sint( this.m_doc, v ) )
+    dim as string digits = str( v )
+    return this.Made_( cJSON_CreateRaw( strptr(digits) ) )
 end function
 
 function JsonBuilder.NewDouble( byval v as double ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_real( this.m_doc, v ) )
+    return this.Made_( cJSON_CreateNumber( v ) )
 end function
 
 function JsonBuilder.NewBool( byval v as boolean ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_bool( this.m_doc, v ) )
+    return this.Made_( cJSON_CreateBool( iif( v, 1, 0 ) ) )
 end function
 
 function JsonBuilder.NewNull( ) as JsonNode
-    if( this.m_doc = NULL ) then return JsonNode( )
-    return JsonNode( yyjson_mut_null( this.m_doc ) )
+    return this.Made_( cJSON_CreateNull( ) )
 end function
 
 '' ----------------------------------------------------------------------------
-''  Object writers
-''
-''  EVERY ONE OF THESE GOES THROUGH SetNode, and SetNode COPIES THE KEY.
-''
-''  yyjson's convenience adders -- yyjson_mut_obj_add_sint and friends -- store
-''  the key POINTER without copying it, even the _strcpy variants, which copy
-''  only the value. A FreeBASIC string literal at a call site is a temporary,
-''  so the key would dangle and the document would serialise with corrupted
-''  key text: {"{\"{\\":-32700} instead of {"code":-32700}. It is not a crash
-''  and not an error return, which is what makes it worth this comment.
+''  Object writers -- every one goes through SetNode. cJSON copies the key.
 '' ----------------------------------------------------------------------------
 
+'' A NODE MAY BE ATTACHED MORE THAN ONCE -- the definition handler sets one
+'' position object as both a range's "start" and its "end" -- and handlers have
+'' always been able to. A cJSON node lives in one parent's child list, through
+'' its own `next`/`prev`: linked a second time, the list becomes a cycle, the
+'' printer runs to its circular limit and gives up, and freeing the tree frees
+'' the node twice (heap corruption at exit). So a node that is already in a
+'' list, or is the root, is attached as a deep copy instead.
+function JsonBuilder.Attachable_( byval v as JsonNode ) as any ptr
+    dim as cJSON ptr item = J_( v.Handle( ) )
+    if( item->prev = NULL andalso v.Handle( ) <> this.m_root ) then return item
+    return this.Made_( cJSON_Duplicate( item, 1 ) ).Handle( )
+end function
+
 function JsonBuilder.SetNode( byval obj as JsonNode, byref key as string, byval v as JsonNode ) as boolean
-    if( cbool(this.m_doc = NULL) orelse obj.IsValid( ) = false orelse v.IsValid( ) = false ) then return false
-
-    dim as yyjson_mut_val ptr keyNode = yyjson_mut_strncpy( this.m_doc, TextPtr(key), len(key) )
-    if( keyNode = NULL ) then return false
-
-    return yyjson_mut_obj_add( obj.Handle( ), keyNode, v.Handle( ) )
+    if( obj.IsValid( ) = false orelse v.IsValid( ) = false ) then return false
+    dim as any ptr item = this.Attachable_( v )
+    if( item = NULL ) then return false
+    return cJSON_AddItemToObject( J_( obj.Handle( ) ), TextPtr(key), J_( item ) ) <> 0
 end function
 
 function JsonBuilder.SetStr( byval obj as JsonNode, byref key as string, byref v as string ) as boolean
@@ -492,44 +516,50 @@ function JsonBuilder.SetNull( byval obj as JsonNode, byref key as string ) as bo
     return this.SetNode( obj, key, this.NewNull( ) )
 end function
 
+function JsonBuilder.PushNode( byval arr as JsonNode, byval v as JsonNode ) as boolean
+    if( arr.IsValid( ) = false orelse v.IsValid( ) = false ) then return false
+    dim as any ptr item = this.Attachable_( v )
+    if( item = NULL ) then return false
+    return cJSON_AddItemToArray( J_( arr.Handle( ) ), J_( item ) ) <> 0
+end function
+
 function JsonBuilder.PushStr( byval arr as JsonNode, byref v as string ) as boolean
-    if( cbool(this.m_doc = NULL) orelse arr.IsValid( ) = false ) then return false
-    return yyjson_mut_arr_add_strncpy( this.m_doc, arr.Handle( ), TextPtr(v), len(v) )
+    if( arr.IsValid( ) = false ) then return false
+    return this.PushNode( arr, this.NewString( v ) )
 end function
 
 function JsonBuilder.PushInt( byval arr as JsonNode, byval v as longint ) as boolean
-    if( cbool(this.m_doc = NULL) orelse arr.IsValid( ) = false ) then return false
-    dim as JsonNode n = this.NewInt( v )
-    if( n.IsValid( ) = false ) then return false
-    return yyjson_mut_arr_add_val( arr.Handle( ), n.Handle( ) )
-end function
-
-function JsonBuilder.PushNode( byval arr as JsonNode, byval v as JsonNode ) as boolean
-    if( arr.IsValid( ) = false orelse v.IsValid( ) = false ) then return false
-    return yyjson_mut_arr_add_val( arr.Handle( ), v.Handle( ) )
+    if( arr.IsValid( ) = false ) then return false
+    return this.PushNode( arr, this.NewInt( v ) )
 end function
 
 sub JsonBuilder.SetRoot( byval root as JsonNode )
-    if( cbool(this.m_doc = NULL) orelse root.IsValid( ) = false ) then exit sub
-    yyjson_mut_doc_set_root( this.m_doc, root.Handle( ) )
+    if( root.IsValid( ) = false ) then exit sub
+    this.m_root = root.Handle( )
 end sub
 
 function JsonBuilder.Serialize( byval pretty as boolean = false ) as string
-    if( this.m_doc = NULL ) then return ""
+    if( this.m_root = NULL ) then return ""
 
-    dim as yyjson_write_flag flg = YYJSON_WRITE_NOFLAG
-    if( pretty ) then flg = YYJSON_WRITE_PRETTY
-
-    dim as uinteger n = 0
-    dim as zstring ptr buf = yyjson_mut_write( this.m_doc, flg, @n )
+    dim as zstring ptr buf
+    if( pretty ) then
+        buf = cJSON_Print( J_( this.m_root ) )
+    else
+        buf = cJSON_PrintUnformatted( J_( this.m_root ) )
+    end if
     if( buf = NULL ) then return ""
 
-    dim as string out_ = TextFrom( buf, n )
+    dim as string out_ = TextOf( buf )
 
-    '' The DLL allocated it, so the DLL releases it. DEALLOCATE here would
-    '' corrupt the process heap.
-    yyjson_free_buf( buf )
-    return out_
+    '' cJSON allocated it, so cJSON releases it. DEALLOCATE here would be a
+    '' different allocator's free.
+    cJSON_free( buf )
+
+    '' The whole text, once: a value copied from another program's JSON
+    '' (CopyOf) never passed NewString. Stray bytes can only be inside strings
+    '' -- every structural character is ASCII -- so U+FFFD keeps the document
+    '' valid JSON.
+    return SanitiseUtf8( out_ )
 end function
 
 '' ############################################################################

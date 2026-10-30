@@ -1550,9 +1550,15 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 end if
 
                 if( isBlock ) then
-                    dim as string name_ = ReadName( text_, tokens, stmt[first_ + 1], lastIdx )
+                    '' An ANONYMOUS nested type -- a bare `type` -- has no name to
+                    '' read and no symbol to add: it opens its block and nothing
+                    '' else. Reading stmt[first_ + 1] for it was a read past the
+                    '' statement, which std/containers' Array has refused since it
+                    '' checks [] against Count (tiko-lang LIB-01): runtime error 6.
+                    dim as string name_ = ""
+                    if( hasNext ) then name_ = ReadName( text_, tokens, stmt[first_ + 1], lastIdx )
                     dim as long symIndex = -1
-                    if( st.Symbols_ <> 0 ) then
+                    if( st.Symbols_ <> 0 andalso hasNext ) then
                         dim as long nameFirst, nameLast
                         NameTokens( text_, tokens, stmt, first_ + 1, nameFirst, nameLast )
                         symIndex = AddSymbol( st, name_, SYM_STRUCT, "type", _

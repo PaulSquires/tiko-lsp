@@ -20,15 +20,9 @@ setlocal enabledelayedexpansion
 
 set ROOT=%~dp0..
 set TIKO=C:\dev\tiko-lang\toolchains\tiko-windows\tiko.exe
-set YYJSON=C:\dev\yyjson
 
 if not "%TIKO_LSP_TIKO%"==""   set TIKO=%TIKO_LSP_TIKO%
-if not "%TIKO_LSP_YYJSON%"=="" set YYJSON=%TIKO_LSP_YYJSON%
 
-rem TIKO_LSP_YYJSON_LIB: see _compile.bat. The suite links what the server links.
-set YYLIB=%YYJSON%\lib\win64
-if not "%TIKO_LSP_YYJSON_LIB%"=="" set YYLIB=%TIKO_LSP_YYJSON_LIB%
-set INC=-i "%YYJSON%\inc" -p "%YYLIB%"
 set FAILED=0
 
 if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
@@ -37,25 +31,25 @@ echo [1/13] building the server
 call "%~dp0_compile.bat" || exit /b 1
 
 echo [2/13] framing tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_framing.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_framing.tiko" ^
     "%ROOT%\src\rpc\transport.tiko" "%ROOT%\src\utils\logging.tiko" ^
     -x "%ROOT%\bin\test_framing.exe" || exit /b 1
 "%ROOT%\bin\test_framing.exe" || set FAILED=1
 
 echo [3/13] json and json-rpc tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_json.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_json.tiko" ^
     "%ROOT%\src\json\json.tiko" "%ROOT%\src\rpc\jsonrpc.tiko" "%ROOT%\src\utils\logging.tiko" ^
     -x "%ROOT%\bin\test_json.exe" || exit /b 1
 "%ROOT%\bin\test_json.exe" || set FAILED=1
 
 echo [4/13] position tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_position.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_position.tiko" ^
     "%ROOT%\src\utils\position.tiko" ^
     -x "%ROOT%\bin\test_position.exe" || exit /b 1
 "%ROOT%\bin\test_position.exe" || set FAILED=1
 
 echo [5/13] uri and document tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_document.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_document.tiko" ^
     "%ROOT%\src\document\document.tiko" "%ROOT%\src\document\document_manager.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
@@ -65,7 +59,7 @@ echo [5/13] uri and document tests
 "%ROOT%\bin\test_document.exe" || set FAILED=1
 
 echo [6/13] lexer and parser tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_analysis.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_analysis.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
@@ -75,7 +69,7 @@ rem source and require zero diagnostics from it.
 "%ROOT%\bin\test_analysis.exe" "%ROOT%" || set FAILED=1
 
 echo [7/13] symbol tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_symbols.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_symbols.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
@@ -83,7 +77,7 @@ echo [7/13] symbol tests
 "%ROOT%\bin\test_symbols.exe" || set FAILED=1
 
 echo [8/13] completion tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_completion.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_completion.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
@@ -93,7 +87,7 @@ echo [8/13] completion tests
 echo [9/13] workspace tests
 rem tests\fake_tiko stands in for `tiko metadata`, here and in the metadata session.
 "%TIKO%" -w all "%ROOT%\tests\fake_tiko.tiko" -x "%ROOT%\bin\fake_tiko.exe" || exit /b 1
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_workspace.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_workspace.tiko" ^
     "%ROOT%\src\workspace\workspace.tiko" "%ROOT%\src\workspace\symbol_index.tiko" "%ROOT%\src\workspace\modules.tiko" "%ROOT%\src\analysis\includes.tiko" ^
     "%ROOT%\src\workspace\index_builder.tiko" "%ROOT%\src\workspace\metadata.tiko" "%ROOT%\src\workspace\cincludes.tiko" ^
     "%ROOT%\src\utils\process.tiko" "%ROOT%\src\json\json.tiko" ^
@@ -104,7 +98,7 @@ rem tests\fake_tiko stands in for `tiko metadata`, here and in the metadata sess
 "%ROOT%\bin\test_workspace.exe" "%ROOT%" || set FAILED=1
 
 echo [10/13] signature tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_signature.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_signature.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\signature.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" "%ROOT%\src\utils\position.tiko" ^
@@ -112,7 +106,7 @@ echo [10/13] signature tests
 "%ROOT%\bin\test_signature.exe" || set FAILED=1
 
 echo [11/13] semantic token tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_semantic.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_semantic.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\semantic.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" "%ROOT%\src\utils\position.tiko" ^
@@ -120,7 +114,7 @@ echo [11/13] semantic token tests
 "%ROOT%\bin\test_semantic.exe" || set FAILED=1
 
 echo [12/13] formatting tests
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\test_format.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\test_format.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
     "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\format.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" "%ROOT%\src\utils\position.tiko" ^
@@ -128,7 +122,7 @@ echo [12/13] formatting tests
 "%ROOT%\bin\test_format.exe" || set FAILED=1
 
 echo [13/13] piped session against the real server
-"%TIKO%" -w all -mt %INC% "%ROOT%\tests\session_tool.tiko" ^
+"%TIKO%" -w all -mt "%ROOT%\tests\session_tool.tiko" ^
     "%ROOT%\src\json\json.tiko" "%ROOT%\src\rpc\transport.tiko" "%ROOT%\src\rpc\jsonrpc.tiko" ^
     "%ROOT%\src\lsp\protocol.tiko" "%ROOT%\src\analysis\semantic.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^

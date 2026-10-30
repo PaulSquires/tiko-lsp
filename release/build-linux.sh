@@ -11,29 +11,25 @@
 #  Ubuntu 22.04, glibc 2.35 (docs/deployment.md, P1-D1). A Fedora build needed
 #  GLIBC_2.42 and would not start on Ubuntu 24.04.
 #
-#    1. copy the tree and yyjson to $HOME -- never build on /mnt/c
-#    2. a static libyyjson64.a           (build/_build_yyjson_linux.sh)
-#    3. the server AND the whole suite   (build/_run_tests.sh)
-#    4. strip a copy of the server, then gates -- each one stops the release:
+#    1. copy the tree to $HOME -- never build on /mnt/c
+#    2. the server AND the whole suite   (build/_run_tests.sh)
+#    3. strip a copy of the server, then gates -- each one stops the release:
 #         - no versioned glibc symbol newer than $TIKO_LSP_GLIBC_MAX (2.35);
 #         - NEEDED libraries only from the allowed list below;
-#    5. release/smoke.py: --version and one LSP session show this version
-#    6. release/pack.py: the tarball, into the source tree's dist/
+#    4. release/smoke.py: --version and one LSP session show this version
+#    5. release/pack.py: the tarball, into the source tree's dist/
 #
 #    TIKO_LSP_TIKO        tiko   (default <tree>/../tiko-lang/toolchains/tiko-linux/bin/tiko)
-#    TIKO_LSP_YYJSON      yyjson (default <tree>/../yyjson)
 #    TIKO_LSP_GLIBC_MAX   newest glibc symbol version allowed (default 2.35)
 # ============================================================================
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
-YYJSON_SRC=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
 GLIBC_MAX=${TIKO_LSP_GLIBC_MAX:-2.35}
 ALLOWED_NEEDED="ld-linux-x86-64.so.2 libc.so.6 libdl.so.2 libm.so.6 libpthread.so.0 libtinfo.so.6"
 
 W=$HOME/tklsp-release
-Y=$HOME/tklsp-release-yyjson
 LOG=$HOME/tklsp-release-suite.log
 
 VERSION=$(sed -n 's/^const LSP_SERVER_VERSION = "\([0-9.]*\)".*/\1/p' "$ROOT/src/lsp/protocol.ti")
@@ -45,21 +41,17 @@ done
 
 echo "== tiko-lsp $VERSION -- Linux x64 release build on $(. /etc/os-release; echo "$PRETTY_NAME"), $(ldd --version | head -1)"
 
-echo "== [1/6] copy to $W"
-rm -rf "$W" "$Y"
-mkdir -p "$W" "$Y"
+echo "== [1/5] copy to $W"
+rm -rf "$W"
+mkdir -p "$W"
 (cd "$ROOT" && tar cf - --exclude=.git --exclude=./bin --exclude=./obj --exclude=./dist --exclude=./editors .) | (cd "$W" && tar xf -)
-(cd "$YYJSON_SRC" && tar cf - --exclude=.git --exclude=./bin --exclude=./lib --exclude=./obj .) | (cd "$Y" && tar xf -)
 
 # The toolchain finds its own inc/ and pkg/; a developer's TKO_* overrides
 # would build against something no user has.
 unset TKO_INCLUDE TKO_LIBPATH TKO_PKG
-export TIKO_LSP_TIKO=$TIKO TIKO_LSP_YYJSON=$Y YYJSON=$Y
+export TIKO_LSP_TIKO=$TIKO
 
-echo "== [2/6] static yyjson"
-sh "$W/build/_build_yyjson_linux.sh"
-
-echo "== [3/6] server + suite (log: $LOG)"
+echo "== [2/5] server + suite (log: $LOG)"
 set +e
 sh "$W/build/_run_tests.sh" > "$LOG" 2>&1
 rc=$?
@@ -75,7 +67,7 @@ if grep -qi "warning" "$LOG"; then
     exit 1
 fi
 
-echo "== [4/6] strip + gates"
+echo "== [3/5] strip + gates"
 mkdir -p "$W/stage"
 cp "$W/bin/tiko-lsp" "$W/stage/tiko-lsp"
 strip "$W/stage/tiko-lsp"
@@ -96,10 +88,10 @@ done
 echo "   newest glibc symbol: GLIBC_$NEWEST (allowed <= $GLIBC_MAX); NEEDED: $NEEDED"
 echo "   size: $(stat -c %s "$W/stage/tiko-lsp") bytes stripped"
 
-echo "== [5/6] smoke"
+echo "== [4/5] smoke"
 python3 "$ROOT/release/smoke.py" "$W/stage/tiko-lsp" "$VERSION"
 
-echo "== [6/6] pack"
-python3 "$ROOT/release/pack.py" linux "$W/stage/tiko-lsp" "$(dirname "$(dirname "$TIKO")")/licences" "$Y"
+echo "== [5/5] pack"
+python3 "$ROOT/release/pack.py" linux "$W/stage/tiko-lsp" "$(dirname "$(dirname "$TIKO")")"
 
 echo "== done: dist/tiko-lsp-linux-x86_64.tar.gz ($VERSION, GLIBC_$NEWEST)"

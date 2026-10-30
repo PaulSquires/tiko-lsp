@@ -7,10 +7,8 @@ set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
-YYJSON=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
 
 [ -x "$TIKO" ] || TIKO=$(command -v tiko)
-INC="-i $YYJSON/inc -p $YYJSON/lib/linux64"
 FAILED=0
 
 mkdir -p "$ROOT/bin"
@@ -19,25 +17,25 @@ echo "[1/13] building the server"
 sh "$ROOT/build/_compile.sh"
 
 echo "[2/13] framing tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_framing.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_framing.tiko" \
     "$ROOT/src/rpc/transport.tiko" "$ROOT/src/utils/logging.tiko" \
     -x "$ROOT/bin/test_framing"
 "$ROOT/bin/test_framing" || FAILED=1
 
 echo "[3/13] json and json-rpc tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_json.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_json.tiko" \
     "$ROOT/src/json/json.tiko" "$ROOT/src/rpc/jsonrpc.tiko" "$ROOT/src/utils/logging.tiko" \
     -x "$ROOT/bin/test_json"
 "$ROOT/bin/test_json" || FAILED=1
 
 echo "[4/13] position tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_position.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_position.tiko" \
     "$ROOT/src/utils/position.tiko" \
     -x "$ROOT/bin/test_position"
 "$ROOT/bin/test_position" || FAILED=1
 
 echo "[5/13] uri and document tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_document.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_document.tiko" \
     "$ROOT/src/document/document.tiko" "$ROOT/src/document/document_manager.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/completion.tiko" \
@@ -47,7 +45,7 @@ echo "[5/13] uri and document tests"
 "$ROOT/bin/test_document" || FAILED=1
 
 echo "[6/13] lexer and parser tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_analysis.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_analysis.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/completion.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" \
@@ -57,7 +55,7 @@ echo "[6/13] lexer and parser tests"
 "$ROOT/bin/test_analysis" "$ROOT" || FAILED=1
 
 echo "[7/13] symbol tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_symbols.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_symbols.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/completion.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" \
@@ -65,7 +63,7 @@ echo "[7/13] symbol tests"
 "$ROOT/bin/test_symbols" || FAILED=1
 
 echo "[8/13] completion tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_completion.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_completion.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/completion.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" \
@@ -75,7 +73,7 @@ echo "[8/13] completion tests"
 echo "[9/13] workspace tests"
 # tests/fake_tiko stands in for `tiko metadata`.
 "$TIKO" -w all "$ROOT/tests/fake_tiko.tiko" -x "$ROOT/bin/fake_tiko"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_workspace.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_workspace.tiko" \
     "$ROOT/src/workspace/workspace.tiko" "$ROOT/src/workspace/symbol_index.tiko" "$ROOT/src/workspace/modules.tiko" "$ROOT/src/analysis/includes.tiko" \
     "$ROOT/src/workspace/index_builder.tiko" "$ROOT/src/workspace/metadata.tiko" "$ROOT/src/workspace/cincludes.tiko" \
     "$ROOT/src/utils/process.tiko" "$ROOT/src/json/json.tiko" \
@@ -86,7 +84,7 @@ echo "[9/13] workspace tests"
 "$ROOT/bin/test_workspace" "$ROOT" || FAILED=1
 
 echo "[10/13] signature tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_signature.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_signature.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/signature.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" "$ROOT/src/utils/position.tiko" \
@@ -94,7 +92,7 @@ echo "[10/13] signature tests"
 "$ROOT/bin/test_signature" || FAILED=1
 
 echo "[11/13] semantic token tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_semantic.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_semantic.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/semantic.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" "$ROOT/src/utils/position.tiko" \
@@ -102,7 +100,7 @@ echo "[11/13] semantic token tests"
 "$ROOT/bin/test_semantic" || FAILED=1
 
 echo "[12/13] formatting tests"
-"$TIKO" -w all -mt $INC "$ROOT/tests/test_format.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/test_format.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
     "$ROOT/src/analysis/symbols.tiko" "$ROOT/src/analysis/format.tiko" \
     "$ROOT/src/analysis/diagnostics.tiko" "$ROOT/src/utils/position.tiko" \
@@ -110,7 +108,7 @@ echo "[12/13] formatting tests"
 "$ROOT/bin/test_format" || FAILED=1
 
 echo "[13/13] piped session against the real server"
-"$TIKO" -w all -mt $INC "$ROOT/tests/session_tool.tiko" \
+"$TIKO" -w all -mt "$ROOT/tests/session_tool.tiko" \
     "$ROOT/src/json/json.tiko" "$ROOT/src/rpc/transport.tiko" "$ROOT/src/rpc/jsonrpc.tiko" \
     "$ROOT/src/lsp/protocol.tiko" "$ROOT/src/analysis/semantic.tiko" \
     "$ROOT/src/analysis/lexer.tiko" "$ROOT/src/analysis/parser.tiko" \
