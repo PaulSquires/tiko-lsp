@@ -27,7 +27,8 @@ signatures for the names declared in the tiko toolchain's headers, such as
 
 ```jsonc
 {
-  "tiko.includePaths": ["C:/tiko/toolchains/tiko-windows/inc"]
+  // the `inc` folder inside the unpacked tiko-lang folder
+  "tiko.includePaths": ["C:/tiko-lang/inc"]          // Linux/macOS: "/home/you/tiko-lang/inc"
 }
 ```
 

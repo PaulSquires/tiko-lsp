@@ -1,427 +1,427 @@
 # tiko-lsp
 
-A Language Server Protocol server for **tiko**, written in tiko and built with the tiko compiler.
+**Editor support for the [tiko](https://tiko-lang.net/) programming language.**
 
-tiko is a FreeBASIC-compatible language ([tiko-lang](https://github.com/PaulSquires/tiko-lang)),
-so the syntax this server reads is FreeBASIC's — which is why its parser could be
-developed against fbc's own sources — but the language it serves, and the
-language id it expects from a client, is **tiko**.
+tiko-lsp is a *language server*: a small program your editor runs in the background
+to understand tiko code. It gives you red underlines for mistakes as you type,
+completion, hover help, go to definition, find references, rename, formatting and more.
+One server works in every editor that speaks the Language Server Protocol (LSP).
 
-It speaks LSP 3.17 over stdin/stdout and is a plain standalone executable, so any
-LSP-capable editor — Zed, VS Code, Neovim, Helix, Sublime Text — can launch it.
-A **Zed extension** lives in [editors/zed](editors/zed); everything else needs
-only a few lines of client configuration.
+- **VS Code users:** install the **Tiko** extension and you are done. The server is
+  included. See [Quick start](#quick-start-vs-code).
+- **Other editors:** see [Other editors](#other-editors).
 
-The server is designed to end up sharing the tiko compiler's own lexer, parser,
-AST, symbol table and semantic analyser rather than shelling out to a compiler.
-Nothing here launches one, and nothing ever will.
+tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 
-```
-        LSP client (Zed / VS Code / Neovim / Helix / ...)
-                          |
-                          |  JSON-RPC 2.0 over stdin/stdout
-                          v
-        +-----------------------------------------+
-        |  tiko-lsp                               |
-        |    transport   Content-Length framing   |
-        |    jsonrpc     message model            |
-        |    dispatcher  lifecycle state machine  |
-        |    handlers    one per LSP method       |
-        +-----------------------------------------+
-                          |
-                          v          (phases 3-7)
-        +-----------------------------------------+
-        |  compiler frontend API                  |
-        |    lexer / parser / AST / symbols /     |
-        |    type system / semantic analyser      |
-        +-----------------------------------------+
-```
+---
 
-## Status: phases 1-12 complete
+## Contents
 
-| Phase | Contents | State |
-| --- | --- | --- |
-| 1 | transport, JSON-RPC, dispatcher, `initialize` / `initialized` / `shutdown` / `exit`, logging | **done** |
-| 2 | documents, `didOpen` / `didChange` / `didSave` / `didClose`, line index, UTF-16 positions | **done** |
-| 3 | lexer, parser with error recovery, diagnostics | **done** |
-| 4 | symbols, document symbols, hover, go to definition | **done** |
-| 5 | completion | **done** |
-| 6 | workspace index, workspace symbols, references | **done** |
-| 7 | rename, signature help, semantic tokens, inlay hints, code actions, formatting | **done** |
-| 8 | the workspace scan off the message loop | **done** |
-| 9 | watched files: an index that notices `git checkout`, bursts included | **done** |
-| 10 | the include graph: what a file can actually see | **done** |
-| 11 | tiko modules: `#import`, `alias.` completion and definition, `tiko.toml` packages, the toolchain `std` | **done** |
-| 12 | `#cinclude`: C headers, through the binding the compiler makes ([docs/phase12.md](docs/phase12.md)) | **done** |
+- [What you get](#what-you-get)
+- [What is available](#what-is-available)
+- [Quick start (VS Code)](#quick-start-vs-code)
+- [Connect the tiko toolchain](#connect-the-tiko-toolchain)
+- [Updating](#updating)
+- [Other editors](#other-editors)
+- [Settings (VS Code)](#settings-vs-code)
+- [Troubleshooting](#troubleshooting)
+- [Known limitations](#known-limitations)
+- [Reporting a problem](#reporting-a-problem)
+- [Uninstalling](#uninstalling)
+- [For contributors](#for-contributors)
+- [Licence](#licence)
 
-The `initialize` response advertises exactly what works: `textDocumentSync`
-(incremental), `positionEncoding`, `documentSymbolProvider`, `hoverProvider`,
-`definitionProvider`, `completionProvider`, `workspaceSymbolProvider`,
-`referencesProvider`, multi-root `workspace.workspaceFolders`,
-`renameProvider` **with** `prepareProvider`, `signatureHelpProvider`,
-`semanticTokensProvider` (`full` only — no delta, because returning a full set
-while claiming deltas is what makes a client show stale colours),
-`inlayHintProvider`, `documentFormattingProvider`,
-`documentRangeFormattingProvider` and `codeActionProvider` (`quickfix` only).
-Nothing else — `typeDefinitionProvider` would need the type system this server
-does not have, so it is not claimed. See `LspBuildCapabilities` in
-[src/lsp/protocol.tiko](src/lsp/protocol.tiko). Diagnostics need no capability: they
-are pushed, and the server publishes them on open, change and save.
+---
 
-The parser was developed against **435,000 lines of real FreeBASIC-compatible
-source** — fbc's own
-compiler, the fbc-modern standard library, AfxNova and the fbc test suite — and
-produces zero diagnostics on all of it except the files fbc itself expects to
-reject. False positives are the failure mode that matters for a language server;
-see [docs/phase3.md](docs/phase3.md) for the fourteen that were found and fixed.
+## What you get
 
-Positions are UTF-16 code units, handled in one place
-([src/utils/position.tiko](src/utils/position.tiko)): `中` is one column and three
-bytes, `😀` is two columns and four bytes.
-
-## Layout
-
-```
-tiko-lsp/
-  src/
-    main.bas                  argument parsing and the message loop
-    json/       json.ti/.tiko         JsonDoc / JsonValue / JsonBuilder over cJSON
-    rpc/        transport.bi/.bas     MessageFramer + StdioTransport
-                jsonrpc.bi/.bas       RpcMessage / RpcId / RpcError + serialisers
-    lsp/        protocol.bi/.bas      method names, capabilities, LSP constants
-                dispatcher.bi/.bas    Server, lifecycle rules, handler registry
-                publish.bi/.bas       diagnostics -> publishDiagnostics
-    document/   document.bi/.bas      TextDocument: text, line index, edits
-                document_manager.bi/.bas   every open buffer, keyed by URI
-    analysis/   lexer.bi/.bas         tiko tokens, 247 reserved words
-                parser.bi/.bas        block structure and symbols, with recovery
-                symbols.bi/.bas       the symbol table, scope resolution, hover text
-                completion.bi/.bas    what could be typed here
-                includes.bi/.bas      the #include and #import directives in a file
-                diagnostics.bi/.bas   the problem model, in byte offsets
-                signature.bi/.bas     calls, and the parameters being filled in
-                semantic.bi/.bas      semantic tokens and their encoding
-                format.bi/.bas        re-indentation, and what it refuses
-    workspace/  workspace.bi/.bas     finding the source files
-                symbol_index.bi/.bas  every symbol in the workspace
-                index_builder.bi/.bas the scan, on a worker thread
-    handlers/   lifecycle.bi/.bas     initialize / initialized / shutdown / exit
-                text_document.bi/.bas didOpen / didChange / didSave / didClose
-                document_symbols.bi/.bas   the outline
-                hover.bi/.bas         hover, and the shared resolution step
-                definition.bi/.bas    go to definition
-                completion.bi/.bas    completion
-                workspace_symbols.bi/.bas  workspace/symbol, and the index build
-                references.bi/.bas    find all references
-                watched_files.bi/.bas files changed outside the editor
-                rename.bi/.bas        prepareRename and rename
-                signature_help.bi/.bas     the signature popup
-                semantic_tokens.bi/.bas    semanticTokens/full
-                inlay_hints.bi/.bas   parameter names at call sites
-                formatting.bi/.bas    formatting and rangeFormatting
-                code_action.bi/.bas   the three quick fixes
-    utils/      logging.bi/.bas       stderr and optional log file, never stdout
-                position.bi/.bas      line index, UTF-16 <-> byte offsets
-                uri.bi/.bas           file: URI <-> filesystem path
-  tests/        assert.bi, test_framing.bas, test_json.bas, test_position.bas,
-                test_document.bas, test_analysis.bas, test_symbols.bas,
-                test_completion.bas, test_workspace.bas, session_tool.bas,
-                fixtures/workspace/   a two-file workspace the cross-file
-                                      assertions are made against
-  build/        _compile.bat/.sh, _run_tests.bat/.sh
-  docs/         architecture.md, phase1.md .. phase10.md, grammar.md
-  editors/zed/  a Zed extension: the language, and where to find the server
-  editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
-  editors/sublime/ LSP-tiko, for Sublime Text's LSP package: the same, plus a sublime-syntax
-  editors/neovim/  tiko.nvim: the filetype, the client, :TikoInfo/:TikoRestart, a Vim syntax
-  grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
-                for editors that colour and fold without a server
-```
-
-Every directory in the sketch now has something real in it.
-
-## Building
-
-The standard library is tiko's `std` modules (`std/containers`, `std/strings`, `std/fs`).
-tiko takes `#import` only before any code in the compiled file, so every `.bas` imports
-what it needs at its top, and the `.bi` headers use `containers.Array` / `containers.Map`
-without importing anything themselves. A new `.bas` must start with
-`#import "std/containers"`.
-
-### Windows
-
-Needs the tiko toolchain (`tiko-lang/toolchains/tiko-windows`) and nothing else: JSON is
-cJSON, tiko's `vendor/cJSON` package, which the toolchain ships prebuilt and the server
-links statically.
-
-```bash
-build\_compile.bat
-```
-
-Override the compiler with `TIKO_LSP_TIKO` if your checkout lives elsewhere. The
-executable needs nothing beside it.
-
-### Linux
-
-Needs the tiko toolchain (`tiko-lang/toolchains/tiko-linux`), and again nothing else:
-
-```bash
-sh build/_compile.sh
-```
-
-### macOS (Apple silicon)
-
-Needs the tiko toolchain for macOS (`tiko-lang/toolchains/tiko-macos`); the same script:
-
-```bash
-TIKO_LSP_TIKO=../tiko-lang/toolchains/tiko-macos/bin/tiko sh build/_compile.sh
-```
-
-The result links only macOS's own `libSystem` and `libncurses`, and runs on macOS 13 or
-later. `release/build-macos.sh` is the release build.
-
-Platform code is `#ifdef __FB_WIN32__` / `#else` throughout: the `#else` side is POSIX and
-serves Linux and macOS alike. It declares the few C functions it needs itself rather than
-through `crt/unistd.bi`, which has no macOS section.
-
-## Running
-
-The server is normally started by the editor, not by hand:
-
-```bash
-tiko-lsp --stdio
-```
-
-| Option | Meaning |
+| Feature | What it does |
 | --- | --- |
-| `--stdio` | accepted and ignored; stdio is the only transport |
-| `--log-level <level>` | `off`, `error` (default), `warn`, `info`, `debug`, `trace` |
-| `--log-file <path>` | append diagnostics to a file as well as stderr |
-| `--version`, `--help` | printed to **stderr**, then exit |
+| **Diagnostics** | Underlines structural mistakes as you type, such as an `if` with no `end if` or an unclosed string. |
+| **Completion** | Suggests variables, procedures, types, fields after `.`, and module exports after `strings.`. |
+| **Hover** | Shows the declaration and signature of the name under the mouse. |
+| **Go to definition** | `F12` jumps to where a name is declared. It works across files, into `#include`d headers and into `#import`ed modules. |
+| **Find references** | `Shift+F12` lists every use of a name in the workspace. |
+| **Rename** | `F2` renames a name everywhere it is used. A rename it cannot do safely is refused, with the reason. |
+| **Signature help** | Shows the parameter list while you type a call, with the current parameter highlighted. |
+| **Inlay hints** | Shows parameter names at call sites, for example `Move(x: 10, y: 20)`. |
+| **Semantic colouring** | Colours types, procedures, variables and constants by what they are, not only by how they look. |
+| **Formatting** | Re-indents a file or a selection. It never touches code that has errors. |
+| **Quick fixes** | One-click fixes for simple mistakes, such as a missing closing quote. |
+| **Outline** | Lists the file's procedures, types and constants, in the Outline view and in breadcrumbs. |
+| **Workspace symbols** | `Ctrl+T` finds any procedure or type in the project by name. |
 
-`TIKO_LSP_LOG_LEVEL` and `TIKO_LSP_LOG_FILE` do the same and are overridden by the
-flags. At `trace` every message is logged in both directions.
+The server reads your code itself. It does not need to compile anything to give you
+these features, so it stays fast: about 1 ms to check a 900-line file.
 
-**Diagnostics never go to stdout.** stdout carries the protocol, and one stray byte
-desynchronises the framing.
+---
 
-### Editor configuration
+## What is available
 
-tiko source files are `.tiko` (and the earlier `.tko`) and headers are `.ti`; the legacy
-`.bas`, `.bi` and `.inc` are still tiko source. The workspace scan indexes all six,
-case-insensitively, and the server asks the client to watch the same set. Map all six to
-the language in your editor.
+### Editors
 
-Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
+| Editor | How you install it | Server included? | Status |
+| --- | --- | --- | --- |
+| **VS Code** | Extensions view: search **tiko**, install **Tiko** by Paul Squires | Yes | Available |
+| **VSCodium**, Cursor, Windsurf and other VS Code-based editors | Their Extensions view (Open VSX): search **tiko** | Yes | Available |
+| **Zed** | Dev extension, from this repository | No: [download it](#the-server-on-its-own) | Manual install; store listing planned |
+| **Neovim** 0.10+ | Plugin, from this repository | No | Manual install; plugin repository planned |
+| **Sublime Text** 4 | `LSP-tiko`, from this repository | No | Manual install; Package Control listing planned |
+| **Helix** and any other LSP editor | A few lines of configuration | No | Works today |
 
-```json
-{
-  "lsp": {
-    "tiko-lsp": {
-      "binary": { "path": "C:/dev/tiko-lsp/bin/tiko-lsp.exe", "arguments": ["--stdio"] }
-    }
-  }
+### Platforms
+
+| System | VS Code extension | Server download |
+| --- | --- | --- |
+| Windows 10/11, x64 | Yes | `tiko-lsp-windows-x86_64.zip` |
+| Linux x64 (glibc 2.34 or newer: Ubuntu 22.04+, Debian 12+, Fedora 36+, RHEL 9+) | Yes | `tiko-lsp-linux-x86_64.tar.gz` |
+| macOS 13+ on Apple silicon (M1 or newer) | Yes | `tiko-lsp-macos-arm64.tar.gz` |
+| Intel Macs, Windows on ARM, Linux on ARM | No | No |
+
+On a platform that is not listed, the VS Code extension shows "not available for your
+platform". That is expected: there is no server build for that platform yet.
+
+---
+
+## Quick start (VS Code)
+
+1. **Install the extension.** In VS Code, open the Extensions view (`Ctrl+Shift+X`, or
+   `Cmd+Shift+X` on a Mac), search for `tiko` and install **Tiko** by *Paul Squires*.
+2. **Open a folder.** Use *File → Open Folder…* and choose your project folder. The
+   server indexes the whole folder, so opening a single file gives you less.
+3. **Open a `.tiko` file.** Colouring appears at once. The server starts within a second.
+   Type a mistake, such as `if x then` with no `end if`, and it is underlined.
+4. **Optional, but recommended: [connect the tiko toolchain](#connect-the-tiko-toolchain).**
+   Without it, names from `#import "std/..."` and `windows.bi` are unknown to the
+   editor.
+
+If VS Code asks whether you trust the folder's authors, choose **Trust**. The extension
+does not run in Restricted Mode, because starting the server means running a program.
+
+To check that the server is running, run **Tiko: Show Language Server Output** from the
+Command Palette (`Ctrl+Shift+P`). Its first line names the server it started and where
+that server came from.
+
+### Files the extension handles
+
+`.tiko` (source), `.ti` (header) and `.tko` (older source) are tiko files.
+
+Older projects use FreeBASIC's `.bas`, `.bi` and `.inc`. Other languages use those
+extensions too, so the extension does not take them over unless you ask it to. To
+treat them as tiko, add this to your settings (`Ctrl+,`, then the `{}` icon at the top
+right):
+
+```jsonc
+"files.associations": {
+  "*.bas": "tiko",
+  "*.bi": "tiko",
+  "*.inc": "tiko"
 }
 ```
 
-VS Code: install the extension in [editors/vscode](editors/vscode) (`npm install`,
-`npm run package`, `code --install-extension tiko-lsp.vsix`), then set
-`tiko.server.path` and `tiko.includePaths` -- see its README.
+Put it in the folder's settings (`.vscode/settings.json`) instead of your user settings
+if you also edit other BASIC dialects.
 
-Sublime Text: install the LSP package, then link [editors/sublime](editors/sublime)
-into Sublime's `Packages` as `LSP-tiko` -- see its README.
+---
 
-Neovim: use the plugin in [editors/neovim](editors/neovim) --
-`require('tiko').setup({ include_paths = { ... } })` -- see its README. Or by hand:
+## Connect the tiko toolchain
+
+The editor features above work on your own code with no setup. To also complete,
+hover and show signatures for the **standard library** (`#import "std/strings"`) and
+the **system headers** (`#include "windows.bi"`), the server needs to know where the
+tiko toolchain is.
+
+Don't have tiko yet? Download it from **<https://tiko-lang.net/#install>** and unpack
+it anywhere. You get one folder, `tiko-lang`.
+
+Do **one** of the following.
+
+### Option A: put tiko on your PATH (no editor setting needed)
+
+The server looks for `tiko` on your `PATH` and uses the headers and packages beside it.
+
+| System | Add this folder to `PATH` |
+| --- | --- |
+| Windows | `...\tiko-lang` (the folder that holds `tiko.exe`) |
+| Linux, macOS | `.../tiko-lang/bin` |
+
+Then restart your editor, so it sees the new `PATH`. This also lets you run `tiko` from
+any terminal.
+
+### Option B: tell the editor where it is
+
+In VS Code settings, set **Tiko: Include Paths** to the toolchain's `inc` folder. The
+`pkg` folder beside it is found automatically:
+
+```jsonc
+// Windows, with tiko unpacked to C:\tiko-lang
+"tiko.includePaths": ["C:/tiko-lang/inc"]
+
+// Linux or macOS, with tiko unpacked to your home folder
+"tiko.includePaths": ["/home/you/tiko-lang/inc"]
+```
+
+When you change these settings, VS Code offers to restart the server. Click **Restart**.
+
+### Option C (optional): let the server ask the compiler
+
+If your project has a `tiko.toml`, or uses `#cinclude` to import C headers, also set:
+
+```jsonc
+"tiko.compilerPath": "C:/tiko-lang/tiko.exe"   // Linux/macOS: ".../tiko-lang/bin/tiko"
+```
+
+The server then asks `tiko` how your package's modules and C headers resolve, so
+`#cinclude "raylib.h"` names complete as well. It never runs the compiler to check your
+code.
+
+---
+
+## Updating
+
+### VS Code and VSCodium
+
+**Updates are automatic.** By default VS Code checks for extension updates and installs
+them, and each update includes the matching server. You never update the server
+separately.
+
+- **Which version am I running?** In the Extensions view, select **Tiko**: the version
+  is under the name. *Tiko: Show Language Server Output* also shows the server version.
+- **Update now:** Extensions view → `...` menu → *Check for Extension Updates*.
+- **Automatic updates turned off?** Select **Tiko** in the Extensions view and click
+  **Update** when it appears.
+- **Go back to an older version:** right-click **Tiko** → *Install Specific Version…*.
+  VS Code then stops auto-updating Tiko until you install the latest version again.
+- **Try new features early:** click **Switch to Pre-Release Version** on the extension's
+  page, if one is offered.
+
+What changed in each version is in the extension's **Changelog** tab, and in
+[editors/vscode/CHANGELOG.md](editors/vscode/CHANGELOG.md).
+
+### Updating the tiko toolchain
+
+The server reads the toolchain's headers and packages when it starts. After you
+install a newer tiko, run **Tiko: Restart Language Server**, or restart the editor.
+If you replaced the folder in place, nothing else needs to change.
+
+### The server on its own (other editors)
+
+For editors other than VS Code, the server is a single program with no dependencies.
+
+1. Download the archive for your system from the
+   [Releases page](https://github.com/PaulSquires/tiko-lsp/releases/latest).
+2. Unpack it to a folder of your choice: for example `C:\tools\tiko-lsp` on Windows, or
+   `~/.local/bin` on Linux and macOS.
+3. Point your editor at `tiko-lsp` (`tiko-lsp.exe` on Windows), or put that folder on
+   your `PATH`.
+
+To update, download the newer archive and replace the file. Then restart the server
+from your editor, or restart the editor.
+
+Check the version you have:
+
+```bash
+tiko-lsp --version
+```
+
+It prints to *stderr*, which every terminal shows.
+
+On macOS, if you downloaded the archive with a browser, clear the quarantine flag once,
+or macOS refuses to run the program:
+
+```bash
+xattr -d com.apple.quarantine tiko-lsp
+```
+
+---
+
+## Other editors
+
+Every editor below runs the same server. Each one needs:
+
+1. the server program ([download](#the-server-on-its-own));
+2. the file extensions `.tiko`, `.ti` and `.tko` mapped to the language `tiko`;
+3. optionally, the toolchain options: `includePaths`, `packagePaths` and `compilerPath`,
+   sent as LSP *initialization options*. They mean the same as the
+   [VS Code settings](#settings-vs-code).
+
+| Editor | Instructions |
+| --- | --- |
+| Zed | [editors/zed/README.md](editors/zed/README.md) |
+| Neovim | [editors/neovim/README.md](editors/neovim/README.md) (`tiko.nvim`, with `:TikoInfo` and `:TikoRestart`) |
+| Sublime Text | [editors/sublime/README.md](editors/sublime/README.md) (`LSP-tiko`, for the LSP package) |
+
+**Helix** (`languages.toml`):
+
+```toml
+[language-server.tiko-lsp]
+command = "tiko-lsp"
+args = ["--stdio"]
+config = { includePaths = ["/home/you/tiko-lang/inc"] }
+
+[[language]]
+name = "tiko"
+scope = "source.tiko"
+file-types = ["tiko", "ti", "tko"]
+roots = ["tiko.toml", ".git"]
+comment-token = "'"
+language-servers = ["tiko-lsp"]
+```
+
+**Neovim without a plugin** (0.11+):
 
 ```lua
-vim.filetype.add( { extension = { tiko = 'tiko', tko = 'tiko', ti = 'tiko', bas = 'tiko', bi = 'tiko', inc = 'tiko' } } )
-
+vim.filetype.add({ extension = { tiko = 'tiko', ti = 'tiko', tko = 'tiko' } })
 vim.lsp.config.tiko_lsp = {
-  cmd = { 'C:/dev/tiko-lsp/bin/tiko-lsp.exe', '--stdio' },
+  cmd = { 'tiko-lsp', '--stdio' },
   filetypes = { 'tiko' },
-  root_markers = { '.git' },
+  root_markers = { 'tiko.toml', '.git' },
+  init_options = { includePaths = { '/home/you/tiko-lang/inc' } },
 }
 vim.lsp.enable('tiko_lsp')
 ```
 
-Helix (`languages.toml`):
+### Server command line
 
-```toml
-[language-server.tiko-lsp]
-command = "C:/dev/tiko-lsp/bin/tiko-lsp.exe"
-args = ["--stdio"]
+Editors start the server for you. These options are for configuring it, and for
+troubleshooting:
+
+| Option | Meaning |
+| --- | --- |
+| `--stdio` | Talk over standard input and output. This is the only mode, and the default. |
+| `--log-level <level>` | `off`, `error` (default), `warn`, `info`, `debug` or `trace` (logs every message). |
+| `--log-file <path>` | Also append the log to a file. |
+| `--version`, `--help` | Print to stderr and exit. |
+
+The environment variables `TIKO_LSP_LOG_LEVEL` and `TIKO_LSP_LOG_FILE` do the same as
+the flags. The flags win when both are set.
+
+---
+
+## Settings (VS Code)
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `tiko.includePaths` | `[]` | The toolchain's `inc` folder or folders. See [Connect the tiko toolchain](#connect-the-tiko-toolchain). |
+| `tiko.packagePaths` | `[]` | Where `#import` packages live, if not in the `pkg` folder beside an include path. Rarely needed. |
+| `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about `tiko.toml` packages and `#cinclude`. It is never used to check your code. |
+| `tiko.server.path` | `""` | Use a different `tiko-lsp` program instead of the one included with the extension. |
+| `tiko.server.arguments` | `["--stdio"]` | Arguments for the server. See [Troubleshooting](#troubleshooting) for logging. |
+| `tiko.trace.server` | `"off"` | `messages` or `verbose` logs the editor ↔ server traffic in the output channel. |
+
+Commands (Command Palette, `Ctrl+Shift+P`):
+
+- **Tiko: Restart Language Server**
+- **Tiko: Show Language Server Output**
+
+---
+
+## Troubleshooting
+
+**Nothing happens when I open a `.tiko` file.**
+Check the language mode at the bottom right of the window. It should say **Tiko**. If
+VS Code shows "Restricted Mode" at the bottom left, the folder is not trusted. Click it
+and choose **Trust**.
+
+**"tiko-lsp was not found".**
+Your platform has no included server (see [Platforms](#platforms)), or you built the
+extension yourself. Put `tiko-lsp` on your `PATH`, or set `tiko.server.path`.
+
+**`std` or `windows.bi` names do not complete, and go to definition does nothing on them.**
+The server cannot find the toolchain. Follow [Connect the tiko toolchain](#connect-the-tiko-toolchain),
+then run **Tiko: Restart Language Server**. The output channel lists the folders the
+server found: look for `toolchain headers from ...`.
+
+**Completion is slow in a project that uses `windows.bi`.**
+The Win32 headers declare about 190,000 names. The first full index takes a few seconds
+on a background thread. After that, completion costs tens of milliseconds a keystroke.
+
+**A red underline on code that compiles.**
+That is a bug in the server. False errors matter most to us, so please
+[report it](#reporting-a-problem) with the smallest piece of code that shows it.
+
+**Formatting does nothing.**
+The formatter refuses to touch a file that has errors. Fix the underlined problems
+first.
+
+**I need to see what the server is doing.**
+Set `tiko.server.arguments` to
+
+```jsonc
+["--stdio", "--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"]
 ```
 
-Nothing in the server depends on its own path, so any location works.
+then restart the server and read that file. To see the messages themselves, set
+`tiko.trace.server` to `verbose` and open **Tiko: Show Language Server Output**.
 
-### Toolchain headers -- Win32, AfxNova, the runtime
+**The server stopped and VS Code says it will not restart it.**
+Run **Tiko: Restart Language Server**. If it keeps stopping, please report it with the
+log file and the file you had open.
 
-`#include once "windows.bi"` names a file in the TOOLCHAIN's `inc`, which no workspace
-folder holds. Tell the server where it is and the full workspace build reads every header
-the workspace's includes reach -- transitively, in the background -- so Win32, AfxNova
-and runtime names complete, hover, jump to their declaration and show their signature:
+---
 
-```json
-"initializationOptions": { "includePaths": ["C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc"] }
-```
+## Known limitations
 
-Without it the server falls back to `TKO_INCLUDE`, then to `inc` beside a `tiko` on PATH.
-Directories are searched in order, after the includer's own directory and the workspace
-folders -- the order the compiler uses.
+- **`#if` is not evaluated.** Both branches of `#ifdef UNICODE` are read, so
+  completion offers both `MessageBoxA` and `MessageBoxW`.
+- **`#define` macros are not indexed.** Object-like macros, such as raylib's colour
+  constants, do not complete.
+- **No type inference.** After `GetCustomer().` completion offers every known member,
+  not only the members of the type that `GetCustomer` returns.
+- **References and rename match by name.** They follow the include graph, but two
+  unrelated symbols with the same name in files that can see each other are treated as
+  one. Rename refuses the cases where that would be unsafe.
+- A header that you start `#include`-ing is read at the next full index, not as you type.
+  Save the file, or restart the server, to pick it up at once.
+- No debugger. Build and run with `tiko` in a terminal, or use tkEdit, which ships with
+  the toolchain.
 
-**Packages** (`#import "std/strings"`) are found in the toolchain's `pkg`: by default the
-`pkg` beside a configured include directory -- a packaged toolchain is `<dir>/inc` and
-`<dir>/pkg`, so `includePaths` alone is enough. `initializationOptions.packagePaths` names
-it explicitly; without either, `TKO_PKG`, then `pkg` beside a `tiko` on PATH. After
-`strings.`, completion offers the module's exports, hover shows what an export names
-(`FB.PadLeft`), and `strings.PadLeft(` shows its signature.
+---
 
-Toolchain headers are read-only to the server: never renamed into, never searched for
-references, and kept out of `workspace/symbol`. Measured on tracks (122 files): 248
-headers, 192,697 symbols, a 2.0 s full build on the worker thread; completion then costs
-~57 ms a keystroke instead of ~6.
+## Reporting a problem
 
-### Asking the compiler -- `compilerPath`
+Open an issue at <https://github.com/PaulSquires/tiko-lsp/issues>. Include:
 
-```json
-"initializationOptions": { "compilerPath": "C:/dev/tiko-editor-tiko/toolchains/tiko-windows/tiko.exe" }
-```
+1. the extension version, or the output of `tiko-lsp --version`;
+2. your operating system and editor version;
+3. the smallest piece of tiko code that shows the problem;
+4. if the server crashed or misbehaved, the `--log-level debug` log
+   ([how](#troubleshooting)).
 
-With a compiler named, the server runs `tiko metadata --manifest . --format json` in the
-directory of each workspace folder's `tiko.toml` (the one at or above the folder) before
-every full workspace build -- the first, and the one a changed `tiko.toml` starts. What it
-says comes FIRST in resolution: the directory the compiler resolved each module chain to,
-the `-i` roots a target's options add (ahead of the workspace folders that otherwise stand
-in for them), its `pkg`, and each root's include directories when `includePaths` is not
-set. The server's own resolver stays behind it as the fallback -- no compiler, a compiler
-that fails, a module no target reaches. It is **never run for diagnostics**, and its output
-never reaches stdout: both of its streams are pipes the server reads.
+---
 
-The request `tiko/metadata` (`{"textDocument":{"uri":...}}`, or no document for the first
-package) answers `{"manifest": <tiko.toml URI>, "metadata": <tiko metadata's object>}` --
-targets, each one's `main`, roots and defines, profiles and outputs, with paths relative to
-the manifest's directory -- or `null`. A task runner or build menu reads it instead of
-parsing `tiko.toml`.
+## Uninstalling
 
-Not handled: `#if` is not evaluated, so `MessageBoxA` and `MessageBoxW` are both
-offered, and `MessageBox` -- a `#define` -- gets no signature. A header a buffer starts
-including is read at the next full build, not as it is typed.
+- **VS Code / VSCodium:** Extensions view → **Tiko** → **Uninstall**. The server goes
+  with it.
+- **The server on its own:** delete the `tiko-lsp` program, and remove its folder from
+  your `PATH` if you added it.
 
-### C headers -- `#cinclude`
+The server writes nothing to disk except a log file that you asked for. With
+`tiko.compilerPath` set, `tiko` keeps its usual build cache.
 
-`#cinclude "raylib.h"` imports a C header, which this server cannot read. With
-`compilerPath` set it asks the compiler instead: `tiko --print-cincludes <file>`, on the
-worker, for each file that holds a `#cinclude`, run in the package's directory. tiko imports
-each header exactly as a build does -- the same cache, so a project that has been built
-answers at once -- and says where the FreeBASIC binding is; the server indexes it as an
-external header. raylib's functions, types and enum values then complete, hover, show their
-signatures and jump to their declaration in the binding, and go to definition on the
-header path opens the binding. Without a compiler a `#cinclude` resolves to nothing.
+---
 
-Not handled: `#define` macros are not offered -- raylib's colours among them; this server
-indexes no object-like macro anywhere. A `#cinclude` typed into a buffer resolves when the
-file is saved. See [docs/phase12.md](docs/phase12.md).
+## For contributors
 
-## Tests
+Building the server from source, its architecture, the test suites and the release
+process are in [docs/development.md](docs/development.md),
+[docs/architecture.md](docs/architecture.md) and [docs/deployment.md](docs/deployment.md).
+
+In short: the server is written in tiko and built with the tiko toolchain:
 
 ```bash
-build\_run_tests.bat
+build\_compile.bat          # Windows
+sh build/_compile.sh        # Linux, macOS
+build\_run_tests.bat        # or: sh build/_run_tests.sh
 ```
 
-(or `sh build/_run_tests.sh`). Twelve suites, 1,130 assertions:
-
-- **framing** — 43 assertions over `MessageFramer`: torn messages fed one byte at a
-  time, several messages per read, CRLF and bare LF, unknown headers, UTF-8 byte
-  counts, a payload containing a blank line, every malformed-header case, and 5000
-  messages through one framer to prove the buffer is compacted.
-- **json + jsonrpc** — 121 assertions over the JSON facade and the message model,
-  including deep-copy ownership and every rejection path. Serialiser output is
-  checked by parsing it back, never by string comparison.
-- **position** — 64 assertions over the line index and UTF-16 conversion: every
-  terminator form, CJK and astral characters, mid-surrogate rounding, clamping in
-  both directions, malformed UTF-8, and an offset round trip over every character
-  boundary in a mixed-script document.
-- **uri + document** — 88 assertions over URI/path conversion, incremental edits
-  (including thirteen single-character insertions, edits that join and split
-  lines, and edits placed by UTF-16 column over multi-byte text), reversed and
-  out-of-range ranges, and the document manager.
-- **analysis** — 157 assertions over the lexer and the parser: comments that
-  nest, all three string spellings, malformed numbers, every block form, the
-  recovery rule (one missing `end if` is one diagnostic, pointing at the `if`),
-  half-typed text, and every false positive found in the corpora. The suite also
-  analyses **this project's own source** and requires zero diagnostics from it.
-- **symbols** — 111 assertions over symbol extraction, the two ranges every
-  symbol carries, scope resolution (a parameter shadows a global of the same
-  name), member resolution, the token-under-the-cursor rules, hover markdown,
-  the hover for tiko-lang's fixed-width type names (`int32` and the rest) and
-  its predeclared `nullptr`, and half-typed code — an unclosed `type` must
-  still produce an outline.
-- **completion** — 98 assertions over context detection (including inside a
-  string and inside a comment, where the answer is nothing), member completion
-  through a declared type, a pointer, `this.`, an enum and a namespace, the
-  scope list with its group ordering, the fixed-width type names and `nullptr`
-  (and a file's own `float32` or `nullptr` replacing tiko's), and
-  case-insensitive de-duplication.
-- **workspace** — 182 assertions over discovery rules, the include graph
-  (a chain, a cycle, an edge to nowhere, a wrong-case forward-slash path, and
-  two files declaring one name where only one is visible, and a `.tko` that
-  includes a `.ti` and a legacy `.bi`), indexing and
-  re-indexing, the one-file-one-entry rule (a path through `build/..` is the
-  same file), buffer-beats-disk, query scoring, and identifier scanning —
-  including the strings and comments a reference search must NOT match — and
-  modules: `alias.` members, and a facade's `#export`ed macros (tiko-lang RFC-0009)
-  resolved to the header declaration they name, never offered bare.
-- **signature** — 53 assertions over splitting a recorded signature (a comma
-  inside a default value does not split it; a function-pointer parameter counts
-  as one), finding which call the caret is in (the INNER one, when they nest),
-  and the argument sites inlay hints are built from.
-- **semantic tokens** — 45 assertions, mostly about the encoding, because that
-  is what fails silently: a four-line block comment must be four tokens, the
-  deltas must rebuild the absolute positions, and lengths are UTF-16 units. A
-  fixed-width name such as `int32` is a type unless the file declares it, and
-  `nullptr` a readonly variable on the same terms.
-- **formatting** — 33 assertions written as "this text formats to that text",
-  including everything it must leave alone: an already-tidy file (zero edits),
-  broken structure (zero edits, and a reason), comment art inside a block
-  comment, a `#macro` body, a `#if` body, and a wrapped line's alignment.
-- **piped session** — 200 assertions against a **real `tiko-lsp` process** driven
-  over a pipe: `session_tool --write` emits a byte-exact scripted session, the
-  server runs it, and `session_tool --check` reframes and validates the reply
-  stream — including that two edits in one `didChange` applied in order against
-  the evolving text, that a syntax error becomes a `publishDiagnostics` with the
-  right range and code, that fixing it publishes an **empty** list, that an
-  outline, a hover, a go-to-definition and a completion list come back with the
-  right kinds — the definition landing on the declaration's name, the completion
-  sorting a declaration above a keyword — that the notifications which must be
-  swallowed produced no output, and that the process exited 0. It also runs
-  against a **real two-file workspace**: a type used in one file and declared in
-  another resolves across files, references span both, and the workspace picker
-  returns the exact match first. The phase-7 half drives the whole editing path:
-  a signature with the right active parameter before and after the comma, two
-  inlay hints, a semantic-token array, a quick fix that inserts one quote, a
-  local rename producing three edits in one file, and the refusal for a name a
-  local elsewhere shares. It also drives the one request the server SENDS --
-  `client/registerCapability`, asking the client to watch the workspace — and
-  the file events that come back: a deleted file leaves the workspace picker,
-  a created one returns to it, and a change reported for a file the editor has
-  open is ignored, because the buffer is the truth. A **burst** of 121 changes
-  goes to the worker instead of the message loop, and the files it could not
-  read keep the symbols the index already had. And the **include graph**: a
-  click on an `#include` path opens that file, the completion list carries what
-  the included header declares, and `w.` offers the fields of a type declared in
-  another file. And **modules** (tiko-lang ADR 0017): `#import` lines and their
-  `as` aliases are read, `public` is recorded on declarations, an import resolves
-  to its module's files -- a two-file module, a module under another name, a
-  `tiko.toml` package's own module and its path dependency, and `std` from a
-  toolchain `pkg/` no workspace folder holds, indexed on demand -- and `http.`
-  offers the module's public names and not its private ones.
+---
 
 ## Licence
 
-MIT, (c) 2026 Paul Squires -- see [LICENSE](LICENSE).
+MIT, © 2026 Paul Squires. See [LICENSE](LICENSE).
 
-The server links [cJSON](https://github.com/DaveGamble/cJSON) statically, which is
-MIT, (c) Dave Gamble and cJSON contributors. It comes with the tiko toolchain as
-the `vendor/cJSON` package, licence included (`pkg/vendor/cJSON/LICENSE`); a
-release carries it in `THIRD-PARTY-NOTICES.txt` (`release/pack.py`).
+The server links [cJSON](https://github.com/DaveGamble/cJSON) (MIT) statically. Every
+release archive, and the VS Code extension's `server/` folder, includes
+`THIRD-PARTY-NOTICES.txt`.

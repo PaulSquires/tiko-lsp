@@ -101,7 +101,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Directories `#include \"windows.bi\"` is found in -- the toolchain's `inc`, e.g. `C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc`. The server reads the headers the workspace includes from here, so Win32, AfxNova and runtime names complete, hover and show signatures. Sent as `initializationOptions.includePaths`."
+          "markdownDescription": "Directories `#include \"windows.bi\"` is found in -- the toolchain's `inc`, e.g. `C:/tiko-lang/inc` (Linux/macOS: `/home/you/tiko-lang/inc`). The server reads the headers the workspace includes from here, so Win32, AfxNova and runtime names complete, hover and show signatures. Sent as `initializationOptions.includePaths`."
         },
         "tiko.packagePaths": {
           "type": "array",
