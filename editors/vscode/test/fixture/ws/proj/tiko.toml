@@ -1,0 +1,6 @@
+[package]
+name = "proj"
+
+[target.proj]
+kind = "exe"
+main = "src/main.tiko"

@@ -21,6 +21,7 @@ tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 - [What is available](#what-is-available)
 - [Quick start (VS Code)](#quick-start-vs-code)
 - [Connect the tiko toolchain](#connect-the-tiko-toolchain)
+- [Build and run (VS Code)](#build-and-run-vs-code)
 - [Updating](#updating)
 - [Other editors](#other-editors)
 - [Settings (VS Code)](#settings-vs-code)
@@ -191,6 +192,58 @@ override the parts of the toolchain one at a time. Whatever you set there wins o
 
 ---
 
+## Build and run (VS Code)
+
+The extension builds and runs with the tiko compiler from the toolchain it found
+(see [Connect the tiko toolchain](#connect-the-tiko-toolchain)). It needs clang, as tiko
+itself does; the [install steps](https://tiko-lang.net/#install) cover it.
+
+| To | Do |
+| --- | --- |
+| **Run** the program | Click **▶** at the top right of a tiko editor, press `Ctrl+F5` (`Cmd+F5` on a Mac), or run **Tiko: Run**. |
+| **Build** without running | `Ctrl+Shift+B` and choose **tiko: build …**, or run **Tiko: Build**. |
+| **Check** for errors without building | **Tiko: Check (no build)**. |
+
+What gets built:
+
+- **A project:** when a `tiko.toml` is in the file's folder or a folder above it, that
+  project is built (`tiko build`, `tiko run`). Its profiles and targets apply.
+- **A single file:** otherwise, the file you are editing. The program is written next to
+  it (`hello.exe` on Windows, `hello` elsewhere).
+
+The build runs in VS Code's terminal, and the program runs there too, so it can read
+input. The compiler's errors and warnings go to the **Problems** view (`Ctrl+Shift+M`),
+including the ones only the compiler can find, such as an undeclared name. Click one to
+jump to it. Open files are saved first.
+
+Options:
+
+```jsonc
+"tiko.build.arguments": ["-g", "-exx"],    // compiler options: debug info, runtime checks
+"tiko.run.arguments": ["input.txt"]         // passed to your program
+```
+
+For more control, add tasks of type `tiko` to `.vscode/tasks.json`. VS Code completes
+their fields:
+
+```jsonc
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "tiko",
+      "command": "run",                  // build | run | check
+      "file": "tools/gen.tiko",          // optional: this root file instead of the project
+      "args": ["-O2"],
+      "runArgs": ["--verbose"],
+      "label": "run the generator"
+    }
+  ]
+}
+```
+
+---
+
 ## Updating
 
 ### VS Code and VSCodium
@@ -323,12 +376,15 @@ the flags. The flags win when both are set.
 | `tiko.includePaths` | `[]` | Override: the toolchain's `inc` folder or folders. |
 | `tiko.packagePaths` | `[]` | Override: where `#import` packages live. |
 | `tiko.compilerPath` | `""` | Override: the `tiko` compiler that the server may ask about `tiko.toml` packages and `#cinclude`. The server never uses it to check your code. |
+| `tiko.build.arguments` | `[]` | Compiler options for Build and Run, such as `-g` or `-exx`. |
+| `tiko.run.arguments` | `[]` | Arguments that **Tiko: Run** passes to your program. |
 | `tiko.server.path` | `""` | Use a different `tiko-lsp` program instead of the one included with the extension. |
 | `tiko.server.arguments` | `["--stdio"]` | Arguments for the server. See [Troubleshooting](#troubleshooting) for logging. |
 | `tiko.trace.server` | `"off"` | `messages` or `verbose` logs the editor ↔ server traffic in the output channel. |
 
 Commands (Command Palette, `Ctrl+Shift+P`):
 
+- **Tiko: Run** (`Ctrl+F5`), **Tiko: Build**, **Tiko: Check (no build)**
 - **Tiko: Locate Toolchain…**
 - **Tiko: Restart Language Server**
 - **Tiko: Show Language Server Output**
@@ -392,8 +448,8 @@ log file and the file you had open.
   one. Rename refuses the cases where that would be unsafe.
 - A header that you start `#include`-ing is read at the next full index, not as you type.
   Save the file, or restart the server, to pick it up at once.
-- No debugger. Build and run with `tiko` in a terminal, or use tkEdit, which ships with
-  the toolchain.
+- No debugger in VS Code yet. **Tiko: Run** builds and runs; `tiko.build.arguments`
+  with `-exx` adds runtime checks that report the failing line.
 
 ---
 

@@ -1,0 +1,5 @@
+' Run by the harness: leaves ran.txt beside itself, so the run is visible on disk.
+dim as long f = freefile
+open "ran.txt" for output as #f
+print #f, "file mode"
+close #f

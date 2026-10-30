@@ -1418,6 +1418,8 @@ scope
     dim as string exe = "tiko", homeVar = "HOME"
 #endif
     dim as string base_ = g_Root & NativePath( "\bin\tc-fixture" )
+    '' From nothing: a folder an earlier run left behind would be found first.
+    if( fs.IsDir( base_ ) ) then fs.RemoveDirAll( base_ )
 
     '' A root with the compiler at its top (the Windows archive) ...
     dim as string flat = base_ & NativePath( "\flat\tiko-lang" )
@@ -1463,9 +1465,17 @@ scope
     AssertEqStr( lcase( DetectToolchainRoot( ) ), lcase( NormalizePath( extracted ) ), _
                  "detected: Downloads/tiko-*/tiko-lang, the way Extract All leaves it" )
 
-    dim as string direct = home1 & NativePath( "\tiko-lang" )
+    '' A home of its own, holding both: every case here only ever ADDS folders, so each
+    '' gets its own home and a run over a previous run's bin\ answers the same.
+    dim as string home3 = base_ & NativePath( "\home3" )
+    dim as string extracted3 = home3 & NativePath( "\Downloads\tiko-windows-x86_64-abc123\tiko-lang" )
+    MakeDirs_( extracted3 & NativePath( "\inc" ) )
+    Touch_( extracted3 & NativePath( "\" ) & exe )
+    dim as string direct = home3 & NativePath( "\tiko-lang" )
     MakeDirs_( direct & NativePath( "\inc" ) )
     Touch_( direct & NativePath( "\" ) & exe )
+    g_homeEnv = homeVar & "=" & home3
+    setenviron g_homeEnv
     AssertEqStr( lcase( DetectToolchainRoot( ) ), lcase( NormalizePath( direct ) ), _
                  "detected: <home>/tiko-lang comes before the Downloads folder" )
 

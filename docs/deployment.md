@@ -639,7 +639,7 @@ feeds that number.
 | O5 | ~~Zero-config toolchain discovery (P1-D4).~~ **Done** 2026-10-30 (feat/toolchain-path). | — |
 | O6 | Code signing for the Windows exe. | nothing, unless a scan flags it |
 | O7 | ~~A PNG icon (at least 128×128) for the listings.~~ **Done**: the tiko mascot, 512×512. | — |
-| O8 | `--version` says "built with FreeBASIC 1.20.0" (from `__FB_VERSION__`). In a public listing it should name tiko. Server change: `src/main.tiko`. | nothing; cosmetic |
+| O8 | ~~`--version` says "built with FreeBASIC 1.20.0".~~ **Done** 2026-10-30: "built with tiko <`__TIKO_VERSION__`>". | — |
 
 ## Sources (read 2026-10-16)
 
