@@ -10,6 +10,10 @@ The extension's version is the version of the tiko-lsp server it includes.
 - Files opened after the first eight are no longer lost by the server: their edits,
   closes and diagnostics are tracked again. (The fault was in the tiko toolchain's
   `std/containers` Map, which the server is now built with fixed.)
+- An anonymous nested `type` (a bare `type` line inside a `union`) no longer stops the
+  server.
+- The server's JSON is now cJSON, from the tiko toolchain, in place of yyjson. The
+  server is smaller (about 865 KB on Windows) and builds from the toolchain alone.
 
 ## 0.1.1
 
