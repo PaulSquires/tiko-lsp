@@ -566,6 +566,167 @@ private function SpanText( byref text_ as string, byref tokens as TokenArray, _
     return out_
 end function
 
+'' ----------------------------------------------------------------------------
+''  Internal RFC references stay out of the popups
+''
+''  The comments above std's and vendor's declarations -- shipped in every
+''  toolchain's pkg/ -- cite the design records they were written from:
+''  "Locale formatting (RFC-0007 section 3).", "Locale formatting is RFC-0007.".
+''  Those records are not shipped and the numbers mean nothing to a
+''  reader of a hover, so a documentation comment loses them before it becomes
+''  hover, completion or signature-help text.
+''
+''  An INTERNAL reference is `RFC-` and four digits starting with 0. A public
+''  standard is written RFC 3986, RFC 3339 -- or RFC-3339 -- and is kept.
+''  A reference in parentheses goes with its parentheses; anywhere else the
+''  whole sentence that holds it goes, since cutting out just the words leaves
+''  "Locale formatting is ." behind.
+'' ----------------------------------------------------------------------------
+
+'' Where the next internal reference starts at or after `from_` (0-based), or -1.
+private function FindInternalRef_( byref t as string, byval from_ as long ) as long
+    dim as long at_ = from_
+    do
+        dim as long hit = instr( at_ + 1, t, "RFC-0" )
+        if( hit = 0 ) then return -1
+        dim as long i = hit - 1
+        dim as boolean ok_ = ( i + 8 <= len( t ) )
+        if( ok_ ) then
+            for k as long = 5 to 7
+                if( t[i + k] < asc( "0" ) orelse t[i + k] > asc( "9" ) ) then ok_ = false
+            next
+        end if
+        if( ok_ andalso i + 8 < len( t ) ) then
+            '' RFC-00071 is not RFC-0007.
+            if( t[i + 8] >= asc( "0" ) andalso t[i + 8] <= asc( "9" ) ) then ok_ = false
+        end if
+        if( ok_ ) then return i
+        at_ = hit
+    loop
+end function
+
+private function IsBlank_( byval c as ubyte ) as boolean
+    return ( c = 32 orelse c = 9 orelse c = 10 orelse c = 13 )
+end function
+
+'' The sentence around position `at_`: from just after the previous sentence
+'' end (". " and the like) or paragraph break, to just after its own end and
+'' the blanks that follow. Returns the first index and one past the last.
+private sub SentenceAround_( byref t as string, byval at_ as long, byref s0 as long, byref s1 as long )
+    s0 = 0
+    for k as long = at_ - 1 to 1 step -1
+        dim as ubyte c = t[k - 1]
+        if( IsBlank_( t[k] ) andalso ( c = asc( "." ) orelse c = asc( "!" ) orelse c = asc( "?" ) ) ) then
+            s0 = k
+            exit for
+        end if
+        if( t[k] = 10 andalso c = 10 ) then
+            s0 = k
+            exit for
+        end if
+    next
+    while( s0 < at_ andalso IsBlank_( t[s0] ) )
+        s0 += 1
+    wend
+
+    dim as long n = len( t )
+    s1 = n
+    for k as long = at_ to n - 1
+        dim as ubyte c = t[k]
+        if( c = asc( "." ) orelse c = asc( "!" ) orelse c = asc( "?" ) ) then
+            if( k + 1 >= n ) then
+                s1 = n
+                exit for
+            end if
+            if( IsBlank_( t[k + 1] ) ) then
+                s1 = k + 1
+                exit for
+            end if
+        end if
+        if( c = 10 andalso k + 1 < n ) then
+            if( t[k + 1] = 10 ) then
+                s1 = k
+                exit for
+            end if
+        end if
+    next
+    while( s1 < n andalso ( t[s1] = 32 orelse t[s1] = 9 ) )
+        s1 += 1
+    wend
+end sub
+
+private function StripInternalRefs_( byval t as string ) as string
+    '' Each pass removes the reference it found, so the loop ends; the cap is
+    '' for a comment written to defeat it.
+    for pass_ as long = 1 to 500
+        dim as long at_ = FindInternalRef_( t, 0 )
+        if( at_ < 0 ) then exit for
+
+        '' The innermost parentheses around it, if any, and not too far away to
+        '' be a parenthetical -- an unbalanced `(` in a code sample must not
+        '' take half the comment with it.
+        dim as long open_ = -1, close_ = -1, depth = 0
+        for k as long = at_ - 1 to 0 step -1
+            if( t[k] = asc( ")" ) ) then
+                depth += 1
+            elseif( t[k] = asc( "(" ) ) then
+                if( depth = 0 ) then
+                    open_ = k
+                    exit for
+                end if
+                depth -= 1
+            end if
+        next
+        if( open_ >= 0 ) then
+            depth = 0
+            for k as long = at_ to len( t ) - 1
+                if( t[k] = asc( "(" ) ) then
+                    depth += 1
+                elseif( t[k] = asc( ")" ) ) then
+                    if( depth = 0 ) then
+                        close_ = k
+                        exit for
+                    end if
+                    depth -= 1
+                end if
+            next
+        end if
+
+        if( open_ >= 0 andalso close_ >= 0 andalso close_ - open_ <= 200 ) then
+            dim as long a = open_
+            while( a > 0 andalso ( t[a - 1] = 32 orelse t[a - 1] = 9 ) )
+                a -= 1
+            wend
+            t = left( t, a ) & mid( t, close_ + 2 )
+        else
+            dim as long s0, s1
+            SentenceAround_( t, at_, s0, s1 )
+            t = left( t, s0 ) & mid( t, s1 + 1 )
+        end if
+    next
+
+    '' What the cuts leave: a space before punctuation, trailing blanks on a
+    '' line, and runs of empty lines.
+    dim as string out_
+    dim as long n = len( t )
+    for k as long = 0 to n - 1
+        dim as ubyte c = t[k]
+        if( c = 32 orelse c = 9 ) then
+            dim as long j = k
+            while( j < n andalso ( t[j] = 32 orelse t[j] = 9 ) )
+                j += 1
+            wend
+            if( j >= n ) then continue for
+            if( t[j] = 10 orelse t[j] = asc( "." ) orelse t[j] = asc( "," ) orelse t[j] = asc( ":" ) ) then continue for
+        end if
+        if( c = 10 andalso len( out_ ) >= 2 ) then
+            if( right( out_, 2 ) = chr( 10, 10 ) ) then continue for
+        end if
+        out_ &= chr( c )
+    next
+    return trim( out_, any chr(10) & " " )
+end function
+
 '' Strips the comment markers off the pending doc block.
 private function CleanDoc( byref raw_ as string ) as string
     dim as string out_
@@ -597,7 +758,7 @@ private function CleanDoc( byref raw_ as string ) as string
         out_ &= ln
     next
 
-    return trim( out_, any chr(10) & " " )
+    return StripInternalRefs_( trim( out_, any chr(10) & " " ) )
 end function
 
 private function AddSymbol( byref st as ParseState, byref name_ as string, _
