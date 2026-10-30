@@ -1,0 +1,4 @@
+#import "std/strings"
+
+dim as string s = strings.PadLeft( "7", 3 )
+print s

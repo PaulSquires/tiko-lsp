@@ -21,19 +21,27 @@ and no setting to change.
 
 ### Win32, runtime and `std` names
 
-The server reads your project without a compiler. To complete, hover and show
-signatures for the names declared in the tiko toolchain's headers, such as
-`windows.bi` and the runtime, point it at the toolchain's `inc` folder:
+For `#import "std/strings"`, `windows.bi` and the runtime's names to complete, hover
+and show signatures, the server needs the tiko toolchain
+([download it](https://tiko-lang.net/#install) if you don't have it yet).
+
+**Usually there is nothing to do.** The server finds the `tiko-lang` folder in your home
+folder, in Downloads (also one level down, where Windows' *Extract All* puts it), at
+`C:\tiko-lang`, `/opt/tiko-lang` or `~/.local/tiko-lang`, or through a `tiko` on your
+`PATH`.
+
+If it finds none, the extension says so once per window and offers **Locate
+Toolchain…**. Choose your `tiko-lang` folder; the extension saves it and restarts the
+server. You can run **Tiko: Locate Toolchain…** from the Command Palette at any time,
+or set the folder yourself:
 
 ```jsonc
 {
-  // the `inc` folder inside the unpacked tiko-lang folder
-  "tiko.includePaths": ["C:/tiko-lang/inc"]          // Linux/macOS: "/home/you/tiko-lang/inc"
+  "tiko.toolchainPath": "D:/tools/tiko-lang"
 }
 ```
 
-The `pkg` folder beside it, which is where `#import "std/strings"` is found, is
-picked up automatically. Changing these settings offers to restart the server.
+**Tiko: Show Language Server Output** shows the toolchain the server used.
 
 ### Legacy FreeBASIC files
 
@@ -55,14 +63,16 @@ treat them as tiko, add:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `tiko.includePaths` | `[]` | The toolchain's `inc` folders: Win32, runtime and other header names then complete, hover and show signatures. |
+| `tiko.toolchainPath` | `""` | The `tiko-lang` folder you unpacked. Leave it empty to have it found automatically. **Tiko: Locate Toolchain…** sets it. |
+| `tiko.includePaths` | `[]` | Override: the toolchain's `inc` folders, for an unusual layout. |
 | `tiko.packagePaths` | `[]` | Where `#import` packages are found, if not in the `pkg` folder beside an include path. |
-| `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about each folder's `tiko.toml` (`tiko metadata`), so imports resolve exactly as the compiler resolves them. Never run for diagnostics. |
+| `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about each folder's `tiko.toml` (`tiko metadata`), so imports resolve exactly as the compiler resolves them. Never run for diagnostics. Empty: the compiler in the toolchain folder, else a `tiko` on the `PATH`. |
 | `tiko.server.path` | `""` | Use a different `tiko-lsp` executable instead of the included one. |
 | `tiko.server.arguments` | `["--stdio"]` | Server arguments. Add `"--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"` to see what the server is doing. |
 | `tiko.trace.server` | `"off"` | Log the LSP traffic in the **Tiko Language Server** output channel. |
 
-**Tiko: Restart Language Server** restarts the server by hand.
+**Tiko: Locate Toolchain…** chooses the toolchain folder. **Tiko: Restart Language
+Server** restarts the server by hand.
 
 ## Which server runs
 

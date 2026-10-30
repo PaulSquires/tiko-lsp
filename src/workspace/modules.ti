@@ -94,3 +94,25 @@ declare function ToolchainIncDirs( ) as PathArray
 '' worker is started, so the thread start orders the write before every read and the worker
 '' needs no lock. A later call would race the worker; there is none.
 declare sub SetConfiguredIncludeDirs( byref dirs as PathArray )
+
+'' THE TOOLCHAIN AS ONE FOLDER -- what a user unpacked: `tiko-lang`, holding the compiler
+'' (`tiko.exe` on Windows, `bin/tiko` elsewhere), `inc` and `pkg`. A user knows that
+'' folder; `includePaths`, `packagePaths` and `compilerPath` are derived from it.
+
+'' The compiler inside a toolchain root -- <root>/tiko(.exe) or <root>/bin/tiko(.exe) --
+'' or "" when there is none.
+declare function ToolchainCompilerIn( byref root as string ) as string
+
+'' The toolchain root `given` names, or "": the root itself, its `bin` directory, or the
+'' compiler. A root is a directory holding a compiler (ToolchainCompilerIn) and `inc`.
+declare function ToolchainRootFrom( byref given as string ) as string
+
+'' A toolchain unpacked where the website's instructions leave one, or "": <home>/tiko-lang,
+'' <home>/Downloads/tiko-lang, <home>/Downloads/tiko-*/tiko-lang (Windows' Extract All makes
+'' a folder named after the archive), then C:\tiko-lang on Windows or /opt/tiko-lang and
+'' ~/.local/tiko-lang elsewhere. <home> is USERPROFILE on Windows, HOME elsewhere. Reads
+'' the environment on every call; called once, from `initialize`.
+declare function DetectToolchainRoot( ) as string
+
+'' The first `tiko` on PATH, or "". Cached by CacheToolchainOnPath like the two above.
+declare function TikoOnPath( ) as string

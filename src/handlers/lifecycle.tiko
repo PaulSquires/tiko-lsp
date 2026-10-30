@@ -83,7 +83,6 @@ private function OnInitialize( byref srv as Server, _
             if( len(d) > 0 ) then incPaths.Push( d )
         next
     end if
-    SetConfiguredIncludeDirs( incPaths )
 
     '' `initializationOptions.packagePaths`: where `#import "std/strings"` is found -- the
     '' toolchain's pkg/. Usually unnecessary: a `pkg` beside a configured include
@@ -98,8 +97,48 @@ private function OnInitialize( byref srv as Server, _
             if( len(d) > 0 ) then pkgPaths.Push( d )
         next
     end if
-    SetConfiguredPackageDirs( pkgPaths )
+
+    '' `initializationOptions.compilerPath`: read here, used below.
+    dim as JsonValue initOpts = params.Member( "initializationOptions" )
+    dim as string comp = initOpts.Member( "compilerPath" ).AsString( "" )
+
+    '' `initializationOptions.toolchainPath`: THE TOOLCHAIN AS ONE FOLDER -- the `tiko-lang`
+    '' a user unpacked (or its bin, or its compiler). It fills whichever of includePaths,
+    '' packagePaths and compilerPath the client left unset; what the client did set wins.
+    ''
+    '' Without it, and with no headers found the older ways (includePaths, TKO_INCLUDE, a
+    '' `tiko` on PATH), the server looks where the website's instructions leave a toolchain
+    '' (DetectToolchainRoot). An EXPLICIT empty string turns that search off.
     CacheToolchainOnPath( )
+    dim as string tcGiven = initOpts.Member( "toolchainPath" ).AsString( "" )
+    dim as string tcRoot, tcSource
+    if( len(tcGiven) > 0 ) then
+        tcRoot = ToolchainRootFrom( tcGiven )
+        if( len(tcRoot) > 0 ) then
+            tcSource = "toolchainPath"
+        else
+            LogWarn( "toolchainPath is not a tiko toolchain (no tiko and inc inside it): " & tcGiven )
+        end if
+    elseif( initOpts.Has( "toolchainPath" ) = false andalso incPaths.IsEmpty( ) andalso _
+            len( ToolchainIncDir( ) ) = 0 ) then
+        tcRoot = DetectToolchainRoot( )
+        if( len(tcRoot) > 0 ) then tcSource = "detected"
+    end if
+    if( len(tcRoot) > 0 ) then
+        LogInfo( "toolchain: " & tcRoot & " (" & tcSource & ")" )
+        dim as string tcInc = fs.PathJoin( tcRoot, "inc" )
+        dim as string tcPkg = fs.PathJoin( tcRoot, "pkg" )
+        if( incPaths.IsEmpty( ) ) then incPaths.Push( tcInc )
+        if( pkgPaths.IsEmpty( ) andalso fs.IsDir( tcPkg ) ) then pkgPaths.Push( tcPkg )
+        if( len(comp) = 0 andalso initOpts.Has( "compilerPath" ) = false ) then comp = ToolchainCompilerIn( tcRoot )
+    end if
+
+    '' A compiler nobody named: the first `tiko` on PATH. An EXPLICIT empty compilerPath
+    '' means "no compiler", and turns this off.
+    if( len(comp) = 0 andalso initOpts.Has( "compilerPath" ) = false ) then comp = TikoOnPath( )
+
+    SetConfiguredIncludeDirs( incPaths )
+    SetConfiguredPackageDirs( pkgPaths )
     dim as string pkgDir = ToolchainPkgDir( )
     if( len(pkgDir) > 0 ) then
         LogInfo( "toolchain packages from " & pkgDir )
@@ -111,8 +150,8 @@ private function OnInitialize( byref srv as Server, _
     '' for each workspace folder's tiko.toml before every whole-workspace scan, and what it
     '' says about modules, -i roots, pkg/ and include directories comes first in resolution;
     '' `tiko/metadata` hands its targets to the client (workspace/metadata.ti). It is never
-    '' run for diagnostics. Without it -- or when it fails -- nothing changes.
-    dim as string comp = params.Member( "initializationOptions" ).Member( "compilerPath" ).AsString( "" )
+    '' run for diagnostics. Without it -- or when it fails -- nothing changes. `comp` is the
+    '' client's, else the toolchain root's, else the one on PATH (above).
     SetCompilerPath( "" )
     if( len(comp) > 0 ) then
 #ifdef __FB_WIN32__
@@ -128,8 +167,9 @@ private function OnInitialize( byref srv as Server, _
 
     dim incDirs as PathArray = ToolchainIncDirs( )
     if( incDirs.IsEmpty( ) ) then
-        LogInfo( "toolchain headers: none configured (initializationOptions.includePaths, " & _
-                 "TKO_INCLUDE, or a tiko on PATH) -- Win32 and library names will be unknown" )
+        LogInfo( "toolchain headers: none configured (initializationOptions.toolchainPath or " & _
+                 "includePaths, TKO_INCLUDE, a tiko on PATH, or a tiko-lang folder where the " & _
+                 "website's instructions leave one) -- Win32 and library names will be unknown" )
     else
         for i as long = 0 to incDirs.Count( ) - 1
             LogInfo( "toolchain headers from " & incDirs[i] )
@@ -186,8 +226,30 @@ private function OnInitialize( byref srv as Server, _
     srv.SetState( SRV_INITIALIZED )
 
     '' -- the result ----------------------------------------------------------
+    '' WHAT TOOLCHAIN WAS FOUND, for a client that wants to say so: the VS Code extension
+    '' offers to locate one when everything here is empty. `experimental` is the
+    '' protocol's place for what no standard capability covers; it promises no feature.
+    ''   capabilities.experimental.tiko.toolchain =
+    ''     { root, source ("toolchainPath" | "detected" | ""), includeDirs[], packageDir, compiler }
+    dim as JsonNode tc = rb.NewObject( )
+    rb.SetStr( tc, "root",   tcRoot )
+    rb.SetStr( tc, "source", tcSource )
+    dim as JsonNode tcIncs = rb.NewArray( )
+    for i as long = 0 to incDirs.Count( ) - 1
+        rb.PushStr( tcIncs, incDirs[i] )
+    next
+    rb.SetNode( tc, "includeDirs", tcIncs )
+    rb.SetStr( tc, "packageDir", pkgDir )
+    rb.SetStr( tc, "compiler",   CompilerPath( ) )
+    dim as JsonNode tcTiko = rb.NewObject( )
+    rb.SetNode( tcTiko, "toolchain", tc )
+    dim as JsonNode experimental = rb.NewObject( )
+    rb.SetNode( experimental, "tiko", tcTiko )
+    dim as JsonNode caps = LspBuildCapabilities( rb )
+    rb.SetNode( caps, "experimental", experimental )
+
     dim as JsonNode result_ = rb.NewObject( )
-    rb.SetNode( result_, "capabilities", LspBuildCapabilities( rb ) )
+    rb.SetNode( result_, "capabilities", caps )
     rb.SetNode( result_, "serverInfo",   LspBuildServerInfo( rb ) )
     return result_
 end function

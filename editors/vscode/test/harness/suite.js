@@ -170,6 +170,33 @@ exports.run = async function run() {
         // 8. Legacy .bas is NOT claimed by default (A-D2).
         const legacy = await open('legacy.bas');
         check('legacy.bas is not tiko by default', legacy.languageId !== 'tiko', legacy.languageId);
+
+        // 9. The toolchain: the setting and the command exist, and naming a
+        //    toolchain folder in tiko.toolchainPath -- nothing else -- makes
+        //    std/ names complete. TIKO_TEST_TOOLCHAIN is that folder; without
+        //    it the end-to-end half is skipped and says so.
+        const props = ((ext.packageJSON.contributes || {}).configuration || {}).properties || {};
+        check('tiko.toolchainPath setting contributed', 'tiko.toolchainPath' in props);
+        const commands = await vscode.commands.getCommands(true);
+        check('Tiko: Locate Toolchain... registered', commands.includes('tiko.locateToolchain'));
+
+        const toolchain = process.env.TIKO_TEST_TOOLCHAIN || '';
+        if (!toolchain) {
+            check('std/ completion through tiko.toolchainPath', true, 'skipped: TIKO_TEST_TOOLCHAIN not set');
+        } else {
+            await vscode.workspace.getConfiguration('tiko')
+                .update('toolchainPath', toolchain, vscode.ConfigurationTarget.Global);
+            await vscode.commands.executeCommand('tiko.restartServer');
+            const std = await open('std.tiko');
+            const after = at(std, 'strings.', 0, 'strings.'.length);
+            const stdLabels = await waitFor(async () => {
+                const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', std.uri, after);
+                const l = (list ? list.items : []).map(labelOf);
+                return l.includes('PadLeft') ? l : undefined;
+            }, READY_MS);
+            check('std/ completion through tiko.toolchainPath', stdLabels,
+                stdLabels ? `${stdLabels.length} items after strings., PadLeft among them` : `no PadLeft (toolchain ${toolchain})`);
+        }
     } catch (err) {
         check('no exception', false, err && err.stack ? err.stack : err);
     }
