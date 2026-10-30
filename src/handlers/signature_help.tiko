@@ -20,6 +20,7 @@
 #include once "workspace_symbols.ti"
 #include once "../workspace/index_builder.ti"
 #include once "../analysis/signature.ti"
+#include once "../analysis/intrinsics.ti"
 #include once "../utils/logging.ti"
 
 '' Resolves the callee of a call context to a symbol in this document.
@@ -85,6 +86,56 @@ private function ResolveCalleeInIndex( byref srv as Server, byval doc as TextDoc
     return IsCallableKind( sym.Kind_ )
 end function
 
+'' A BUILT-IN: `left(`, `mid(`, `instr(` -- declared nowhere, described by its codetip
+'' (analysis/intrinsics.ti). Reached only when no declaration answered, so a
+'' procedure of the same name in the workspace is always shown instead. Null for a
+'' member call (`s.Left(` is a method, not the built-in) and for a name with no
+'' codetip.
+private function IntrinsicSignatureHelp( byval doc as TextDocumentPtr, byref ctx as CallContext, _
+                                         byref rb as JsonBuilder ) as JsonNode
+    if( IsMemberAccess( doc->Text( ), doc->Tokens( ), ctx.NameTok ) ) then return rb.NewNull( )
+    dim as string tip = IntrinsicCodetip( TokenText( doc->Text( ), doc->Tokens( )[ctx.NameTok] ) )
+    if( len(tip) = 0 ) then return rb.NewNull( )
+    dim params as SigParamArray
+    if( ParseCodetip( tip, params ) = false ) then return rb.NewNull( )
+
+    dim as JsonNode paramList = rb.NewArray( )
+    for i as long = 0 to params.Count( ) - 1
+        dim as JsonNode p = rb.NewObject( )
+        dim as JsonNode span = rb.NewArray( )
+        rb.PushInt( span, params[i].LabelStart )
+        rb.PushInt( span, params[i].LabelEnd )
+        rb.SetNode( p, "label", span )
+        rb.PushNode( paramList, p )
+    next
+
+    dim as JsonNode sig = rb.NewObject( )
+    rb.SetStr ( sig, "label", tip )
+    rb.SetNode( sig, "parameters", paramList )
+    dim as JsonNode docNode = rb.NewObject( )
+    rb.SetStr( docNode, "kind",  "markdown" )
+    rb.SetStr( docNode, "value", "Built-in. Square brackets mark optional arguments." )
+    rb.SetNode( sig, "documentation", docNode )
+
+    '' Clamped as a declared procedure's is: past the last parameter the last stays
+    '' lit -- Chr(ch0 [, ch1 ... chN]) takes any number.
+    dim as long active = ctx.ActiveArg
+    if( params.Count( ) = 0 ) then
+        active = 0
+    elseif( active >= params.Count( ) ) then
+        active = params.Count( ) - 1
+    end if
+
+    dim as JsonNode sigs = rb.NewArray( )
+    rb.PushNode( sigs, sig )
+    dim as JsonNode result_ = rb.NewObject( )
+    rb.SetNode( result_, "signatures",      sigs )
+    rb.SetInt ( result_, "activeSignature", 0 )
+    rb.SetInt ( result_, "activeParameter",  active )
+    LogDebug( "signature help: built-in " & tip & ", argument " & active )
+    return result_
+end function
+
 private function OnSignatureHelp( byref srv as Server, _
                                   byref req as RpcMessage, _
                                   byref rb as JsonBuilder, _
@@ -125,7 +176,9 @@ private function OnSignatureHelp( byref srv as Server, _
         if( symIndex >= 0 ) then
             sym = doc->Symbols( ).Items[symIndex]
         else
-            if( ResolveCalleeInIndex( srv, doc, ctx, sym ) = false ) then return rb.NewNull( )
+            if( ResolveCalleeInIndex( srv, doc, ctx, sym ) = false ) then
+                return IntrinsicSignatureHelp( doc, ctx, rb )
+            end if
             alternatives = 1
         end if
     end if

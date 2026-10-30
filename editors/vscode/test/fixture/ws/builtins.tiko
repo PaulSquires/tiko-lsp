@@ -1,0 +1,4 @@
+' Built-ins have no declaration anywhere: their codetips answer signature help and hover.
+dim as string s = "hello"
+print left( s, 2 )
+print mid( s, 2, 1 )

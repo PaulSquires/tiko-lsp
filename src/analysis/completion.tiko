@@ -4,6 +4,7 @@
 
 #import "std/containers"
 #include once "completion.ti"
+#include once "intrinsics.ti"
 
 '' ############################################################################
 ''  Context
@@ -483,6 +484,15 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
     dim consts as containers.Array( of string ) = AllBuiltinConstants( )
     for i as long = 0 to consts.Count( ) - 1
         AddItem( items, consts[i], CMP_CONSTANT, BuiltinConstantDecl( consts[i] ), _
+                 "", CMPGROUP_KEYWORD )
+    next
+
+    ''    ...and its built-in procedures -- left, mid, instr -- as functions, with their
+    ''    codetip as the detail. Before the keywords, so that `left` is offered once,
+    ''    as the function it is (AddItem keeps the first of a name).
+    dim builtins as containers.Array( of string ) = IntrinsicNames( )
+    for i as long = 0 to builtins.Count( ) - 1
+        AddItem( items, lcase( builtins[i] ), CMP_FUNCTION, IntrinsicCodetip( builtins[i] ), _
                  "", CMPGROUP_KEYWORD )
     next
 

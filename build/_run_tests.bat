@@ -52,7 +52,7 @@ echo [5/13] uri and document tests
 "%TIKO%" -w all -mt "%ROOT%\tests\test_document.tiko" ^
     "%ROOT%\src\document\document.tiko" "%ROOT%\src\document\document_manager.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
-    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
+    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" "%ROOT%\src\analysis\intrinsics.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
     "%ROOT%\src\utils\position.tiko" "%ROOT%\src\utils\uri.tiko" "%ROOT%\src\utils\logging.tiko" ^
     -x "%ROOT%\bin\test_document.exe" || exit /b 1
@@ -61,7 +61,7 @@ echo [5/13] uri and document tests
 echo [6/13] lexer and parser tests
 "%TIKO%" -w all -mt "%ROOT%\tests\test_analysis.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
-    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
+    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" "%ROOT%\src\analysis\intrinsics.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
     -x "%ROOT%\bin\test_analysis.exe" || exit /b 1
 rem The project root is passed so the suite can analyse this project's OWN
@@ -71,7 +71,7 @@ rem source and require zero diagnostics from it.
 echo [7/13] symbol tests
 "%TIKO%" -w all -mt "%ROOT%\tests\test_symbols.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
-    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
+    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" "%ROOT%\src\analysis\intrinsics.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
     -x "%ROOT%\bin\test_symbols.exe" || exit /b 1
 "%ROOT%\bin\test_symbols.exe" || set FAILED=1
@@ -79,7 +79,7 @@ echo [7/13] symbol tests
 echo [8/13] completion tests
 "%TIKO%" -w all -mt "%ROOT%\tests\test_completion.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
-    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" ^
+    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\completion.tiko" "%ROOT%\src\analysis\intrinsics.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" ^
     -x "%ROOT%\bin\test_completion.exe" || exit /b 1
 "%ROOT%\bin\test_completion.exe" || set FAILED=1
@@ -100,7 +100,7 @@ rem tests\fake_tiko stands in for `tiko metadata`, here and in the metadata sess
 echo [10/13] signature tests
 "%TIKO%" -w all -mt "%ROOT%\tests\test_signature.tiko" ^
     "%ROOT%\src\analysis\lexer.tiko" "%ROOT%\src\analysis\parser.tiko" ^
-    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\signature.tiko" ^
+    "%ROOT%\src\analysis\symbols.tiko" "%ROOT%\src\analysis\signature.tiko" "%ROOT%\src\analysis\intrinsics.tiko" ^
     "%ROOT%\src\analysis\diagnostics.tiko" "%ROOT%\src\utils\position.tiko" ^
     -x "%ROOT%\bin\test_signature.exe" || exit /b 1
 "%ROOT%\bin\test_signature.exe" || set FAILED=1

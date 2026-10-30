@@ -44,7 +44,7 @@ tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 | **Go to definition** | `F12` jumps to where a name is declared. It works across files, into `#include`d headers and into `#import`ed modules. |
 | **Find references** | `Shift+F12` lists every use of a name in the workspace. |
 | **Rename** | `F2` renames a name everywhere it is used. A rename it cannot do safely is refused, with the reason. |
-| **Signature help** | Shows the parameter list while you type a call, with the current parameter highlighted. |
+| **Signature help** | Shows the parameter list while you type a call, with the current parameter highlighted. It covers the built-ins too, such as `left`, `mid` and `instr`. |
 | **Inlay hints** | Shows parameter names at call sites, for example `Move(x: 10, y: 20)`. |
 | **Semantic colouring** | Colours types, procedures, variables and constants by what they are, not only by how they look. |
 | **Formatting** | Re-indents a file or a selection. It never touches code that has errors. |

@@ -512,6 +512,27 @@ scope
     AssertTrue( g_Syms.Count( ) >= 0, "a half-typed parameter list does not crash" )
     Analyse( "" )
     AssertEqInt( g_Syms.Count( ), 0, "an empty document declares nothing" )
+
+    '' AS WITH NOTHING AFTER IT. `dim x as` as the last line of a file -- the moment
+    '' before the type is typed -- once read one token past the statement and stopped
+    '' the server (runtime error 6) on every keystroke. Each form is analysed, and the
+    '' name must come out with no type rather than with a neighbouring token as one.
+    Analyse( "dim x as" )
+    dim as long x1 = Expect( "x", SYM_VARIABLE, "`dim x as` at the end of the file declares x" )
+    AssertEqStr( S_(x1).Detail_, "", "with no type yet" )
+    Analyse( "dim x as " )
+    AssertTrue( IndexOfName( "x" ) >= 0, "`dim x as ` with a trailing space too" )
+    Analyse( "sub f( )" & LF & "    dim x as" )
+    AssertTrue( IndexOfName( "x" ) >= 0, "inside an unclosed sub" )
+    Analyse( "dim x as, y as long" )
+    AssertEqStr( S_( IndexOfName( "x" ) ).Detail_, "", "`dim x as, y`: x has no type, not `as ,`" )
+    AssertEqStr( S_( IndexOfName( "y" ) ).Detail_, "as long", "and y keeps its own" )
+    Analyse( "dim x as = 1" )
+    AssertEqStr( S_( IndexOfName( "x" ) ).Detail_, "", "`dim x as = 1`: x has no type, not `as =`" )
+    Analyse( "const C as" )
+    AssertTrue( IndexOfName( "C" ) >= 0, "`const C as` at the end of the file" )
+    Analyse( "dim as" )
+    AssertEqInt( g_Syms.Count( ), 0, "`dim as` declares nothing yet" )
 end scope
 
 end TestSummary( "symbols" )

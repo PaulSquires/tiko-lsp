@@ -1,0 +1,74 @@
+'' ############################################################################
+''  analysis/intrinsics.tiko -- codetips for the built-in procedures. See
+''  intrinsics.ti.
+'' ############################################################################
+
+#import "std/containers"
+#include once "intrinsics.ti"
+
+#embed g_CodetipsText "codetips.txt"
+
+type CodetipMap as containers.Map( of string, string )
+
+'' A POINTER, filled by a module constructor -- the lexer's keyword table and its
+'' reasons (lexer.tiko): a shared Map object can have its own constructor run after
+'' the fill on Linux, and a table filled lazily is a race between threads.
+dim shared as CodetipMap ptr g_Codetips
+dim shared as containers.Array( of string ) ptr g_CodetipNames
+
+private sub FillCodetips( )
+    if( g_Codetips <> 0 ) then exit sub
+    g_Codetips = new CodetipMap
+    g_CodetipNames = new containers.Array( of string )
+
+    dim as long n = ubound( g_CodetipsText ) + 1
+    dim as long p = 0
+    while( p < n )
+        dim as long e = p
+        while( e < n andalso g_CodetipsText(e) <> 10 )
+            e += 1
+        wend
+        dim as string row = space( e - p )
+        for i as long = 0 to e - p - 1
+            row[i] = g_CodetipsText(p + i)
+        next
+        p = e + 1
+
+        row = trim( row, any " " & chr(9) & chr(13) )
+        dim as long eq = instr( row, "=" )
+        if( eq < 2 orelse left( row, 1 ) = "'" ) then continue while
+        dim as string key_ = ucase( trim( left( row, eq - 1 ) ) )
+        dim as string tip = trim( mid( row, eq + 1 ) )
+        if( len(tip) = 0 ) then continue while
+        if( g_Codetips->Put( key_, tip ) ) then
+            '' The name as the codetip spells it: up to its '(' -- or its first blank,
+            '' for the few that take no parentheses.
+            dim as long cut = instr( tip, "(" )
+            if( cut = 0 ) then cut = instr( tip, " " )
+            dim as string spelled = trim( iif( cut > 0, left( tip, cut - 1 ), tip ) )
+            if( lcase( spelled ) <> lcase( key_ ) ) then spelled = key_
+            g_CodetipNames->Push( spelled )
+        end if
+    wend
+end sub
+
+private sub InitCodetips constructor
+    FillCodetips( )
+end sub
+
+function IntrinsicCodetip( byref name_ as string ) as string
+    FillCodetips( )
+    dim as string tip
+    if( g_Codetips->TryGet( ucase( name_ ), tip ) ) then return tip
+    return ""
+end function
+
+function IntrinsicNames( ) as containers.Array( of string )
+    FillCodetips( )
+    return *g_CodetipNames
+end function
+
+function IntrinsicCount( ) as long
+    FillCodetips( )
+    return g_Codetips->Count( )
+end function

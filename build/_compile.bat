@@ -54,6 +54,7 @@ set SOURCES=^
  "%ROOT%\src\analysis\parser.tiko"^
  "%ROOT%\src\analysis\symbols.tiko"^
  "%ROOT%\src\analysis\completion.tiko"^
+ "%ROOT%\src\analysis\intrinsics.tiko"^
  "%ROOT%\src\analysis\includes.tiko"^
  "%ROOT%\src\analysis\signature.tiko"^
  "%ROOT%\src\analysis\semantic.tiko"^
