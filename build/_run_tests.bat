@@ -165,6 +165,13 @@ copy /y "%ROOT%\bin\fake_tiko.exe" "%TC%\tiko.exe" >nul || exit /b 1
 "%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-tc.bin" > "%ROOT%\bin\captured-tc.bin" 2>"%ROOT%\bin\server-tc.log"
 "%ROOT%\bin\session_tool.exe" --check-tc "%ROOT%\bin\captured-tc.bin" || set FAILED=1
 
+rem And with NO option at all, run from INSIDE that toolchain -- as a tiko release ships it,
+rem tiko-lang\tiko-lsp.exe beside tiko.exe: the server takes the toolchain it is installed in.
+copy /y "%ROOT%\bin\tiko-lsp.exe" "%TC%\tiko-lsp.exe" >nul || exit /b 1
+"%ROOT%\bin\session_tool.exe" --write-self "%ROOT%\bin\session-self.bin" "%ROOT%\tests\fixtures\incws" || exit /b 1
+"%TC%\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-self.bin" > "%ROOT%\bin\captured-self.bin" 2>"%ROOT%\bin\server-self.log"
+"%ROOT%\bin\session_tool.exe" --check-self "%ROOT%\bin\captured-self.bin" || set FAILED=1
+
 rem The compiler-metadata session: tests\fixtures\meta\ws, whose one import is found only
 rem through `tiko metadata` -- here tests\fake_tiko -- and then the same session with no
 rem compiler, which must not find it.

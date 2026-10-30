@@ -121,8 +121,16 @@ private function OnInitialize( byref srv as Server, _
         end if
     elseif( initOpts.Has( "toolchainPath" ) = false andalso incPaths.IsEmpty( ) andalso _
             len( ToolchainIncDir( ) ) = 0 ) then
-        tcRoot = DetectToolchainRoot( )
-        if( len(tcRoot) > 0 ) then tcSource = "detected"
+        '' The toolchain THIS SERVER CAME WITH first: a tiko release carries tiko-lsp beside
+        '' the compiler (tiko-lang/tiko-lsp.exe, tiko-lang/bin/tiko-lsp), and that toolchain
+        '' is the one it was built and tested with. Then where the website leaves one.
+        tcRoot = ToolchainRootFrom( exepath( ) )
+        if( len(tcRoot) > 0 ) then
+            tcSource = "installed"
+        else
+            tcRoot = DetectToolchainRoot( )
+            if( len(tcRoot) > 0 ) then tcSource = "detected"
+        end if
     end if
     if( len(tcRoot) > 0 ) then
         LogInfo( "toolchain: " & tcRoot & " (" & tcSource & ")" )
@@ -230,7 +238,7 @@ private function OnInitialize( byref srv as Server, _
     '' offers to locate one when everything here is empty. `experimental` is the
     '' protocol's place for what no standard capability covers; it promises no feature.
     ''   capabilities.experimental.tiko.toolchain =
-    ''     { root, source ("toolchainPath" | "detected" | ""), includeDirs[], packageDir, compiler }
+    ''     { root, source ("toolchainPath" | "installed" | "detected" | ""), includeDirs[], packageDir, compiler }
     dim as JsonNode tc = rb.NewObject( )
     rb.SetStr( tc, "root",   tcRoot )
     rb.SetStr( tc, "source", tcSource )

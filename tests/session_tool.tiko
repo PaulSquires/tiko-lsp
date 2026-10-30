@@ -1318,14 +1318,16 @@ private function ResponseFor_( byref messages as containers.Array( of string ), 
     return ""
 end function
 
-private function CheckIncSession( byref path as string, byval viaRoot as boolean ) as long
+private function CheckIncSession( byref path as string, byref wantSource as string ) as long
     dim as string captured
     if( ReadWholeFile( path, captured ) = false ) then
         print "session_tool: cannot read " & path
         return 1
     end if
 
-    TestGroup( "toolchain headers, over the wire" & iif( viaRoot, " -- through toolchainPath", "" ) )
+    dim as string groupName = "toolchain headers, over the wire"
+    if( len(wantSource) > 0 ) then groupName &= " -- source " & wantSource
+    TestGroup( groupName )
 
     dim as MessageFramer f
     dim messages as containers.Array( of string )
@@ -1355,9 +1357,11 @@ private function CheckIncSession( byref path as string, byval viaRoot as boolean
         AssertTrue( tc.IsObject( ), "initialize reports the toolchain it found" )
         AssertEqInt( tc.Member( "includeDirs" ).Count( ), 1, "with one include directory" )
         AssertContains( tc.Member( "packageDir" ).AsString( ), "pkg", "and a package directory" )
-        if( viaRoot ) then
-            AssertEqStr( tc.Member( "source" ).AsString( ), "toolchainPath", "found through toolchainPath" )
-            AssertContains( lcase( tc.Member( "root" ).AsString( ) ), "tiko-lang", "the root is the folder named" )
+        if( len(wantSource) > 0 ) then
+            '' toolchainPath: the folder named. installed: the folder the server itself was
+            '' started from, with no option at all -- a tiko release's own tiko-lsp.
+            AssertEqStr( tc.Member( "source" ).AsString( ), wantSource, "found as " & wantSource )
+            AssertContains( lcase( tc.Member( "root" ).AsString( ) ), "tiko-lang", "the root is the toolchain folder" )
             AssertContains( lcase( tc.Member( "includeDirs" ).Item( 0 ).AsString( ) ), "tiko-lang", "its inc is the include directory" )
             AssertContains( lcase( tc.Member( "compiler" ).AsString( ) ), "tiko", "and its compiler is the compiler" )
         else
@@ -1873,7 +1877,7 @@ select case lcase( mode_ )
         end WriteIncSession( path_, root_, "{" & Q & "includePaths" & Q & ":[" & JsonQuote( command( 4 ) ) & "]}" )
 
     case "--check-inc"
-        end CheckIncSession( path_, false )
+        end CheckIncSession( path_, "" )
 
     case "--write-tc"
         if( len(root_) = 0 orelse len( command( 4 ) ) = 0 ) then
@@ -1883,7 +1887,17 @@ select case lcase( mode_ )
         end WriteIncSession( path_, root_, "{" & Q & "toolchainPath" & Q & ":" & JsonQuote( command( 4 ) ) & "}" )
 
     case "--check-tc"
-        end CheckIncSession( path_, true )
+        end CheckIncSession( path_, "toolchainPath" )
+
+    case "--write-self"
+        if( len(root_) = 0 ) then
+            print "session_tool --write-self needs the workspace root"
+            end 2
+        end if
+        end WriteIncSession( path_, root_, "{}" )
+
+    case "--check-self"
+        end CheckIncSession( path_, "installed" )
 
     case "--write-meta"
         if( len(root_) = 0 ) then

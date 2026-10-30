@@ -7,8 +7,10 @@ to understand tiko code. It gives you red underlines for mistakes as you type,
 completion, hover help, go to definition, find references, rename, formatting and more.
 One server works in every editor that speaks the Language Server Protocol (LSP).
 
-- **VS Code users:** install the **Tiko** extension and you are done. The server is
-  included. See [Quick start](#quick-start-vs-code).
+- **Installed tiko?** Then you already have the server: it comes with the toolchain,
+  beside the compiler. See [Where the server is](#where-the-server-is).
+- **VS Code users:** install the **Tiko** extension and you are done. The extension
+  carries its own copy of the server. See [Quick start](#quick-start-vs-code).
 - **Other editors:** see [Other editors](#other-editors).
 
 tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
@@ -19,6 +21,7 @@ tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 
 - [What you get](#what-you-get)
 - [What is available](#what-is-available)
+- [Where the server is](#where-the-server-is)
 - [Quick start (VS Code)](#quick-start-vs-code)
 - [Connect the tiko toolchain](#connect-the-tiko-toolchain)
 - [Build and run (VS Code)](#build-and-run-vs-code)
@@ -61,26 +64,52 @@ these features, so it stays fast: about 1 ms to check a 900-line file.
 
 ### Editors
 
-| Editor | How you install it | Server included? | Status |
+| Editor | How you install it | Where the server comes from | Status |
 | --- | --- | --- | --- |
-| **VS Code** | Extensions view: search **tiko**, install **Tiko** by Paul Squires | Yes | Available |
-| **VSCodium**, Cursor, Windsurf and other VS Code-based editors | Their Extensions view (Open VSX): search **tiko** | Yes | Available |
-| **Zed** | Dev extension, from this repository | No: [download it](#the-server-on-its-own) | Manual install; store listing planned |
-| **Neovim** 0.10+ | Plugin, from this repository | No | Manual install; plugin repository planned |
-| **Sublime Text** 4 | `LSP-tiko`, from this repository | No | Manual install; Package Control listing planned |
-| **Helix** and any other LSP editor | A few lines of configuration | No | Works today |
+| **VS Code** | Extensions view: search **tiko**, install **Tiko** by Paul Squires | The extension | Available |
+| **VSCodium**, Cursor, Windsurf and other VS Code-based editors | Their Extensions view (Open VSX): search **tiko** | The extension | Available |
+| **Zed** | Dev extension, from this repository | The tiko toolchain | Manual install; store listing planned |
+| **Neovim** 0.10+ | Plugin, from this repository | The tiko toolchain | Manual install; plugin repository planned |
+| **Sublime Text** 4 | `LSP-tiko`, from this repository | The tiko toolchain | Manual install; Package Control listing planned |
+| **Helix** and any other LSP editor | A few lines of configuration | The tiko toolchain | Works today |
 
 ### Platforms
 
-| System | VS Code extension | Server download |
+| System | VS Code extension | In the tiko toolchain |
 | --- | --- | --- |
-| Windows 10/11, x64 | Yes | `tiko-lsp-windows-x86_64.zip` |
-| Linux x64 (glibc 2.34 or newer: Ubuntu 22.04+, Debian 12+, Fedora 36+, RHEL 9+) | Yes | `tiko-lsp-linux-x86_64.tar.gz` |
-| macOS 13+ on Apple silicon (M1 or newer) | Yes | `tiko-lsp-macos-arm64.tar.gz` |
+| Windows 10/11, x64 | Yes | Yes |
+| Linux x64 (glibc 2.34 or newer: Ubuntu 22.04+, Debian 12+, Fedora 36+, RHEL 9+) | Yes | Yes |
+| macOS 13+ on Apple silicon (M1 or newer) | Yes | Yes |
 | Intel Macs, Windows on ARM, Linux on ARM | No | No |
 
 On a platform that is not listed, the VS Code extension shows "not available for your
 platform". That is expected: there is no server build for that platform yet.
+
+---
+
+## Where the server is
+
+The server is one program with no dependencies. Every tiko release carries it, next
+to the compiler:
+
+| System | The server | The compiler |
+| --- | --- | --- |
+| Windows | `tiko-lang\tiko-lsp.exe` | `tiko-lang\tiko.exe` |
+| Linux, macOS | `tiko-lang/bin/tiko-lsp` | `tiko-lang/bin/tiko` |
+
+So if `tiko` is on your `PATH`, `tiko-lsp` is too, and most editors find it with no
+setting. If it isn't, name the `tiko-lang` folder in your editor's settings, as
+[Other editors](#other-editors) shows. The server then also uses that toolchain's
+headers and packages, so `std/` and `windows.bi` names complete.
+
+Check the version you have:
+
+```bash
+tiko-lsp --version
+```
+
+It prints to *stderr*, which every terminal shows. The server and the compiler come from
+the same release, so they always match.
 
 ---
 
@@ -265,53 +294,41 @@ separately.
 What changed in each version is in the extension's **Changelog** tab, and in
 [editors/vscode/CHANGELOG.md](editors/vscode/CHANGELOG.md).
 
-### Updating the tiko toolchain
+### Other editors: update tiko
 
-The server reads the toolchain's headers and packages when it starts. After you
-install a newer tiko, run **Tiko: Restart Language Server**, or restart the editor.
-If you replaced the folder in place, nothing else needs to change.
+The server in your other editors is the one in the tiko toolchain, so **installing a
+newer tiko updates it**. Unpack the new release over the old `tiko-lang` folder (or in
+its place), then restart the server from your editor, or restart the editor.
 
-### The server on its own (other editors)
+VS Code keeps using the server inside its extension, which updates with the extension.
+After a new tiko, run **Tiko: Restart Language Server**, so the server reads the new
+toolchain's headers and packages.
 
-For editors other than VS Code, the server is a single program with no dependencies.
-
-1. Download the archive for your system from the
-   [Releases page](https://github.com/PaulSquires/tiko-lsp/releases/latest).
-2. Unpack it to a folder of your choice: for example `C:\tools\tiko-lsp` on Windows, or
-   `~/.local/bin` on Linux and macOS.
-3. Point your editor at `tiko-lsp` (`tiko-lsp.exe` on Windows), or put that folder on
-   your `PATH`.
-
-To update, download the newer archive and replace the file. Then restart the server
-from your editor, or restart the editor.
-
-Check the version you have:
+On macOS, download tiko with `curl` as tiko-lang.net shows. An archive a browser
+downloaded is quarantined, and macOS refuses to run the programs in it until you clear
+the flag:
 
 ```bash
-tiko-lsp --version
-```
-
-It prints to *stderr*, which every terminal shows.
-
-On macOS, if you downloaded the archive with a browser, clear the quarantine flag once,
-or macOS refuses to run the program:
-
-```bash
-xattr -d com.apple.quarantine tiko-lsp
+xattr -dr com.apple.quarantine tiko-lang
 ```
 
 ---
 
 ## Other editors
 
-Every editor below runs the same server. Each one needs:
+Every editor below runs the same server: the one in your tiko toolchain
+([where it is](#where-the-server-is)). Each one needs:
 
-1. the server program ([download](#the-server-on-its-own));
+1. the server program. The Zed, Neovim and Sublime packages in this repository find it
+   by themselves: in the `tiko-lang` folder you name in their settings, then on your
+   `PATH`, then (Neovim and Sublime) in a `tiko-lang` folder in your home or Downloads
+   folder. Any other editor: give it the full path, or put `tiko-lang` (on Linux and
+   macOS, `tiko-lang/bin`) on your `PATH`;
 2. the file extensions `.tiko`, `.ti` and `.tko` mapped to the language `tiko`;
 3. optionally, the toolchain: send `toolchainPath` (the `tiko-lang` folder) as an LSP
-   *initialization option*. Without it, the server looks in the
-   [usual places](#usually-nothing-to-do). The server also accepts `includePaths`,
-   `packagePaths` and `compilerPath`, which mean the same as the
+   *initialization option*. Without it, the server uses the toolchain it is installed in,
+   then looks in the [usual places](#usually-nothing-to-do). The server also accepts
+   `includePaths`, `packagePaths` and `compilerPath`, which mean the same as the
    [VS Code settings](#settings-vs-code). To turn the search off, send an empty string
    for `toolchainPath` or `compilerPath`.
 
@@ -399,8 +416,11 @@ VS Code shows "Restricted Mode" at the bottom left, the folder is not trusted. C
 and choose **Trust**.
 
 **"tiko-lsp was not found".**
-Your platform has no included server (see [Platforms](#platforms)), or you built the
-extension yourself. Put `tiko-lsp` on your `PATH`, or set `tiko.server.path`.
+In VS Code: your platform has no included server (see [Platforms](#platforms)), or you
+built the extension yourself. Set `tiko.server.path` to the `tiko-lsp` in your tiko
+toolchain. In other editors: name your `tiko-lang` folder in the editor's settings, or
+put it (on Linux and macOS, its `bin`) on your `PATH`. See
+[Where the server is](#where-the-server-is).
 
 **`std` or `windows.bi` names do not complete, and go to definition does nothing on them.**
 The server cannot find the toolchain. Run **Tiko: Locate Toolchain…** and choose your
@@ -469,8 +489,8 @@ Open an issue at <https://github.com/PaulSquires/tiko-lsp/issues>. Include:
 
 - **VS Code / VSCodium:** Extensions view → **Tiko** → **Uninstall**. The server goes
   with it.
-- **The server on its own:** delete the `tiko-lsp` program, and remove its folder from
-  your `PATH` if you added it.
+- **Other editors:** the server goes with the tiko toolchain. Remove the editor's tiko
+  package or settings to stop it starting.
 
 The server writes nothing to disk except a log file that you asked for. With
 `tiko.compilerPath` set, `tiko` keeps its usual build cache.

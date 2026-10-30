@@ -15,6 +15,8 @@ The extension's version is the version of the tiko-lsp server it includes.
   it, saves it and restarts the server. When no toolchain is found, the extension offers
   it once per window, with **Don't Ask Again**.
 - The output channel shows the toolchain the server used.
+- The server uses the toolchain it is installed in: a tiko release carries tiko-lsp
+  beside the compiler, for the editors other than VS Code.
 - **Build and run.** **Tiko: Run** (`Ctrl+F5`, or the ▶ button on a tiko editor), **Tiko:
   Build** (also under `Ctrl+Shift+B`) and **Tiko: Check (no build)** run `tiko run`,
   `tiko build` and `tiko check` in the terminal. A project is built when a `tiko.toml` is

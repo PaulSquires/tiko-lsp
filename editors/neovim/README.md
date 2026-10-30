@@ -19,9 +19,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   dir = 'C:/dev/tiko-lsp/editors/neovim',
   ft = 'tiko',
-  opts = {
-    include_paths = { 'C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc' },
-  },
+  opts = {},   -- or { toolchain_path = 'C:/tiko-lang' }
 }
 ```
 
@@ -31,9 +29,7 @@ manager, put the directory on the runtimepath and call setup in `init.lua`:
 
 ```lua
 vim.opt.rtp:append('C:/dev/tiko-lsp/editors/neovim')
-require('tiko').setup({
-  include_paths = { 'C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc' },
-})
+require('tiko').setup({})
 ```
 
 ## Where it looks for the server
@@ -41,8 +37,15 @@ require('tiko').setup({
 In order:
 
 1. `server_path` in `setup()`;
-2. `tiko-lsp` on your `PATH`;
-3. `bin/tiko-lsp.exe` under the project root -- so opening the tiko-lsp
+2. the server in the toolchain folder named by `toolchain_path` -- tiko comes with
+   it: `tiko-lang\tiko-lsp.exe` on Windows, `tiko-lang/bin/tiko-lsp` on Linux and
+   macOS;
+3. `tiko-lsp` on your `PATH` -- which it is, beside `tiko`, if you put the toolchain
+   on your `PATH`;
+4. a `tiko-lang` folder where tiko-lang.net's instructions leave one: your home
+   folder, Downloads (and one level below it), `C:/tiko-lang`, `/opt/tiko-lang`,
+   `~/.local/tiko-lang`;
+5. `bin/tiko-lsp.exe` under the project root -- so opening the tiko-lsp
    repository itself works after a build.
 
 If none of those finds it, it says so once.
@@ -51,7 +54,8 @@ If none of those finds it, it says so once.
 
 ```lua
 require('tiko').setup({
-  server_path = nil,                      -- the executable; nil: PATH, then <root>/bin
+  server_path = nil,                      -- the executable; nil: see the order above
+  toolchain_path = nil,                   -- the tiko-lang folder: server, headers, packages, compiler
   server_arguments = { '--stdio' },       -- add '--log-level', 'debug', '--log-file', 'C:/temp/tiko-lsp.log'
   include_paths = {},                     -- the toolchain's inc: Win32, AfxNova, runtime names
   package_paths = {},                     -- the toolchain's pkg; found beside inc on its own
@@ -60,7 +64,7 @@ require('tiko').setup({
 })
 ```
 
-`include_paths` and `package_paths` are sent as `initializationOptions`, which
+`toolchain_path`, `include_paths` and `package_paths` are sent as `initializationOptions`, which
 the server reads once: `:TikoRestart` applies a change. `:TikoInfo` shows which
 binary, root and paths are in use.
 

@@ -10,8 +10,15 @@
 //!
 //!   1. `lsp.tiko-lsp.binary.path` in Zed's settings, which is the escape hatch
 //!      for anyone whose build lives somewhere unusual;
-//!   2. `tiko-lsp` on the PATH;
-//!   3. `bin/tiko-lsp` inside the worktree, so that opening the tiko-lsp
+//!   2. the server inside the tiko toolchain named by
+//!      `lsp.tiko-lsp.initialization_options.toolchainPath` -- a tiko release
+//!      carries it: `tiko-lang/tiko-lsp.exe` on Windows, `tiko-lang/bin/tiko-lsp`
+//!      elsewhere. The extension runs in a sandbox that cannot look outside the
+//!      worktree, so this path is built, not checked: a wrong toolchainPath is
+//!      reported by Zed when the server fails to start;
+//!   3. `tiko-lsp` on the PATH -- where a toolchain's server already is for
+//!      anyone who put tiko on the PATH, since it sits beside the compiler;
+//!   4. `bin/tiko-lsp` inside the worktree, so that opening the tiko-lsp
 //!      repository itself just works after a build.
 //!
 //! If none of those finds it, the error says exactly what to do -- an editor
@@ -34,6 +41,26 @@ const SERVER_NAME: &str = "tiko-lsp";
 const DEFAULT_ARGS: &[&str] = &["--stdio"];
 
 impl TikoLspExtension {
+    /// The server inside the toolchain `initialization_options.toolchainPath`
+    /// names, or `None` when there is no such setting.
+    fn toolchain_binary(&self, settings: &Option<LspSettings>) -> Option<String> {
+        let root = settings
+            .as_ref()?
+            .initialization_options
+            .as_ref()?
+            .get("toolchainPath")?
+            .as_str()?
+            .trim_end_matches(|c| c == '/' || c == '\\');
+        if root.is_empty() {
+            return None;
+        }
+        let (os, _) = zed::current_platform();
+        Some(match os {
+            zed::Os::Windows => format!("{root}/{SERVER_NAME}.exe"),
+            _ => format!("{root}/bin/{SERVER_NAME}"),
+        })
+    }
+
     /// The binary a worktree should use, or `None` if nothing plausible exists.
     fn find_binary(&self, worktree: &Worktree) -> Option<String> {
         if let Some(path) = worktree.which(SERVER_NAME) {
@@ -71,6 +98,7 @@ impl zed::Extension for TikoLspExtension {
         // when it is wrong, because guessing past an explicit instruction is
         // how a tool becomes impossible to point somewhere.
         let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree).ok();
+        let from_toolchain = self.toolchain_binary(&settings);
         let binary_settings = settings.and_then(|settings| settings.binary);
 
         let configured_path = binary_settings
@@ -80,13 +108,14 @@ impl zed::Extension for TikoLspExtension {
             .as_ref()
             .and_then(|binary| binary.arguments.clone());
 
-        let command = match configured_path {
+        let command = match configured_path.or(from_toolchain) {
             Some(path) => path,
             None => self.find_binary(worktree).ok_or_else(|| {
                 format!(
-                    "tiko-lsp was not found. Put it on your PATH, or set it in Zed's \
-                     settings:\n\n  \"lsp\": {{ \"{SERVER_NAME}\": {{ \"binary\": {{ \
-                     \"path\": \"C:/path/to/{SERVER_NAME}.exe\" }} }} }}"
+                    "tiko-lsp was not found. It comes with tiko: put the tiko-lang folder \
+                     (on Linux and macOS, its bin) on your PATH, or name the folder in Zed's \
+                     settings:\n\n  \"lsp\": {{ \"{SERVER_NAME}\": {{ \"initialization_options\": \
+                     {{ \"toolchainPath\": \"C:/tiko-lang\" }} }} }}"
                 )
             })?,
         };

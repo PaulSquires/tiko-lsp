@@ -9,8 +9,9 @@ and the path to a binary. Everything a user sees comes from the server.
 
 ## Install
 
-1. **Build the server** ([../../build/_compile.bat](../../build/_compile.bat)),
-   so `bin\tiko-lsp.exe` exists.
+1. **Install tiko** ([tiko-lang.net](https://tiko-lang.net/#install)). The server comes
+   with it: `tiko-lang\tiko-lsp.exe` on Windows, `tiko-lang/bin/tiko-lsp` on Linux and
+   macOS.
 2. In Zed: `zed: install dev extension` from the command palette
    (`ctrl-shift-p`), and choose this folder — `editors/zed`.
 
@@ -22,9 +23,29 @@ Zed compiles the extension to WebAssembly itself; it needs `rustup` and the
 In order:
 
 1. `lsp.tiko-lsp.binary.path` in your Zed settings;
-2. `tiko-lsp` on your `PATH`;
-3. `bin/tiko-lsp.exe` inside the folder you have open — so building the server
+2. the server in the toolchain folder named by
+   `lsp.tiko-lsp.initialization_options.toolchainPath` (see below);
+3. `tiko-lsp` on your `PATH` — which it is, beside `tiko`, if you put the
+   toolchain on your `PATH`;
+4. `bin/tiko-lsp.exe` inside the folder you have open — so building the server
    and editing it in the same window just works.
+
+An extension runs in a sandbox that cannot look outside the folder you have open,
+so a `toolchainPath` is used as written: if it is wrong, the server fails to start
+and Zed shows that error.
+
+The simplest setting names the toolchain once; the server then takes its headers,
+packages and compiler from the same folder:
+
+```json
+{
+  "lsp": {
+    "tiko-lsp": {
+      "initialization_options": { "toolchainPath": "C:/tiko-lang" }
+    }
+  }
+}
+```
 
 If none of those finds it, Zed shows the error the extension raises, which says
 what to set. A language server that silently isn't there is the worst outcome,
