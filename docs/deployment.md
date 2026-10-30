@@ -56,7 +56,7 @@ link (A-D5).
 | F2 | `bin/tiko-lsp` built on Fedora needs **GLIBC_2.42**, and fails on Ubuntu 24.04 (glibc 2.39): `version 'GLIBC_2.42' not found`. | Phase 1: Fedora cannot be the Linux release host. |
 | F3 | `toolchains/tiko-linux/bin/tiko` needs only **GLIBC_2.34**. | Phase 1: any distro whose build passes the glibc gate can be the host. |
 | F4 | The Linux binary links `libtinfo.so.6`, libm and libc, and carries debug info (3.9 MB). | Phase 1: strip it; tinfo is open item O3. |
-| F5 | `tiko-lsp.exe` imports `yyjson64.dll`, `KERNEL32.dll` and `ucrtbase.dll` (814 KB). | Phase 1: link yyjson statically, or ship the DLL (P1-D2). |
+| F5 | `tiko-lsp.exe` imported `yyjson64.dll`, `KERNEL32.dll` and `ucrtbase.dll` (814 KB). | Phase 1: link yyjson statically (P1-D2). **Superseded 2026-10-30**: JSON is now tiko's `vendor/cJSON`, linked statically. |
 | F6 | Every client finds the server through settings → PATH → `<workspace>/bin`. None can obtain it itself. | Every track. |
 | F7 | `editors/zed`, `editors/neovim` and `tree-sitter-tiko` have no LICENSE. | B, D. |
 | F8 | The Zed grammar is loaded from `file:///C:/dev/tree-sitter-tiko`. Zed language-extension IDs should equal the language name; the current ID is `tiko-lsp`. | B. |
@@ -85,13 +85,12 @@ green. Still owed: the tarball smoke test on **Fedora 44**
   property of that host, not of the code. If the gate (≤ 2.35) ever trips on 24.04, build
   on an older distro instead (`wsl --install -d Ubuntu-22.04`). Fedora 44 stays a test
   host.
-- **P1-D2. yyjson is linked statically on Windows: DONE.** `build/_build_yyjson_static.sh`
-  compiles yyjson.c and the shim with `clang -target x86_64-pc-windows-msvc` into
-  `obj/yyjson-static/libyyjson64.a`. The shim is first copied with `__declspec(dllexport)`
-  removed, otherwise the exe would get an export table and a stray `.lib/.exp`. Setting
-  `TIKO_LSP_YYJSON_LIB` points `_compile.bat` and `_run_tests.bat` at it. The result is
-  1.1 MB and imports only `KERNEL32` and `ucrtbase`. The default dev build is unchanged
-  and still uses the DLL.
+- **P1-D2. JSON is linked statically: DONE, then SUPERSEDED (2026-10-30).** First yyjson,
+  built into a static COFF archive by a script of its own. Now cJSON, tiko's
+  `vendor/cJSON` package: the toolchain ships it prebuilt for every host,
+  `src/json/json.tiko` imports it `link static`, and the build needs nothing outside
+  the toolchain. The exe still imports only `KERNEL32` and `ucrtbase` and has no
+  export table (cJSON's archive hides its symbols).
 - **P1-D3. Archive names carry no version**, so `releases/latest/download/<asset>` stays a
   stable URL for Phase 2 downloaders. The version lives in the tag and in a `VERSION`
   file.
@@ -106,12 +105,11 @@ green. Still owed: the tarball smoke test on **Fedora 44**
 | File | Does |
 | --- | --- |
 | `release/bump.py X.Y.Z` | Writes the version into every registered site. Phase 1 has one site, `src/lsp/protocol.ti`; each track **adds** its own lines to `SITES`. A site matching zero or two times stops the bump before anything is written, and line endings are kept. |
-| `build/_build_yyjson_static.sh` | The static COFF `libyyjson64.a` (P1-D2) |
-| `release/build-windows.sh` | Git Bash: static yyjson → `build\_run_tests.bat` (the server and the whole suite, linked statically) → gates → smoke → `dist/tiko-lsp-windows-x86_64.zip`. About 14 s. |
-| `release/build-linux.sh` | `wsl -d Ubuntu -- bash release/build-linux.sh`: copies the tree and yyjson to `$HOME` (never builds on `/mnt/c`), static yyjson, `build/_run_tests.sh`, then `strip`, gates, smoke → `dist/tiko-lsp-linux-x86_64.tar.gz`. About 30 s. |
+| `release/build-windows.sh` | Git Bash: `build\_run_tests.bat` (the server and the whole suite; cJSON linked statically) → gates → smoke → `dist/tiko-lsp-windows-x86_64.zip`. About 14 s. |
+| `release/build-linux.sh` | `wsl -d Ubuntu -- bash release/build-linux.sh`: copies the tree to `$HOME` (never builds on `/mnt/c`), `build/_run_tests.sh`, then `strip`, gates, smoke → `dist/tiko-lsp-linux-x86_64.tar.gz`. About 30 s. |
 | `release/smoke.py <exe> <ver>` | Standard-library Python, used on both platforms: `--version`, then one LSP session (`initialize` → `initialized` → `shutdown` → `exit`). Requires `serverInfo` = tiko-lsp + the version, a null `shutdown` result, clean framing on stdout, and exit code 0 within 30 s. |
 | `release/smoke-linux.sh [tarball]` | For any Linux test host: extracts the tarball into a fresh temp dir, checks the exec bit, runs `smoke.py` |
-| `release/pack.py` | Builds the archive. `THIRD-PARTY-NOTICES.txt` is **assembled from the licence files** (yyjson's two, plus `LICENSE-tiko-rt` from the toolchain that built the binary), so it can't drift from what was linked. CRLF in the zip, LF in the tarball. |
+| `release/pack.py` | Builds the archive. `THIRD-PARTY-NOTICES.txt` is **assembled from the licence files** (cJSON's and `LICENSE-tiko-rt`, both from the toolchain that built the binary), so it can't drift from what was linked. CRLF in the zip, LF in the tarball. |
 
 ```
 tiko-lsp-windows-x86_64.zip     tiko-lsp.exe (1.1 MB)                    LICENSE  THIRD-PARTY-NOTICES.txt   425 KB
@@ -135,7 +133,7 @@ Measured 2026-10-17 at 780cab8 plus these scripts:
 
 - Windows: 17 suites, 1,401 assertions, 0 warnings. Imports are `kernel32` and `ucrtbase`
   only. The smoke test passes on the exe extracted from the zip into an empty directory
-  (no `yyjson64.dll` anywhere near it).
+  (no DLL anywhere near it).
 - Linux (WSL Ubuntu 24.04.5, glibc 2.39): suite passed; newest symbol GLIBC_2.34; NEEDED
   `libc`, `libm`, `libtinfo`. `smoke-linux.sh` on the extracted tarball passes.
 

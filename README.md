@@ -85,7 +85,7 @@ bytes, `😀` is two columns and four bytes.
 tiko-lsp/
   src/
     main.bas                  argument parsing and the message loop
-    json/       json.bi/.bas          JsonDoc / JsonValue / JsonBuilder over yyjson
+    json/       json.ti/.tiko         JsonDoc / JsonValue / JsonBuilder over cJSON
     rpc/        transport.bi/.bas     MessageFramer + StdioTransport
                 jsonrpc.bi/.bas       RpcMessage / RpcId / RpcError + serialisers
     lsp/        protocol.bi/.bas      method names, capabilities, LSP constants
@@ -128,7 +128,7 @@ tiko-lsp/
                 test_completion.bas, test_workspace.bas, session_tool.bas,
                 fixtures/workspace/   a two-file workspace the cross-file
                                       assertions are made against
-  build/        _compile.bat/.sh, _run_tests.bat/.sh, _build_yyjson_linux.sh
+  build/        _compile.bat/.sh, _run_tests.bat/.sh
   docs/         architecture.md, phase1.md .. phase10.md, grammar.md
   editors/zed/  a Zed extension: the language, and where to find the server
   editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
@@ -150,26 +150,20 @@ without importing anything themselves. A new `.bas` must start with
 
 ### Windows
 
-Needs the tiko toolchain (`tiko-lang/toolchains/tiko-windows`) and a built `yyjson64.dll`:
+Needs the tiko toolchain (`tiko-lang/toolchains/tiko-windows`) and nothing else: JSON is
+cJSON, tiko's `vendor/cJSON` package, which the toolchain ships prebuilt and the server
+links statically.
 
 ```bash
 build\_compile.bat
 ```
 
-Override the defaults with `TIKO_LSP_TIKO` and `TIKO_LSP_YYJSON` if your checkouts
-live elsewhere. The build copies `yyjson64.dll` next to the executable, which is
-where the server loads it from.
+Override the compiler with `TIKO_LSP_TIKO` if your checkout lives elsewhere. The
+executable needs nothing beside it.
 
 ### Linux
 
-Needs the tiko toolchain (`tiko-lang/toolchains/tiko-linux`). yyjson ships a Windows DLL
-only, so build its static library once:
-
-```bash
-sh build/_build_yyjson_linux.sh
-```
-
-then:
+Needs the tiko toolchain (`tiko-lang/toolchains/tiko-linux`), and again nothing else:
 
 ```bash
 sh build/_compile.sh
@@ -177,7 +171,7 @@ sh build/_compile.sh
 
 There is no Windows-only code outside a single `#ifdef __FB_WIN32__` in
 [src/rpc/transport.tiko](src/rpc/transport.tiko), where stdin and stdout are put into
-binary mode. macOS needs the same yyjson step and nothing else.
+binary mode.
 
 ## Running
 
@@ -416,7 +410,7 @@ build\_run_tests.bat
 
 MIT, (c) 2026 Paul Squires -- see [LICENSE](LICENSE).
 
-The server links [yyjson](https://github.com/ibireme/yyjson), which is MIT,
-(c) YaoYuan (ibireme). It is not vendored here; a build needs the FreeBASIC
-bindings at `C:\dev\yyjson`, and a distributed binary ships `yyjson64.dll`
-beside it, so carry yyjson's licence with any release.
+The server links [cJSON](https://github.com/DaveGamble/cJSON) statically, which is
+MIT, (c) Dave Gamble and cJSON contributors. It comes with the tiko toolchain as
+the `vendor/cJSON` package, licence included (`pkg/vendor/cJSON/LICENSE`); a
+release carries it in `THIRD-PARTY-NOTICES.txt` (`release/pack.py`).

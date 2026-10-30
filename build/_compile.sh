@@ -4,14 +4,14 @@
 #
 #  Requires:
 #    tiko         $TIKO_LSP_TIKO or ../tiko-lang/toolchains/tiko-linux/bin/tiko
-#    yyjson       $YYJSON with lib/linux64/libyyjson64.a
-#                 (build it once with build/_build_yyjson_linux.sh)
+#
+#  JSON is cJSON, tiko's vendor/cJSON package, which the toolchain ships
+#  prebuilt; src/json/json.tiko imports it 'link static'.
 # ============================================================================
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
-YYJSON=${TIKO_LSP_YYJSON:-"$ROOT/../yyjson"}
 
 [ -x "$TIKO" ] || TIKO=$(command -v tiko || true)
 if [ -z "$TIKO" ] || [ ! -x "$TIKO" ]; then
@@ -19,16 +19,10 @@ if [ -z "$TIKO" ] || [ ! -x "$TIKO" ]; then
     exit 1
 fi
 
-if [ ! -f "$YYJSON/lib/linux64/libyyjson64.a" ]; then
-    echo "libyyjson64.a missing -- run build/_build_yyjson_linux.sh first." >&2
-    exit 1
-fi
-
 mkdir -p "$ROOT/bin"
 
 echo "Building tiko-lsp"
 "$TIKO" -w all -mt \
-    -i "$YYJSON/inc" -p "$YYJSON/lib/linux64" \
     "$ROOT/src/main.tiko" \
     "$ROOT/src/json/json.tiko" \
     "$ROOT/src/rpc/transport.tiko" \

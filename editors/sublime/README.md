@@ -33,7 +33,6 @@ In order:
    repository itself works after a build.
 
 If none of those finds it, LSP reports why the server could not start.
-On Windows, `yyjson64.dll` must sit beside the executable.
 
 ## Settings
 

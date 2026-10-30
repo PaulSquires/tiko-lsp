@@ -4,39 +4,21 @@ rem  Build bin\tiko-lsp.exe (Windows x64).
 rem
 rem  Requires:
 rem    tiko         C:\dev\tiko-lang\toolchains\tiko-windows\tiko.exe
-rem    yyjson       C:\dev\yyjson  (bin\yyjson64.dll must already be built)
+rem                 (override with TIKO_LSP_TIKO)
 rem
-rem  Override either with TIKO_LSP_TIKO / TIKO_LSP_YYJSON.
-rem
-rem  TIKO_LSP_YYJSON_LIB names the directory yyjson is linked from instead of
-rem  %YYJSON%\lib\win64. A directory holding a static libyyjson64.a (and no
-rem  libyyjson64.dll.a -- tiko prefers the import library) gives an exe that
-rem  needs no yyjson64.dll; build\_build_yyjson_static.sh makes one, and the
-rem  release build uses it.
+rem  JSON is cJSON, tiko's vendor/cJSON package, which the toolchain ships
+rem  prebuilt; src\json\json.tiko imports it 'link static', so the exe needs
+rem  nothing beside it.
 rem ===========================================================================
 setlocal
 
 set ROOT=%~dp0..
 set TIKO=C:\dev\tiko-lang\toolchains\tiko-windows\tiko.exe
-set YYJSON=C:\dev\yyjson
 
 if not "%TIKO_LSP_TIKO%"==""   set TIKO=%TIKO_LSP_TIKO%
-if not "%TIKO_LSP_YYJSON%"=="" set YYJSON=%TIKO_LSP_YYJSON%
-
-set YYLIB=%YYJSON%\lib\win64
-if not "%TIKO_LSP_YYJSON_LIB%"=="" set YYLIB=%TIKO_LSP_YYJSON_LIB%
 
 if not exist "%TIKO%" (
     echo Compiler not found: %TIKO%
-    exit /b 1
-)
-if exist "%YYLIB%\libyyjson64.dll.a" (
-    if not exist "%YYJSON%\bin\yyjson64.dll" (
-        echo yyjson64.dll not found under %YYJSON% -- run its build\_compile.bat first.
-        exit /b 1
-    )
-) else if not exist "%YYLIB%\libyyjson64.a" (
-    echo Neither libyyjson64.dll.a nor libyyjson64.a is in %YYLIB%.
     exit /b 1
 )
 
@@ -89,16 +71,12 @@ set SOURCES=^
  "%ROOT%\src\utils\uri.tiko"
 
 echo Building tiko-lsp.exe
-"%TIKO%" -w all -mt -i "%YYJSON%\inc" -p "%YYLIB%" %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
+"%TIKO%" -w all -mt %SOURCES% -x "%ROOT%\bin\tiko-lsp.exe"
 if errorlevel 1 (
     echo.
     echo BUILD FAILED
     exit /b 1
 )
-
-rem Linked through the import library, the server loads yyjson64.dll at run
-rem time, so it has to sit beside the exe. A static link needs nothing.
-if exist "%YYLIB%\libyyjson64.dll.a" copy /y "%YYJSON%\bin\yyjson64.dll" "%ROOT%\bin\" >nul
 
 echo Built %ROOT%\bin\tiko-lsp.exe
 exit /b 0

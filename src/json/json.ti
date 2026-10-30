@@ -1,24 +1,37 @@
 '' ############################################################################
 ''  json/json.ti -- the JSON facade
 ''
-''  Everything the rest of the server knows about JSON is in this file. yyjson
-''  appears here and in json.tiko and nowhere else, so the library can be
-''  replaced without touching the RPC layer, the dispatcher or a handler.
+''  Everything the rest of the server knows about JSON is in this file. The
+''  library underneath -- cJSON, tiko's `vendor/cJSON` package -- is named only
+''  in json.tiko, so it can be replaced without touching the RPC layer, the
+''  dispatcher or a handler. That is also why every handle below is an
+''  `any ptr`: a header cannot #import (TKO0362), and a cJSON type here would
+''  make every one of the 26 files that include it import cJSON themselves.
 ''
 ''  Ownership is explicit:
 ''
 ''      JsonDoc      OWNS a parsed, immutable document. Frees it.
 ''      JsonValue    BORROWS a node inside a JsonDoc. Copyable, cheap, and
 ''                   invalid the moment its document dies.
-''      JsonBuilder  OWNS a mutable document under construction.
+''      JsonBuilder  OWNS a document under construction, and every node it
+''                   made, attached or not.
 ''      JsonNode     BORROWS a node inside a JsonBuilder. Same lifetime rule.
 ''
 ''  Nothing in the server ever concatenates JSON text by hand.
+''
+''  WHAT cJSON DOES NOT DO, and the server accepts (docs/architecture.md):
+''    * a number is a double, so a PARSED integer above 2^53 loses precision --
+''      LSP ids, positions and lengths are far below it. Integers WRITTEN are
+''      exact (JsonBuilder.NewInt);
+''    * a string is NUL-terminated, so an escaped u0000 inside one ends it;
+''    * invalid UTF-8 in an incoming message is read, not refused. Outgoing
+''      text is always sanitised (JsonBuilder.Serialize).
 '' ############################################################################
 
 #pragma once
 
-#include once "yyjson.bi"
+'' NULL, which the files including this one have always had from it.
+#include once "crt/stddef.bi"
 
 '' ----------------------------------------------------------------------------
 ''  JsonValue -- a borrowed, read-only view of one node
@@ -29,13 +42,13 @@
 '' ----------------------------------------------------------------------------
 type JsonValue
     private:
-        m_val as yyjson_val ptr
+        m_val as any ptr
 
     public:
         declare constructor( )
-        declare constructor( byval v as yyjson_val ptr )
+        declare constructor( byval v as any ptr )
 
-        declare function Handle( ) as yyjson_val ptr
+        declare function Handle( ) as any ptr
 
         declare function IsValid ( ) as boolean
         declare function IsNull  ( ) as boolean
@@ -47,6 +60,7 @@ type JsonValue
 
         '' Object access. Member() on a missing key returns an invalid
         '' JsonValue, so chains like Member("a").Member("b") never fault.
+        '' Keys are case-sensitive; a duplicated key finds its first value.
         declare function Has   ( byref key as string ) as boolean
         declare function Member( byref key as string ) as JsonValue
 
@@ -72,17 +86,16 @@ end type
 ''
 ''  The iterator is a separate type rather than a JsonValue member because
 ''  FreeBASIC cannot resolve the circular by-value return between the two
-''  (error 71, incomplete type) -- see docs/architecture.md.
+''  (error 71, incomplete type) -- see docs/architecture.md. It walks the
+''  elements' own links, so a whole pass is linear, not quadratic.
 '' ----------------------------------------------------------------------------
 type JsonArrayIterator
     private:
-        m_arr as yyjson_val ptr
-        m_idx as long
-        m_max as long
+        m_cur as any ptr
 
     public:
         declare constructor( )
-        declare constructor( byval arr as yyjson_val ptr )
+        declare constructor( byval arr as any ptr )
         declare function IsValid ( ) as boolean
         declare function Value   ( ) as JsonValue
         declare sub      MoveNext( )
@@ -90,7 +103,7 @@ end type
 
 type JsonArray
     private:
-        m_arr as yyjson_val ptr
+        m_arr as any ptr
 
     public:
         declare constructor( )
@@ -109,11 +122,14 @@ declare function ArrayOf( byval v as JsonValue ) as JsonArray
 ''  container without a double free. A JsonValue taken from the original still
 ''  points into the original and is NOT rebased onto the copy -- take values
 ''  from the object you actually hold.
+''
+''  Parsing is strict RFC 8259 -- no comments, no trailing commas, nothing after
+''  the value -- and any value may be the root, scalars included.
 '' ----------------------------------------------------------------------------
 type JsonDoc
     private:
-        m_doc as yyjson_doc ptr
-        m_err as string
+        m_root as any ptr
+        m_err  as string
 
     public:
         declare constructor( )
@@ -134,12 +150,12 @@ end type
 '' ----------------------------------------------------------------------------
 type JsonNode
     private:
-        m_val as yyjson_mut_val ptr
+        m_val as any ptr
 
     public:
         declare constructor( )
-        declare constructor( byval v as yyjson_mut_val ptr )
-        declare function Handle ( ) as yyjson_mut_val ptr
+        declare constructor( byval v as any ptr )
+        declare function Handle ( ) as any ptr
         declare function IsValid( ) as boolean
 end type
 
@@ -149,10 +165,20 @@ end type
 ''  Every string handed in is COPIED into the document, so a builder never
 ''  holds a reference into a FreeBASIC temporary. Serialize() returns the text
 ''  and the builder still owns the tree.
+''
+''  The builder owns EVERY node it made: those attached to the root go with
+''  the root, and any it made but never attached -- a handler that built half
+''  a reply and returned early -- are freed with it too. A builder is never
+''  copied; nodes are never stored beyond the request that built them.
 '' ----------------------------------------------------------------------------
 type JsonBuilder
     private:
-        m_doc as yyjson_mut_doc ptr
+        m_root      as any ptr
+        m_made      as any ptr ptr      '' every node a factory returned
+        m_madeCount as long
+        m_madeCap   as long
+        declare function Made_( byval p as any ptr ) as JsonNode
+        declare function Attachable_( byval v as JsonNode ) as any ptr
 
     public:
         declare constructor( )

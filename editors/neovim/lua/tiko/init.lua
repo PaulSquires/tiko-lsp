@@ -81,7 +81,7 @@ function M.find_server(root)
     if is_file(cand) then return cand end
   end
   return nil, SERVER_NAME .. ' was not found. Put it on your PATH, or pass server_path to '
-    .. "require('tiko').setup(). On Windows, yyjson64.dll must sit beside the executable."
+    .. "require('tiko').setup()."
 end
 
 --- The project root for a buffer: the nearest root marker, else the file's directory.

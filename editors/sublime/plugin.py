@@ -76,8 +76,7 @@ class Tiko(AbstractPlugin):
         if not path:
             raise ValueError(
                 "tiko-lsp was not found. Put it on your PATH, or set \"server_path\" in "
-                "Preferences > Package Settings > LSP > Servers > LSP-tiko. "
-                "On Windows, yyjson64.dll must sit beside the executable."
+                "Preferences > Package Settings > LSP > Servers > LSP-tiko."
             )
         if not os.path.isfile(path):
             raise ValueError("LSP-tiko: server_path names a file that does not exist: {}".format(path))
