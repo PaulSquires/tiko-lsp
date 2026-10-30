@@ -17,7 +17,14 @@
     #include once "crt/io.bi"
     #include once "crt/fcntl.bi"
 #else
-    #include once "crt/unistd.bi"
+    '' POSIX, declared here: crt/unistd.bi has no macOS section, and PIPE and WRITE
+    '' are keywords, so the C functions take names of their own.
+    extern "C"
+        declare function tf_pipe_  alias "pipe"  ( byval fds as long ptr ) as long
+        declare function tf_dup2_  alias "dup2"  ( byval a as long, byval b as long ) as long
+        declare function tf_write_ alias "write" ( byval fd as long, byval buf as const any ptr, _
+                                                  byval n as uinteger ) as integer
+    end extern
 #endif
 
 const CR = chr(13)
@@ -264,7 +271,7 @@ scope
         '' the hang this test detects, arrived at from the other end.
         dim as long rc = _pipe( @fds(0), 64 * 1024, _O_BINARY )
     #else
-        dim as long rc = pipe_( @fds(0) )   '' PIPE and WRITE are keywords: the crt names end in _
+        dim as long rc = tf_pipe_( @fds(0) )
     #endif
 
     if( rc <> 0 ) then
@@ -277,7 +284,7 @@ scope
         #ifdef __FB_WIN32__
             _dup2( fds(0), 0 )
         #else
-            dup2( fds(0), 0 )
+            tf_dup2_( fds(0), 0 )
         #endif
 
         dim as string msg = Framed( "{""jsonrpc"":""2.0"",""id"":1,""method"":""initialize""}" )
@@ -285,7 +292,7 @@ scope
         #ifdef __FB_WIN32__
             _write( fds(1), strptr(msg), len(msg) )
         #else
-            write_( fds(1), strptr(msg), len(msg) )
+            tf_write_( fds(1), strptr(msg), len(msg) )
         #endif
 
         g_PipeDone = false
