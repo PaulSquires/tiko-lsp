@@ -153,6 +153,18 @@ rem reach a stand-in toolchain inc through initializationOptions.includePaths.
 "%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-inc.bin" > "%ROOT%\bin\captured-inc.bin" 2>"%ROOT%\bin\server-inc.log"
 "%ROOT%\bin\session_tool.exe" --check-inc "%ROOT%\bin\captured-inc.bin" || set FAILED=1
 
+rem The same session with initializationOptions.toolchainPath alone: a stand-in toolchain
+rem folder laid out as the Windows archive is -- tiko.exe (tests\fake_tiko), inc, pkg --
+rem from which the server derives the include directory, the packages and the compiler.
+set TC=%ROOT%\bin\tc-session\tiko-lang
+if exist "%ROOT%\bin\tc-session" rmdir /s /q "%ROOT%\bin\tc-session"
+xcopy /e /i /q "%ROOT%\tests\fixtures\toolinc" "%TC%\inc" >nul || exit /b 1
+xcopy /e /i /q "%ROOT%\tests\fixtures\pkg" "%TC%\pkg" >nul || exit /b 1
+copy /y "%ROOT%\bin\fake_tiko.exe" "%TC%\tiko.exe" >nul || exit /b 1
+"%ROOT%\bin\session_tool.exe" --write-tc "%ROOT%\bin\session-tc.bin" "%ROOT%\tests\fixtures\incws" "%TC%" || exit /b 1
+"%ROOT%\bin\tiko-lsp.exe" --log-level info < "%ROOT%\bin\session-tc.bin" > "%ROOT%\bin\captured-tc.bin" 2>"%ROOT%\bin\server-tc.log"
+"%ROOT%\bin\session_tool.exe" --check-tc "%ROOT%\bin\captured-tc.bin" || set FAILED=1
+
 rem The compiler-metadata session: tests\fixtures\meta\ws, whose one import is found only
 rem through `tiko metadata` -- here tests\fake_tiko -- and then the same session with no
 rem compiler, which must not find it.

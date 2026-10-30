@@ -95,7 +95,10 @@ green. Still owed: the tarball smoke test on **Fedora 44**
 - **P1-D3. Archive names carry no version**, so `releases/latest/download/<asset>` stays a
   stable URL for Phase 2 downloaders. The version lives in the tag and in a `VERSION`
   file.
-- **P1-D4. Zero-config toolchain discovery (optional server feature, your call).** When
+- **P1-D4. Zero-config toolchain discovery: DONE (feat/toolchain-path, 2026-10-30)** --
+  `initializationOptions.toolchainPath`, detection of a `tiko-lang` folder in the usual
+  places, the compiler from PATH, and Locate Toolchain in VS Code; see
+  docs/development.md. The original note: when
   `initialize` brings no `includePaths` and no `compilerPath`, the server looks for `tiko`
   on PATH and uses `<tiko>/../inc`, `<tiko>/../pkg` and `compilerPath = tiko`. Without it,
   a new user gets diagnostics and symbols but no Win32 or std completions until they edit
@@ -633,7 +636,7 @@ feeds that number.
 | O2 | ~~Can yyjson link statically into a windows-x86_64 tiko build?~~ **Yes**, done 2026-10-17 (P1-D2). | — |
 | O3 | `libtinfo.so.6`: what in the runtime pulls it in? Drop it or link it statically. | nothing; until then, document it |
 | O4 | Entra ID publishing with a personal Microsoft account. | A.8 item 4; deadline 2026-12-01 |
-| O5 | Zero-config toolchain discovery (P1-D4). | the "no setting" goal for Win32/std completions |
+| O5 | ~~Zero-config toolchain discovery (P1-D4).~~ **Done** 2026-10-30 (feat/toolchain-path). | — |
 | O6 | Code signing for the Windows exe. | nothing, unless a scan flags it |
 | O7 | ~~A PNG icon (at least 128×128) for the listings.~~ **Done**: the tiko mascot, 512×512. | — |
 | O8 | `--version` says "built with FreeBASIC 1.20.0" (from `__FB_VERSION__`). In a public listing it should name tiko. Server change: `src/main.tiko`. | nothing; cosmetic |

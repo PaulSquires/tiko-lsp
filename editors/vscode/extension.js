@@ -142,11 +142,15 @@ async function start(context) {
     const args = cfg.get('server.arguments', ['--stdio']);
 
     // The server reads no configuration of its own: what it needs to know
-    // about the toolchain arrives here, in `initialize`.
+    // about the toolchain arrives here, in `initialize`. With none of it, the
+    // server looks for a toolchain itself (PATH, then where the website's
+    // instructions leave one) and reports what it found -- see toolchainReport.
     const initializationOptions = {};
+    const toolchainPath = cfg.get('toolchainPath', '');
     const includePaths = cfg.get('includePaths', []);
     const packagePaths = cfg.get('packagePaths', []);
     const compilerPath = cfg.get('compilerPath', '');
+    if (toolchainPath) initializationOptions.toolchainPath = toolchainPath;
     if (includePaths.length > 0) initializationOptions.includePaths = includePaths;
     if (packagePaths.length > 0) initializationOptions.packagePaths = packagePaths;
     if (compilerPath) initializationOptions.compilerPath = compilerPath;
@@ -174,6 +178,144 @@ async function start(context) {
         output.appendLine(`failed to start: ${err && err.message ? err.message : err}`);
         vscode.window.showErrorMessage(`tiko-lsp failed to start: ${err && err.message ? err.message : err}`);
         client = undefined;
+        return;
+    }
+
+    const tc = toolchainReport(client);
+    if (!tc) return; // a server older than 0.1.3 says nothing; nothing to act on
+    if (toolchainFound(tc)) {
+        output.appendLine(`toolchain: ${tc.root || '(no single folder)'}` +
+            (tc.source ? `  (${tc.source === 'detected' ? 'found automatically' : 'tiko.toolchainPath'})` : ''));
+        if (tc.includeDirs.length > 0) output.appendLine(`  headers   ${tc.includeDirs.join(', ')}`);
+        if (tc.packageDir) output.appendLine(`  packages  ${tc.packageDir}`);
+        if (tc.compiler) output.appendLine(`  compiler  ${tc.compiler}`);
+    } else {
+        output.appendLine('toolchain: none found -- std/ and windows.bi names are unknown. Run "Tiko: Locate Toolchain...".');
+        promptForToolchain(context, toolchainPath);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The toolchain: one folder, found by the server or located by the user.
+//
+// The server does the finding (initializationOptions.toolchainPath, else PATH,
+// else where tiko-lang.net's instructions leave a `tiko-lang` folder) and
+// reports the result in capabilities.experimental.tiko.toolchain. The
+// extension only reads that report, offers once per window to locate a
+// toolchain when nothing was found, and writes `tiko.toolchainPath`.
+// ---------------------------------------------------------------------------
+
+const DOWNLOAD_URL = 'https://tiko-lang.net/#install';
+const NEVER_ASK_KEY = 'tiko.toolchainPrompt.never';
+let promptedThisWindow = false;
+/** The value Locate Toolchain just wrote: its change event needs no "restart?". */
+let selfSetToolchainPath;
+
+/** The server's toolchain report, or undefined when the server sends none. */
+function toolchainReport(c) {
+    const r = c && c.initializeResult;
+    const tc = r && r.capabilities && r.capabilities.experimental &&
+        r.capabilities.experimental.tiko && r.capabilities.experimental.tiko.toolchain;
+    if (!tc || typeof tc !== 'object') return undefined;
+    return {
+        root: tc.root || '',
+        source: tc.source || '',
+        includeDirs: Array.isArray(tc.includeDirs) ? tc.includeDirs : [],
+        packageDir: tc.packageDir || '',
+        compiler: tc.compiler || '',
+    };
+}
+
+function toolchainFound(tc) {
+    return tc.includeDirs.length > 0 || tc.packageDir !== '';
+}
+
+function isDir(p) {
+    try {
+        return fs.statSync(p).isDirectory();
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The toolchain root that `chosen` names -- the root itself, its `bin`
+ * folder, or the compiler -- or undefined. The same rule as the server's
+ * ToolchainRootFrom: a root holds `inc` and a compiler, at its top
+ * (Windows) or in `bin` (Linux, macOS).
+ */
+function toolchainRootFrom(chosen) {
+    const exe = process.platform === 'win32' ? 'tiko.exe' : 'tiko';
+    let p = path.resolve(chosen);
+    if (isFile(p)) p = path.dirname(p);
+    for (let tries = 0; tries < 2; tries++) {
+        const hasCompiler = isFile(path.join(p, exe)) || isFile(path.join(p, 'bin', exe));
+        if (hasCompiler && isDir(path.join(p, 'inc'))) return p;
+        const up = path.dirname(p);
+        if (up === p) break;
+        p = up;
+    }
+    return undefined;
+}
+
+/** Shown at most once per window, and never after "Don't Ask Again". */
+async function promptForToolchain(context, configuredPath) {
+    if (promptedThisWindow || context.globalState.get(NEVER_ASK_KEY, false)) return;
+    promptedThisWindow = true;
+
+    const message = configuredPath
+        ? `tiko.toolchainPath does not name a tiko toolchain: ${configuredPath}`
+        : 'Tiko could not find the tiko toolchain, so names from std/ and windows.bi ' +
+          'will not complete. Point it at the folder you unpacked tiko into.';
+    const choice = await vscode.window.showInformationMessage(
+        message, 'Locate Toolchain...', 'Download tiko', "Don't Ask Again");
+    if (choice === 'Locate Toolchain...') {
+        await locateToolchain(context);
+    } else if (choice === 'Download tiko') {
+        vscode.env.openExternal(vscode.Uri.parse(DOWNLOAD_URL));
+    } else if (choice === "Don't Ask Again") {
+        await context.globalState.update(NEVER_ASK_KEY, true);
+    }
+}
+
+/** Tiko: Locate Toolchain... -- pick the folder, check it, save it, restart. */
+async function locateToolchain(context) {
+    for (;;) {
+        const picked = await vscode.window.showOpenDialog({
+            title: 'Locate the tiko toolchain (the tiko-lang folder)',
+            openLabel: 'Use This Toolchain',
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+        });
+        if (!picked || picked.length === 0) return;
+
+        const root = toolchainRootFrom(picked[0].fsPath);
+        if (!root) {
+            const inside = process.platform === 'win32' ? 'tiko.exe and an inc folder' : 'bin/tiko and an inc folder';
+            const again = await vscode.window.showErrorMessage(
+                `${picked[0].fsPath} is not a tiko toolchain: expected ${inside} inside it.`,
+                'Choose Another Folder', 'Download tiko');
+            if (again === 'Choose Another Folder') continue;
+            if (again === 'Download tiko') vscode.env.openExternal(vscode.Uri.parse(DOWNLOAD_URL));
+            return;
+        }
+
+        // A user setting: the toolchain is a property of this machine, not of
+        // any one project -- unless this workspace already overrides it, in
+        // which case a user setting would be shadowed and change nothing. The
+        // restart below replaces the usual "restart?" prompt.
+        const cfg = vscode.workspace.getConfiguration('tiko');
+        const seen = cfg.inspect('toolchainPath') || {};
+        const target = seen.workspaceValue !== undefined
+            ? vscode.ConfigurationTarget.Workspace
+            : vscode.ConfigurationTarget.Global;
+        selfSetToolchainPath = root;
+        await cfg.update('toolchainPath', root, target);
+        await context.globalState.update(NEVER_ASK_KEY, false);
+        output.appendLine(`tiko.toolchainPath set to ${root}`);
+        await restart(context);
+        return;
     }
 }
 
@@ -200,13 +342,19 @@ async function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand('tiko.restartServer', () => restart(context)),
         vscode.commands.registerCommand('tiko.showOutput', () => output.show(true)),
+        vscode.commands.registerCommand('tiko.locateToolchain', () => locateToolchain(context)),
 
         // initializationOptions are read once, at `initialize`: a change to
         // anything the server is started with needs a restart to take effect.
         vscode.workspace.onDidChangeConfiguration((e) => {
-            const affected = ['tiko.server.path', 'tiko.server.arguments', 'tiko.includePaths', 'tiko.packagePaths', 'tiko.compilerPath']
+            const affected = ['tiko.server.path', 'tiko.server.arguments', 'tiko.toolchainPath', 'tiko.includePaths', 'tiko.packagePaths', 'tiko.compilerPath']
                 .some((key) => e.affectsConfiguration(key));
             if (!affected) return;
+            if (selfSetToolchainPath !== undefined && e.affectsConfiguration('tiko.toolchainPath') &&
+                vscode.workspace.getConfiguration('tiko').get('toolchainPath', '') === selfSetToolchainPath) {
+                selfSetToolchainPath = undefined; // Locate Toolchain restarts the server itself
+                return;
+            }
             vscode.window
                 .showInformationMessage('Tiko settings changed. Restart the language server?', 'Restart')
                 .then((choice) => {

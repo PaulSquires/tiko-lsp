@@ -151,12 +151,110 @@ end function
 dim shared as boolean g_pathWalked = false
 dim shared as string g_pathPkgDir
 dim shared as string g_pathIncDir
+dim shared as string g_pathTiko
+
+#ifdef __FB_WIN32__
+const TIKO_EXE_NAME = "tiko.exe"
+#else
+const TIKO_EXE_NAME = "tiko"
+#endif
+
+'' The first <dir>/tiko(.exe) on PATH.
+private function TikoExeOnPath_( ) as string
+    dim as string p = environ( "PATH" )
+#ifdef __FB_WIN32__
+    dim as string sep = ";"
+#else
+    dim as string sep = ":"
+#endif
+    dim as long st = 1
+    while( st <= len(p) )
+        dim as long en = instr( st, p, sep )
+        if( en = 0 ) then en = len(p) + 1
+        dim as string d = trim( mid( p, st, en - st ), any chr(34) )
+        st = en + 1
+        if( len(d) = 0 ) then continue while
+        dim as string cand = JoinNative( d, TIKO_EXE_NAME )
+        if( fs.IsFile( cand ) ) then return cand
+    wend
+    return ""
+end function
 
 sub CacheToolchainOnPath( )
     g_pathPkgDir = BesideTikoOnPath_( "pkg" )
     g_pathIncDir = BesideTikoOnPath_( "inc" )
+    g_pathTiko   = TikoExeOnPath_( )
     g_pathWalked = true
 end sub
+
+function TikoOnPath( ) as string
+    if( g_pathWalked ) then return g_pathTiko
+    return TikoExeOnPath_( )
+end function
+
+function ToolchainCompilerIn( byref root as string ) as string
+    if( len(root) = 0 ) then return ""
+    dim as string cand = JoinNative( root, TIKO_EXE_NAME )
+    if( fs.IsFile( cand ) ) then return cand
+    cand = JoinNative( root, "bin/" & TIKO_EXE_NAME )
+    if( fs.IsFile( cand ) ) then return cand
+    return ""
+end function
+
+function ToolchainRootFrom( byref given as string ) as string
+    if( len(given) = 0 ) then return ""
+    dim as string p = NormalizePath( given )
+    '' The compiler itself was named: start from its directory.
+    if( fs.IsFile( p ) ) then p = DirPart( p )
+    '' The root, or -- one level down -- its bin directory.
+    for tries as long = 0 to 1
+        if( len(p) = 0 ) then exit for
+        if( len( ToolchainCompilerIn( p ) ) > 0 andalso fs.IsDir( JoinNative( p, "inc" ) ) ) then return p
+        p = DirPart( p )
+    next
+    return ""
+end function
+
+function DetectToolchainRoot( ) as string
+    dim cands as PathArray
+#ifdef __FB_WIN32__
+    dim as string home = environ( "USERPROFILE" )
+#else
+    dim as string home = environ( "HOME" )
+#endif
+    if( len(home) > 0 ) then
+        cands.Push( JoinNative( home, "tiko-lang" ) )
+        dim as string downloads = JoinNative( home, "Downloads" )
+        cands.Push( JoinNative( downloads, "tiko-lang" ) )
+        '' Windows' Extract All unpacks tiko-windows-x86_64-<sha>.zip into a folder of that
+        '' name, so the toolchain is one level further down.
+        if( fs.IsDir( downloads ) ) then
+            dim entries as containers.Array( of fs.DirEntry )
+            if( fs.ListDir( downloads, entries ).IsOk( ) ) then
+                for q as long = 0 to entries.Count( ) - 1
+                    if( entries[q].IsDirectory( ) = false ) then continue for
+                    dim as string nm = entries[q].Name( )
+                    if( lcase( left( nm, 5 ) ) <> "tiko-" ) then continue for
+                    cands.Push( JoinNative( downloads, nm & "/tiko-lang" ) )
+                next
+            end if
+        end if
+    end if
+#ifdef __FB_WIN32__
+    dim as string drive_ = environ( "SystemDrive" )
+    if( len(drive_) = 0 ) then drive_ = "C:"
+    cands.Push( JoinNative( drive_ & "\", "tiko-lang" ) )
+#else
+    cands.Push( "/opt/tiko-lang" )
+    if( len(home) > 0 ) then cands.Push( JoinNative( home, ".local/tiko-lang" ) )
+#endif
+
+    for i as long = 0 to cands.Count( ) - 1
+        dim as string root = ToolchainRootFrom( cands[i] )
+        if( len(root) > 0 ) then return root
+    next
+    return ""
+end function
 
 function ToolchainPkgDir( ) as string
     for i as long = 0 to g_configuredPackageDirs.Count( ) - 1

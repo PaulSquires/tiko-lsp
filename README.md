@@ -91,9 +91,10 @@ platform". That is expected: there is no server build for that platform yet.
    server indexes the whole folder, so opening a single file gives you less.
 3. **Open a `.tiko` file.** Colouring appears at once. The server starts within a second.
    Type a mistake, such as `if x then` with no `end if`, and it is underlined.
-4. **Optional, but recommended: [connect the tiko toolchain](#connect-the-tiko-toolchain).**
-   Without it, names from `#import "std/..."` and `windows.bi` are unknown to the
-   editor.
+4. **The tiko toolchain** is found automatically if you unpacked it in your home or
+   Downloads folder. If it isn't found, VS Code offers **Locate Toolchain…** once:
+   choose your `tiko-lang` folder. See
+   [Connect the tiko toolchain](#connect-the-tiko-toolchain).
 
 If VS Code asks whether you trust the folder's authors, choose **Trust**. The extension
 does not run in Restricted Mode, because starting the server means running a program.
@@ -128,52 +129,65 @@ if you also edit other BASIC dialects.
 
 The editor features above work on your own code with no setup. To also complete,
 hover and show signatures for the **standard library** (`#import "std/strings"`) and
-the **system headers** (`#include "windows.bi"`), the server needs to know where the
-tiko toolchain is.
+the **system headers** (`#include "windows.bi"`), the server needs the tiko toolchain.
 
 Don't have tiko yet? Download it from **<https://tiko-lang.net/#install>** and unpack
-it anywhere. You get one folder, `tiko-lang`.
+it. You get one folder, `tiko-lang`.
 
-Do **one** of the following.
+### Usually, nothing to do
 
-### Option A: put tiko on your PATH (no editor setting needed)
+The server finds the toolchain by itself when you unpacked it in one of these places:
 
-The server looks for `tiko` on your `PATH` and uses the headers and packages beside it.
-
-| System | Add this folder to `PATH` |
+| Where | Example |
 | --- | --- |
-| Windows | `...\tiko-lang` (the folder that holds `tiko.exe`) |
-| Linux, macOS | `.../tiko-lang/bin` |
+| Your home folder | `C:\Users\you\tiko-lang`, `/home/you/tiko-lang`, `/Users/you/tiko-lang` |
+| Your Downloads folder | `Downloads\tiko-lang` |
+| A folder inside Downloads named after the archive (what Windows' *Extract All* makes) | `Downloads\tiko-windows-x86_64-6828165b\tiko-lang` |
+| Windows: the top of the system drive | `C:\tiko-lang` |
+| Linux and macOS | `/opt/tiko-lang`, `~/.local/tiko-lang` |
 
-Then restart your editor, so it sees the new `PATH`. This also lets you run `tiko` from
-any terminal.
+The server also uses a `tiko` on your `PATH`. If you want to run `tiko` from any
+terminal, add `...\tiko-lang` (Windows) or `.../tiko-lang/bin` (Linux, macOS) to your
+`PATH`, then restart your editor.
 
-### Option B: tell the editor where it is
+**Tiko: Show Language Server Output** shows what was found, for example:
 
-In VS Code settings, set **Tiko: Include Paths** to the toolchain's `inc` folder. The
-`pkg` folder beside it is found automatically:
-
-```jsonc
-// Windows, with tiko unpacked to C:\tiko-lang
-"tiko.includePaths": ["C:/tiko-lang/inc"]
-
-// Linux or macOS, with tiko unpacked to your home folder
-"tiko.includePaths": ["/home/you/tiko-lang/inc"]
+```
+toolchain: C:\Users\you\tiko-lang  (found automatically)
+  headers   C:\Users\you\tiko-lang\inc
+  packages  C:\Users\you\tiko-lang\pkg
+  compiler  C:\Users\you\tiko-lang\tiko.exe
 ```
 
-When you change these settings, VS Code offers to restart the server. Click **Restart**.
+### Somewhere else: Tiko: Locate Toolchain…
 
-### Option C (optional): let the server ask the compiler
+If no toolchain is found, VS Code tells you, once per window, with a **Locate Toolchain…**
+button (and a **Don't Ask Again** button).
+You can also run **Tiko: Locate Toolchain…** from the Command Palette at any time.
+Choose the `tiko-lang` folder. The extension checks that it is a toolchain, saves it as
+**Tiko: Toolchain Path**, and restarts the server.
 
-If your project has a `tiko.toml`, or uses `#cinclude` to import C headers, also set:
+Or set it yourself:
 
 ```jsonc
-"tiko.compilerPath": "C:/tiko-lang/tiko.exe"   // Linux/macOS: ".../tiko-lang/bin/tiko"
+"tiko.toolchainPath": "D:/tools/tiko-lang"
 ```
 
-The server then asks `tiko` how your package's modules and C headers resolve, so
-`#cinclude "raylib.h"` names complete as well. It never runs the compiler to check your
-code.
+From that one folder the server takes three things:
+
+- the headers, from `inc`;
+- the packages, from `pkg`;
+- the compiler, `tiko.exe` (Windows) or `bin/tiko` (Linux, macOS).
+
+With the compiler, the server also asks `tiko` how a `tiko.toml` package's modules and
+`#cinclude` C headers resolve, so names from `#cinclude "raylib.h"` complete too. The
+server never runs the compiler to check your code.
+
+### Advanced: separate settings
+
+For unusual layouts, `tiko.includePaths`, `tiko.packagePaths` and `tiko.compilerPath`
+override the parts of the toolchain one at a time. Whatever you set there wins over
+`tiko.toolchainPath`.
 
 ---
 
@@ -241,9 +255,12 @@ Every editor below runs the same server. Each one needs:
 
 1. the server program ([download](#the-server-on-its-own));
 2. the file extensions `.tiko`, `.ti` and `.tko` mapped to the language `tiko`;
-3. optionally, the toolchain options: `includePaths`, `packagePaths` and `compilerPath`,
-   sent as LSP *initialization options*. They mean the same as the
-   [VS Code settings](#settings-vs-code).
+3. optionally, the toolchain: send `toolchainPath` (the `tiko-lang` folder) as an LSP
+   *initialization option*. Without it, the server looks in the
+   [usual places](#usually-nothing-to-do). The server also accepts `includePaths`,
+   `packagePaths` and `compilerPath`, which mean the same as the
+   [VS Code settings](#settings-vs-code). To turn the search off, send an empty string
+   for `toolchainPath` or `compilerPath`.
 
 | Editor | Instructions |
 | --- | --- |
@@ -257,7 +274,7 @@ Every editor below runs the same server. Each one needs:
 [language-server.tiko-lsp]
 command = "tiko-lsp"
 args = ["--stdio"]
-config = { includePaths = ["/home/you/tiko-lang/inc"] }
+config = { toolchainPath = "/home/you/tiko-lang" }
 
 [[language]]
 name = "tiko"
@@ -276,7 +293,7 @@ vim.lsp.config.tiko_lsp = {
   cmd = { 'tiko-lsp', '--stdio' },
   filetypes = { 'tiko' },
   root_markers = { 'tiko.toml', '.git' },
-  init_options = { includePaths = { '/home/you/tiko-lang/inc' } },
+  init_options = { toolchainPath = '/home/you/tiko-lang' },
 }
 vim.lsp.enable('tiko_lsp')
 ```
@@ -302,15 +319,17 @@ the flags. The flags win when both are set.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `tiko.includePaths` | `[]` | The toolchain's `inc` folder or folders. See [Connect the tiko toolchain](#connect-the-tiko-toolchain). |
-| `tiko.packagePaths` | `[]` | Where `#import` packages live, if not in the `pkg` folder beside an include path. Rarely needed. |
-| `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about `tiko.toml` packages and `#cinclude`. It is never used to check your code. |
+| `tiko.toolchainPath` | `""` | The `tiko-lang` folder. Leave it empty to have it found automatically. See [Connect the tiko toolchain](#connect-the-tiko-toolchain). |
+| `tiko.includePaths` | `[]` | Override: the toolchain's `inc` folder or folders. |
+| `tiko.packagePaths` | `[]` | Override: where `#import` packages live. |
+| `tiko.compilerPath` | `""` | Override: the `tiko` compiler that the server may ask about `tiko.toml` packages and `#cinclude`. The server never uses it to check your code. |
 | `tiko.server.path` | `""` | Use a different `tiko-lsp` program instead of the one included with the extension. |
 | `tiko.server.arguments` | `["--stdio"]` | Arguments for the server. See [Troubleshooting](#troubleshooting) for logging. |
 | `tiko.trace.server` | `"off"` | `messages` or `verbose` logs the editor ↔ server traffic in the output channel. |
 
 Commands (Command Palette, `Ctrl+Shift+P`):
 
+- **Tiko: Locate Toolchain…**
 - **Tiko: Restart Language Server**
 - **Tiko: Show Language Server Output**
 
@@ -328,9 +347,9 @@ Your platform has no included server (see [Platforms](#platforms)), or you built
 extension yourself. Put `tiko-lsp` on your `PATH`, or set `tiko.server.path`.
 
 **`std` or `windows.bi` names do not complete, and go to definition does nothing on them.**
-The server cannot find the toolchain. Follow [Connect the tiko toolchain](#connect-the-tiko-toolchain),
-then run **Tiko: Restart Language Server**. The output channel lists the folders the
-server found: look for `toolchain headers from ...`.
+The server cannot find the toolchain. Run **Tiko: Locate Toolchain…** and choose your
+`tiko-lang` folder. To see what the server found, run **Tiko: Show Language Server
+Output** and look at the `toolchain:` line.
 
 **Completion is slow in a project that uses `windows.bi`.**
 The Win32 headers declare about 190,000 names. The first full index takes a few seconds

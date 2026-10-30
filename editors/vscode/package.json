@@ -74,6 +74,11 @@
         "command": "tiko.showOutput",
         "title": "Show Language Server Output",
         "category": "Tiko"
+      },
+      {
+        "command": "tiko.locateToolchain",
+        "title": "Locate Toolchain...",
+        "category": "Tiko"
       }
     ],
     "configuration": {
@@ -95,13 +100,19 @@
           ],
           "markdownDescription": "Arguments passed to the server. Add `--log-level`, `debug`, `--log-file`, `C:/temp/tiko-lsp.log` to see what it is doing; it never writes to stdout."
         },
+        "tiko.toolchainPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "The folder you unpacked tiko into -- the one named `tiko-lang`, e.g. `C:/tiko-lang` (Linux/macOS: `/home/you/tiko-lang`). Its headers, packages and compiler are then used, so `std/` and `windows.bi` names complete. Empty: a `tiko` on the `PATH`, then a `tiko-lang` folder in your home or Downloads folder, is found automatically. **Tiko: Locate Toolchain...** sets this for you. Sent as `initializationOptions.toolchainPath`."
+        },
         "tiko.includePaths": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Directories `#include \"windows.bi\"` is found in -- the toolchain's `inc`, e.g. `C:/tiko-lang/inc` (Linux/macOS: `/home/you/tiko-lang/inc`). The server reads the headers the workspace includes from here, so Win32, AfxNova and runtime names complete, hover and show signatures. Sent as `initializationOptions.includePaths`."
+          "markdownDescription": "Usually unnecessary: `tiko.toolchainPath` sets this. Directories `#include \"windows.bi\"` is found in -- the toolchain's `inc`, e.g. `C:/tiko-lang/inc` (Linux/macOS: `/home/you/tiko-lang/inc`). The server reads the headers the workspace includes from here, so Win32, AfxNova and runtime names complete, hover and show signatures. Sent as `initializationOptions.includePaths`."
         },
         "tiko.packagePaths": {
           "type": "array",
@@ -114,7 +125,7 @@
         "tiko.compilerPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "A `tiko` the server may ASK about each workspace folder's `tiko.toml` (`tiko metadata`): imports then resolve where the compiler resolves them, `-i` options included, and the `tiko/metadata` request returns the package's targets. Never run for diagnostics. Empty: the server resolves on its own. Sent as `initializationOptions.compilerPath`."
+          "markdownDescription": "A `tiko` the server may ASK about each workspace folder's `tiko.toml` (`tiko metadata`): imports then resolve where the compiler resolves them, `-i` options included, and the `tiko/metadata` request returns the package's targets. Never run for diagnostics. Empty: the compiler in `tiko.toolchainPath`, else a `tiko` on the `PATH`. Sent as `initializationOptions.compilerPath`."
         },
         "tiko.trace.server": {
           "type": "string",

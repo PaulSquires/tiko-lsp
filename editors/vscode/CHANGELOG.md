@@ -2,6 +2,20 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## Unreleased
+
+- **The toolchain is found for you.** The server looks for the `tiko-lang` folder in your
+  home folder, in Downloads (also one level down, where Windows' Extract All puts it), at
+  `C:\tiko-lang`, `/opt/tiko-lang` or `~/.local/tiko-lang`, and for a `tiko` on the `PATH`.
+  `std/` and `windows.bi` names then complete with no setting.
+- New setting `tiko.toolchainPath`: the `tiko-lang` folder. The headers, the packages and
+  the compiler are all taken from it; `tiko.includePaths`, `tiko.packagePaths` and
+  `tiko.compilerPath` still override them one by one.
+- New command **Tiko: Locate Toolchain...**: choose the folder, and the extension checks
+  it, saves it and restarts the server. When no toolchain is found, the extension offers
+  it once per window, with **Don't Ask Again**.
+- The output channel shows the toolchain the server used.
+
 ## 0.1.2
 
 - **macOS on Apple silicon** (macOS 13 or later): the server is included, as it is

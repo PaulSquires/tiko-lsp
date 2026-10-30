@@ -71,6 +71,15 @@ done
 export PATH=$CLEAN_PATH
 export TIKO_TEST_RESULTS=$(native "$RESULTS")
 export TIKO_TEST_EXTENSIONS_DIR=$(native "$WORK/extensions")
+# A packaged tiko toolchain for the tiko.toolchainPath check; the check is skipped
+# (and says so) when there is none. Override with TIKO_TEST_TOOLCHAIN.
+if [ -z "${TIKO_TEST_TOOLCHAIN:-}" ]; then
+    if [ $WIN -eq 1 ]; then TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-windows"
+    elif [ "$(uname -s)" = Darwin ]; then TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-macos"
+    else TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-linux"; fi
+    [ -d "$TC_DEFAULT/inc" ] && TIKO_TEST_TOOLCHAIN=$(native "$(cd "$TC_DEFAULT" && pwd)")
+fi
+export TIKO_TEST_TOOLCHAIN=${TIKO_TEST_TOOLCHAIN:-}
 unset ELECTRON_RUN_AS_NODE
 set +e
 timeout 300 "$CODE_EXE" \

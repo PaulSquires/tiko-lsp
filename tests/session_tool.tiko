@@ -1185,7 +1185,7 @@ private function At_( byref uri as string, byval l as long, byval c as long ) as
            Q & "position" & Q & ":{" & Q & "line" & Q & ":" & l & "," & Q & "character" & Q & ":" & c & "}}"
 end function
 
-private function IncSessionBytes( byref wsRoot as string, byref incDir as string ) as string
+private function IncSessionBytes( byref wsRoot as string, byref initOpts as string ) as string
     dim as string s
     dim as string wsUri  = PathToUri( wsRoot )
     dim as string appPath = wsRoot & "\app.bas"
@@ -1197,11 +1197,12 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
         end 1
     end if
 
-    '' 1. initialize, naming the toolchain's include directory.
+    '' 1. initialize, naming the toolchain: its include directory (--write-inc) or the
+    ''    whole toolchain folder (--write-tc).
     s &= Req_( 1, "initialize", "{" & Q & "processId" & Q & ":4242," & _
                Q & "rootUri" & Q & ":" & Q & wsUri & Q & "," & _
                Q & "capabilities" & Q & ":{}," & _
-               Q & "initializationOptions" & Q & ":{" & Q & "includePaths" & Q & ":[" & JsonQuote( incDir ) & "]}," & _
+               Q & "initializationOptions" & Q & ":" & initOpts & "," & _
                Q & "workspaceFolders" & Q & ":[{" & Q & "uri" & Q & ":" & Q & wsUri & Q & "," & _
                Q & "name" & Q & ":" & Q & "incws" & Q & "}]}" )
     s &= Note_( "initialized", "{}" )
@@ -1291,13 +1292,13 @@ private function IncSessionBytes( byref wsRoot as string, byref incDir as string
 end function
 
 private function WriteIncSession( byref path as string, byref wsRoot as string, _
-                                  byref incDir as string ) as long
+                                  byref initOpts as string ) as long
     dim as long f = freefile( )
     if( open( path for binary access write as #f ) <> 0 ) then
         print "session_tool: cannot write " & path
         return 1
     end if
-    dim as string bytes_ = IncSessionBytes( wsRoot, incDir )
+    dim as string bytes_ = IncSessionBytes( wsRoot, initOpts )
     put #f, , bytes_
     close #f
     print "wrote " & len(bytes_) & " bytes to " & path
@@ -1317,14 +1318,14 @@ private function ResponseFor_( byref messages as containers.Array( of string ), 
     return ""
 end function
 
-private function CheckIncSession( byref path as string ) as long
+private function CheckIncSession( byref path as string, byval viaRoot as boolean ) as long
     dim as string captured
     if( ReadWholeFile( path, captured ) = false ) then
         print "session_tool: cannot read " & path
         return 1
     end if
 
-    TestGroup( "toolchain headers, over the wire" )
+    TestGroup( "toolchain headers, over the wire" & iif( viaRoot, " -- through toolchainPath", "" ) )
 
     dim as MessageFramer f
     dim messages as containers.Array( of string )
@@ -1344,6 +1345,26 @@ private function CheckIncSession( byref path as string ) as long
     for id as long = 1 to 16
         if( len( ResponseFor_( messages, id ) ) = 0 ) then TestFail( "request " & id & " is answered", "no response" )
     next
+
+    '' What the server says it found: capabilities.experimental.tiko.toolchain.
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 1 ) )
+        dim as JsonValue tc = d.Root( ).Member( "result" ).Member( "capabilities" ) _
+                                  .Member( "experimental" ).Member( "tiko" ).Member( "toolchain" )
+        AssertTrue( tc.IsObject( ), "initialize reports the toolchain it found" )
+        AssertEqInt( tc.Member( "includeDirs" ).Count( ), 1, "with one include directory" )
+        AssertContains( tc.Member( "packageDir" ).AsString( ), "pkg", "and a package directory" )
+        if( viaRoot ) then
+            AssertEqStr( tc.Member( "source" ).AsString( ), "toolchainPath", "found through toolchainPath" )
+            AssertContains( lcase( tc.Member( "root" ).AsString( ) ), "tiko-lang", "the root is the folder named" )
+            AssertContains( lcase( tc.Member( "includeDirs" ).Item( 0 ).AsString( ) ), "tiko-lang", "its inc is the include directory" )
+            AssertContains( lcase( tc.Member( "compiler" ).AsString( ) ), "tiko", "and its compiler is the compiler" )
+        else
+            AssertEqStr( tc.Member( "source" ).AsString( ), "", "includePaths alone names no toolchain folder" )
+            AssertEqStr( tc.Member( "root" ).AsString( ), "", "so the root is empty" )
+        end if
+    end scope
 
     scope
         dim as JsonDoc d
@@ -1849,10 +1870,20 @@ select case lcase( mode_ )
             print "session_tool --write-inc needs the workspace root and the include directory"
             end 2
         end if
-        end WriteIncSession( path_, root_, command( 4 ) )
+        end WriteIncSession( path_, root_, "{" & Q & "includePaths" & Q & ":[" & JsonQuote( command( 4 ) ) & "]}" )
 
     case "--check-inc"
-        end CheckIncSession( path_ )
+        end CheckIncSession( path_, false )
+
+    case "--write-tc"
+        if( len(root_) = 0 orelse len( command( 4 ) ) = 0 ) then
+            print "session_tool --write-tc needs the workspace root and the toolchain folder"
+            end 2
+        end if
+        end WriteIncSession( path_, root_, "{" & Q & "toolchainPath" & Q & ":" & JsonQuote( command( 4 ) ) & "}" )
+
+    case "--check-tc"
+        end CheckIncSession( path_, true )
 
     case "--write-meta"
         if( len(root_) = 0 ) then

@@ -258,6 +258,31 @@ args = ["--stdio"]
 
 Nothing in the server depends on its own path, so any location works.
 
+### The toolchain as one folder -- `toolchainPath`
+
+```json
+"initializationOptions": { "toolchainPath": "C:/tiko-lang" }
+```
+
+The folder a user unpacked: `inc`, `pkg` and the compiler (`tiko.exe` at the top on
+Windows, `bin/tiko` on Linux and macOS). The root itself, its `bin` or the compiler may
+be named (`ToolchainRootFrom`). It fills whichever of `includePaths`, `packagePaths` and
+`compilerPath` the client left unset.
+
+Without it, and with no headers found through `includePaths`, `TKO_INCLUDE` or a `tiko`
+on PATH, the server looks where tiko-lang.net's instructions leave one
+(`DetectToolchainRoot`): `<home>/tiko-lang`, `<home>/Downloads/tiko-lang`,
+`<home>/Downloads/tiko-*/tiko-lang` (Windows' Extract All), then `C:\tiko-lang`, or
+`/opt/tiko-lang` and `~/.local/tiko-lang`. A `compilerPath` nobody named is the first
+`tiko` on PATH. An explicit `"toolchainPath": ""` or `"compilerPath": ""` turns the
+matching search off -- the test sessions' compiler-less controls depend on it.
+
+What was found goes back in `initialize`, as
+`capabilities.experimental.tiko.toolchain` =
+`{ root, source ("toolchainPath" | "detected" | ""), includeDirs[], packageDir, compiler }`.
+The VS Code extension offers **Locate Toolchain...** when `includeDirs` and `packageDir`
+are both empty.
+
 ### Toolchain headers -- Win32, AfxNova, the runtime
 
 `#include once "windows.bi"` names a file in the TOOLCHAIN's `inc`, which no workspace

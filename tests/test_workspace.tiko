@@ -9,6 +9,7 @@
 '' ############################################################################
 
 #import "std/containers"
+#import "std/fs"
 #include once "assert.ti"
 #include once "../src/workspace/workspace.ti"
 #include once "../src/workspace/symbol_index.ti"
@@ -1380,6 +1381,109 @@ scope
     CacheToolchainOnPath( )
     AssertEqStr( ToolchainPkgDir( ), pkgBefore, "ToolchainPkgDir answers as it did before the cache" )
     AssertEqStr( ToolchainIncDir( ), incBefore, "and ToolchainIncDir too" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "the toolchain as one folder (toolchainPath, detection)" )
+'' ----------------------------------------------------------------------------
+''
+'' Built at run time under bin\ -- a compiler is an .exe, which the repository ignores --
+'' as the release archives lay a toolchain out: Windows has tiko.exe at the root,
+'' Linux and macOS have bin/tiko. Each also gets the other layout's twin, so both
+'' spellings of the rule are exercised on every host.
+
+dim shared as string g_homeEnv
+
+private sub MakeDirs_( byref p as string )
+    dim as string sep = NativePath( "\" ), acc
+    dim as long st = 1
+    do
+        dim as long en = instr( st + 1, p, sep )
+        if( en = 0 ) then en = len(p) + 1
+        acc = left( p, en - 1 )
+        if( len(acc) > 0 andalso fs.IsDir( acc ) = false ) then mkdir( acc )
+        st = en
+    loop while( en <= len(p) )
+end sub
+
+private sub Touch_( byref p as string )
+    dim as long f = freefile( )
+    if( open( p for output as #f ) = 0 ) then close #f
+end sub
+
+scope
+#ifdef __FB_WIN32__
+    dim as string exe = "tiko.exe", homeVar = "USERPROFILE"
+#else
+    dim as string exe = "tiko", homeVar = "HOME"
+#endif
+    dim as string base_ = g_Root & NativePath( "\bin\tc-fixture" )
+
+    '' A root with the compiler at its top (the Windows archive) ...
+    dim as string flat = base_ & NativePath( "\flat\tiko-lang" )
+    MakeDirs_( flat & NativePath( "\inc" ) )
+    MakeDirs_( flat & NativePath( "\pkg" ) )
+    Touch_( flat & NativePath( "\" ) & exe )
+    '' ... and one with it in bin (the Linux and macOS archives).
+    dim as string binned = base_ & NativePath( "\binned\tiko-lang" )
+    MakeDirs_( binned & NativePath( "\inc" ) )
+    MakeDirs_( binned & NativePath( "\bin" ) )
+    Touch_( binned & NativePath( "\bin\" ) & exe )
+    '' Not a toolchain: a compiler, no inc.
+    dim as string noinc = base_ & NativePath( "\noinc" )
+    MakeDirs_( noinc )
+    Touch_( noinc & NativePath( "\" ) & exe )
+
+    AssertEqStr( lcase( ToolchainCompilerIn( flat ) ), lcase( NormalizePath( flat & NativePath( "\" ) & exe ) ), _
+                 "ToolchainCompilerIn: <root>/tiko at the top" )
+    AssertEqStr( lcase( ToolchainCompilerIn( binned ) ), lcase( NormalizePath( binned & NativePath( "\bin\" ) & exe ) ), _
+                 "ToolchainCompilerIn: <root>/bin/tiko" )
+    AssertEqStr( ToolchainCompilerIn( base_ ), "", "ToolchainCompilerIn: none in a folder without one" )
+
+    dim as string wantFlat = lcase( NormalizePath( flat ) ), wantBinned = lcase( NormalizePath( binned ) )
+    AssertEqStr( lcase( ToolchainRootFrom( flat ) ), wantFlat, "ToolchainRootFrom: the root itself" )
+    AssertEqStr( lcase( ToolchainRootFrom( flat & NativePath( "\" ) & exe ) ), wantFlat, "ToolchainRootFrom: its compiler" )
+    AssertEqStr( lcase( ToolchainRootFrom( binned ) ), wantBinned, "ToolchainRootFrom: a root whose compiler is in bin" )
+    AssertEqStr( lcase( ToolchainRootFrom( binned & NativePath( "\bin" ) ) ), wantBinned, "ToolchainRootFrom: its bin folder" )
+    AssertEqStr( lcase( ToolchainRootFrom( binned & NativePath( "\bin\" ) & exe ) ), wantBinned, "ToolchainRootFrom: the compiler in bin" )
+    AssertEqStr( ToolchainRootFrom( noinc ), "", "ToolchainRootFrom: a compiler with no inc beside it is not a toolchain" )
+    AssertEqStr( ToolchainRootFrom( base_ & NativePath( "\missing" ) ), "", "ToolchainRootFrom: a path that does not exist" )
+    AssertEqStr( ToolchainRootFrom( "" ), "", "ToolchainRootFrom: nothing given" )
+
+    '' DETECTION, with the home folder pointed at fixtures. The fallbacks outside home
+    '' (C:\tiko-lang, /opt/tiko-lang) belong to the machine, so "nothing found" is only
+    '' asserted where none of them exists.
+    dim as string savedHome = environ( homeVar )
+    dim as string home1 = base_ & NativePath( "\home1" )
+    dim as string extracted = home1 & NativePath( "\Downloads\tiko-windows-x86_64-abc123\tiko-lang" )
+    MakeDirs_( extracted & NativePath( "\inc" ) )
+    Touch_( extracted & NativePath( "\" ) & exe )
+    g_homeEnv = homeVar & "=" & home1
+    setenviron g_homeEnv
+    AssertEqStr( lcase( DetectToolchainRoot( ) ), lcase( NormalizePath( extracted ) ), _
+                 "detected: Downloads/tiko-*/tiko-lang, the way Extract All leaves it" )
+
+    dim as string direct = home1 & NativePath( "\tiko-lang" )
+    MakeDirs_( direct & NativePath( "\inc" ) )
+    Touch_( direct & NativePath( "\" ) & exe )
+    AssertEqStr( lcase( DetectToolchainRoot( ) ), lcase( NormalizePath( direct ) ), _
+                 "detected: <home>/tiko-lang comes before the Downloads folder" )
+
+    dim as string home2 = base_ & NativePath( "\home2" )
+    MakeDirs_( home2 )
+    g_homeEnv = homeVar & "=" & home2
+    setenviron g_homeEnv
+#ifdef __FB_WIN32__
+    dim as boolean machineHasOne = fs.IsDir( environ( "SystemDrive" ) & "\tiko-lang" ) orelse fs.IsDir( "C:\tiko-lang" )
+#else
+    dim as boolean machineHasOne = fs.IsDir( "/opt/tiko-lang" )
+#endif
+    if( machineHasOne = false ) then
+        AssertEqStr( DetectToolchainRoot( ), "", "detected: nothing, in a home with no tiko-lang folder" )
+    end if
+
+    g_homeEnv = homeVar & "=" & savedHome
+    setenviron g_homeEnv
 end scope
 
 end TestSummary( "workspace" )
