@@ -186,7 +186,7 @@ async function start(context) {
     if (!tc) return; // a server older than 0.1.3 says nothing; nothing to act on
     if (toolchainFound(tc)) {
         output.appendLine(`toolchain: ${tc.root || '(no single folder)'}` +
-            (tc.source ? `  (${tc.source === 'detected' ? 'found automatically' : 'tiko.toolchainPath'})` : ''));
+            (tc.source ? `  (${TOOLCHAIN_SOURCES[tc.source] || tc.source})` : ''));
         if (tc.includeDirs.length > 0) output.appendLine(`  headers   ${tc.includeDirs.join(', ')}`);
         if (tc.packageDir) output.appendLine(`  packages  ${tc.packageDir}`);
         if (tc.compiler) output.appendLine(`  compiler  ${tc.compiler}`);
@@ -207,6 +207,12 @@ async function start(context) {
 // ---------------------------------------------------------------------------
 
 const DOWNLOAD_URL = 'https://tiko-lang.net/#install';
+/** How the output channel names capabilities.experimental.tiko.toolchain.source. */
+const TOOLCHAIN_SOURCES = {
+    toolchainPath: 'tiko.toolchainPath',
+    installed: 'the toolchain the server is installed in',
+    detected: 'found automatically',
+};
 const NEVER_ASK_KEY = 'tiko.toolchainPrompt.never';
 let promptedThisWindow = false;
 /** The value Locate Toolchain just wrote: its change event needs no "restart?". */

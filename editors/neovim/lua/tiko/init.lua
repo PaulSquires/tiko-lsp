@@ -11,16 +11,22 @@
 --
 --   1. `server_path` passed to setup() -- the escape hatch for anyone whose
 --      build lives somewhere unusual;
---   2. `tiko-lsp` on the PATH;
---   3. `bin/tiko-lsp(.exe)` under the project root, so that opening the
+--   2. the server inside the tiko toolchain named by `toolchain_path` -- a tiko
+--      release carries it: tiko-lang/tiko-lsp.exe on Windows, tiko-lang/bin/tiko-lsp
+--      elsewhere;
+--   3. `tiko-lsp` on the PATH -- where a toolchain's server already is for
+--      anyone who put tiko on the PATH, since it sits beside the compiler;
+--   4. the server inside a tiko-lang folder where tiko-lang.net's instructions
+--      leave one: the home folder, Downloads (and one level below it, where
+--      Windows' Extract All puts an archive), C:/tiko-lang, /opt/tiko-lang,
+--      ~/.local/tiko-lang -- the places tiko-lsp itself looks for a toolchain;
+--   5. `bin/tiko-lsp(.exe)` under the project root, so that opening the
 --      tiko-lsp repository itself just works after a build.
 --
 -- If none of those finds it, the plugin says so ONCE and what to set -- an
 -- editor that silently offers no completions is the worst outcome here.
 --
---   require('tiko').setup({
---     include_paths = { 'C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc' },
---   })
+--   require('tiko').setup({ toolchain_path = 'C:/tiko-lang' })   -- or setup({})
 
 local M = {}
 
@@ -29,8 +35,13 @@ local IS_WINDOWS = vim.fn.has('win32') == 1
 local EXE = IS_WINDOWS and (SERVER_NAME .. '.exe') or SERVER_NAME
 
 local defaults = {
-  -- The tiko-lsp executable; nil: PATH, then <root>/bin.
+  -- The tiko-lsp executable; nil: the one in toolchain_path, PATH, a tiko-lang
+  -- folder in the usual places, then <root>/bin.
   server_path = nil,
+  -- The folder you unpacked tiko into (tiko-lang): its server, headers, packages
+  -- and compiler are used. nil: the server finds a toolchain on its own. Sent as
+  -- initializationOptions.toolchainPath.
+  toolchain_path = nil,
   -- Arguments passed to the server. Add '--log-level', 'debug', '--log-file',
   -- 'C:/temp/tiko-lsp.log' to see what it is doing; it never writes to stdout.
   server_arguments = { '--stdio' },
@@ -61,6 +72,39 @@ local function is_file(p)
   return st ~= nil and st.type == 'file'
 end
 
+--- The tiko-lsp inside a toolchain folder, either layout, or nil.
+local function server_in(root)
+  for _, cand in ipairs({ vim.fs.joinpath(root, EXE), vim.fs.joinpath(root, 'bin', EXE) }) do
+    if is_file(cand) then return cand end
+  end
+  return nil
+end
+
+--- Where tiko-lang.net's instructions leave a toolchain, first choice first.
+local function usual_toolchains()
+  local home = vim.uv.os_homedir() or ''
+  local downloads = vim.fs.joinpath(home, 'Downloads')
+  local places = { vim.fs.joinpath(home, 'tiko-lang'), vim.fs.joinpath(downloads, 'tiko-lang') }
+  local extracted = {}
+  local st = vim.uv.fs_stat(downloads)
+  for name, kind in (st and st.type == 'directory') and vim.fs.dir(downloads) or function() end do
+    if kind == 'directory' and name:lower():sub(1, 5) == 'tiko-' then
+      table.insert(extracted, name)
+    end
+  end
+  table.sort(extracted)
+  for _, name in ipairs(extracted) do
+    table.insert(places, vim.fs.joinpath(downloads, name, 'tiko-lang'))
+  end
+  if IS_WINDOWS then
+    table.insert(places, (os.getenv('SystemDrive') or 'C:') .. '/tiko-lang')
+  else
+    table.insert(places, '/opt/tiko-lang')
+    table.insert(places, vim.fs.joinpath(home, '.local', 'tiko-lang'))
+  end
+  return places
+end
+
 --- The server binary for a project root, or nil and the reason.
 function M.find_server(root)
   local configured = M.config.server_path
@@ -73,15 +117,25 @@ function M.find_server(root)
     return nil, 'server_path names a file that does not exist: ' .. configured
   end
 
+  if M.config.toolchain_path and M.config.toolchain_path ~= '' then
+    local found = server_in(vim.fn.expand(M.config.toolchain_path))
+    if found then return found end
+  end
+
   local on_path = vim.fn.exepath(SERVER_NAME)
   if on_path ~= '' then return on_path end
+
+  for _, place in ipairs(usual_toolchains()) do
+    local found = server_in(place)
+    if found then return found end
+  end
 
   if root then
     local cand = vim.fs.joinpath(root, 'bin', EXE)
     if is_file(cand) then return cand end
   end
-  return nil, SERVER_NAME .. ' was not found. Put it on your PATH, or pass server_path to '
-    .. "require('tiko').setup()."
+  return nil, SERVER_NAME .. ' was not found. It comes with tiko: put the tiko-lang folder (on '
+    .. "Linux and macOS, its bin) on your PATH, or pass toolchain_path to require('tiko').setup()."
 end
 
 --- The project root for a buffer: the nearest root marker, else the file's directory.
@@ -95,6 +149,9 @@ end
 --- What the server is told in `initialize`.
 local function init_options()
   local opts = {}
+  if M.config.toolchain_path and M.config.toolchain_path ~= '' then
+    opts.toolchainPath = vim.fn.expand(M.config.toolchain_path)
+  end
   if #M.config.include_paths > 0 then opts.includePaths = M.config.include_paths end
   if #M.config.package_paths > 0 then opts.packagePaths = M.config.package_paths end
   if M.config.compiler_path then opts.compilerPath = M.config.compiler_path end
@@ -151,6 +208,7 @@ function M.info()
     'tiko-lsp:      ' .. (path or ('NOT FOUND -- ' .. why)),
     'arguments:     ' .. table.concat(M.config.server_arguments, ' '),
     'project root:  ' .. root,
+    'toolchain:     ' .. (M.config.toolchain_path or '(found by the server)'),
     'include paths: ' .. (#M.config.include_paths > 0 and table.concat(M.config.include_paths, ', ') or '(none)'),
     'package paths: ' .. (#M.config.package_paths > 0 and table.concat(M.config.package_paths, ', ') or '(beside the include paths)'),
   }

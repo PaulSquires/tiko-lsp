@@ -28,9 +28,20 @@ Files: `.tiko`, `.tko`, `.ti`, and the legacy `.bas`, `.bi`, `.inc`.
 In order:
 
 1. `server_path` in the settings;
-2. `tiko-lsp` on your `PATH`;
-3. `bin/tiko-lsp.exe` inside a workspace folder -- so opening the tiko-lsp
+2. the server in the toolchain folder named by `initializationOptions.toolchainPath`
+   -- tiko comes with it: `tiko-lang\tiko-lsp.exe` on Windows,
+   `tiko-lang/bin/tiko-lsp` on Linux and macOS;
+3. `tiko-lsp` on your `PATH` -- which it is, beside `tiko`, if you put the toolchain
+   on your `PATH`;
+4. a `tiko-lang` folder where tiko-lang.net's instructions leave one: your home
+   folder, Downloads (and one level below it), `C:\tiko-lang`, `/opt/tiko-lang`,
+   `~/.local/tiko-lang`;
+5. `bin/tiko-lsp.exe` inside a workspace folder -- so opening the tiko-lsp
    repository itself works after a build.
+
+Leave an initialization option out to let the server decide: an empty
+`"toolchainPath": ""` or `"compilerPath": ""` is an instruction that turns its own
+search off.
 
 If none of those finds it, LSP reports why the server could not start.
 

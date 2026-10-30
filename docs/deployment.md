@@ -373,6 +373,17 @@ From Git Bash on Windows 11:
 
 ## Phase 2: GitHub Releases foundation (after Track A; needed by B, C, D)
 
+> **2026-10-30, author: the server ships inside the tiko toolchain.** tiko-lang's
+> `build/release.sh` puts the binary from this repository's release archives beside the
+> compiler (`tiko-lang/tiko-lsp.exe`, `tiko-lang/bin/tiko-lsp`) with `licences/LICENSE-tiko-lsp`,
+> and the server takes the toolchain it is installed in. Zed, Neovim and Sublime find it in a
+> `toolchainPath` setting, on PATH, or (Neovim, Sublime) in the usual `tiko-lang` folders. So
+> Tracks B-D no longer need this phase to get a server to a user: it is now optional, for a
+> client that wants a server newer than the toolchain's. VS Code keeps its bundled copy.
+> **Order for a release:** build this repository's three archives first (release/build-*.sh),
+> then tiko-lang's `release.sh`, which refuses without them (`--no-lsp` skips).
+
+
 **Goal:** a public repo with a release whose assets any client can download anonymously.
 
 1. **Make `PaulSquires/tiko-lsp` public** (F1), unless it already went public for A-D5.
