@@ -8,7 +8,8 @@ before each first publish, because they change.
 
 A new user starts their editor, opens its extension store, types **tiko**, installs one
 thing, opens a `.tiko` file and has a running server. They never download a binary, edit a
-setting or install a dependency by hand. Windows x86-64 and Linux x86-64 only.
+setting or install a dependency by hand. Windows x86-64, Linux x86-64 and, since
+2026-10-30, macOS on Apple silicon (arm64, macOS 13+).
 
 ## How the plan is shaped
 
@@ -108,12 +109,14 @@ green. Still owed: the tarball smoke test on **Fedora 44**
 | `release/build-windows.sh` | Git Bash: `build\_run_tests.bat` (the server and the whole suite; cJSON linked statically) → gates → smoke → `dist/tiko-lsp-windows-x86_64.zip`. About 14 s. |
 | `release/build-linux.sh` | `wsl -d Ubuntu -- bash release/build-linux.sh`: copies the tree to `$HOME` (never builds on `/mnt/c`), `build/_run_tests.sh`, then `strip`, gates, smoke → `dist/tiko-lsp-linux-x86_64.tar.gz`. About 30 s. |
 | `release/smoke.py <exe> <ver>` | Standard-library Python, used on both platforms: `--version`, then one LSP session (`initialize` → `initialized` → `shutdown` → `exit`). Requires `serverInfo` = tiko-lsp + the version, a null `shutdown` result, clean framing on stdout, and exit code 0 within 30 s. |
-| `release/smoke-linux.sh [tarball]` | For any Linux test host: extracts the tarball into a fresh temp dir, checks the exec bit, runs `smoke.py` |
+| `release/build-macos.sh` | **On the Mac** (tiko-lang M11, 2026-10-30): `build/_run_tests.sh` with the Mac toolchain, then `strip -x`, an ad hoc re-sign, gates (arm64 only; links only `/usr/lib/libSystem` and `/usr/lib/libncurses`; minimum macOS ≤ 13.0; `codesign --verify --strict`), smoke → `dist/tiko-lsp-macos-arm64.tar.gz`, copied back to Windows with `scp` for packaging. |
+| `release/smoke-linux.sh [tarball]` | For any Linux or macOS test host: extracts the tarball into a fresh temp dir, checks the exec bit, runs `smoke.py` |
 | `release/pack.py` | Builds the archive. `THIRD-PARTY-NOTICES.txt` is **assembled from the licence files** (cJSON's and `LICENSE-tiko-rt`, both from the toolchain that built the binary), so it can't drift from what was linked. CRLF in the zip, LF in the tarball. |
 
 ```
 tiko-lsp-windows-x86_64.zip     tiko-lsp.exe (1.1 MB)                    LICENSE  THIRD-PARTY-NOTICES.txt   425 KB
 tiko-lsp-linux-x86_64.tar.gz    tiko-lsp (mode 0755, stripped, 1.1 MB)   LICENSE  THIRD-PARTY-NOTICES.txt   441 KB
+tiko-lsp-macos-arm64.tar.gz     tiko-lsp (mode 0755, stripped, signed)   LICENSE  THIRD-PARTY-NOTICES.txt   340 KB
 ```
 
 `dist/` and `obj/` are gitignored.
@@ -177,8 +180,10 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 - **A-D5. Repository link.** Either make `tiko-lsp` public before the first publish, or
   leave `repository` out of `package.json` until it is. A dead link on a listing looks
   abandoned.
-- **A-D6. No universal VSIX.** Only `win32-x64` and `linux-x64` are published. macOS and
-  ARM users see "not available for your platform", which is true.
+- **A-D6. No universal VSIX.** Only `win32-x64`, `linux-x64` and (since 2026-10-30)
+  `darwin-arm64` are published. Intel Macs and other ARM users see "not available for your
+  platform", which is true. On macOS the extension also clears `com.apple.quarantine` from
+  its server before starting it, because a quarantined binary blocks in syspolicyd.
 - **A-D7. Open VSX is part of Track A.** It takes the same two VSIX files, so it costs one
   extra command per release, and it covers VSCodium, Cursor, Windsurf and Kiro.
 
@@ -355,6 +360,7 @@ From Git Bash on Windows 11:
 | 2 | `bash release/build-windows.sh` | Phase 1 gates |
 | 3 | `wsl -d Ubuntu -- bash release/build-linux.sh` | glibc ≤ 2.35, suite green |
 | 4 | `sh release/smoke-linux.sh` on Fedora 44 (and `wsl -d Ubuntu -- sh release/smoke-linux.sh`) | `smoke ok` |
+| 4b | Mac: sync the tree, `bash release/build-macos.sh` there, `sh release/smoke-linux.sh` there, `scp` the tarball into `dist/` | gates + `smoke ok` |
 | 5 | `bash release/vscode/package.sh` | one binary per VSIX, versions in lockstep |
 | 6 | `bash release/vscode/test.sh dist/tiko-win32-x64.vsix`, and the linux-x64 one on a Linux desktop | all checks PASS |
 | 7 | `git tag vX.Y.Z && git push origin main vX.Y.Z` | |

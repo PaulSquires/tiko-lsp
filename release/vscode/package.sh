@@ -11,6 +11,8 @@
 #
 #      dist/tiko-win32-x64.vsix   <- dist/tiko-lsp-windows-x86_64.zip
 #      dist/tiko-linux-x64.vsix   <- dist/tiko-lsp-linux-x86_64.tar.gz
+#      dist/tiko-darwin-arm64.vsix <- dist/tiko-lsp-macos-arm64.tar.gz  (built on the Mac by
+#                                    release/build-macos.sh and copied back)
 #
 #  Gates, each one stops the packaging:
 #    - editors/vscode/package.json's version equals the server's (lockstep, A-D4);
@@ -84,6 +86,7 @@ EOF
 
 package_one win32-x64 tiko-lsp-windows-x86_64.zip    tiko-lsp.exe
 package_one linux-x64 tiko-lsp-linux-x86_64.tar.gz   tiko-lsp
+package_one darwin-arm64 tiko-lsp-macos-arm64.tar.gz tiko-lsp
 
 rm -rf server
-echo "== done: dist/tiko-win32-x64.vsix, dist/tiko-linux-x64.vsix ($EXT_VERSION)"
+echo "== done: dist/tiko-win32-x64.vsix, dist/tiko-linux-x64.vsix, dist/tiko-darwin-arm64.vsix ($EXT_VERSION)"

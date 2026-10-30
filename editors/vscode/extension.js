@@ -60,9 +60,15 @@ function onPath() {
 
 /**
  * The bundled server, executable. A .vsix is a zip, and one packed on Windows
- * carries no Unix mode bits, so on Linux the binary may arrive as 0644 and
- * spawn would fail with EACCES. Set the bits once; if that is impossible (a
+ * carries no Unix mode bits, so on Linux and macOS the binary may arrive as 0644
+ * and spawn would fail with EACCES. Set the bits once; if that is impossible (a
  * read-only install), starting it will say so.
+ *
+ * On macOS, a binary carrying the com.apple.quarantine attribute is held by
+ * Gatekeeper when it is run -- the tiko compiler itself blocks in syspolicyd
+ * until the attribute is cleared. Whether VS Code marks the files it unpacks
+ * from a Marketplace download is not something this extension controls, so
+ * the attribute is removed from the server, and only from it, if present.
  */
 function bundled(context) {
     const cand = context.asAbsolutePath(path.join('server', EXE));
@@ -73,6 +79,14 @@ function bundled(context) {
             if ((mode & 0o111) !== 0o111) fs.chmodSync(cand, mode | 0o755);
         } catch {
             // Reported by the start that follows, with the path in the message.
+        }
+    }
+    if (process.platform === 'darwin') {
+        try {
+            const { execFileSync } = require('child_process');
+            execFileSync('/usr/bin/xattr', ['-d', 'com.apple.quarantine', cand], { stdio: 'ignore' });
+        } catch {
+            // Not quarantined (xattr exits non-zero when the attribute is absent).
         }
     }
     return cand;
@@ -113,8 +127,9 @@ async function start(context) {
         // Only reachable without a bundled server: a platform no .vsix is
         // published for, or a development package (`npm run package`).
         notFound(
-            `${SERVER_NAME} was not found. This extension includes the server for Windows and ` +
-            `Linux x64 only; elsewhere, put ${SERVER_NAME} on your PATH or set "tiko.server.path".`
+            `${SERVER_NAME} was not found. This extension includes the server for Windows x64, ` +
+            `Linux x64 and macOS on Apple silicon only; elsewhere, put ${SERVER_NAME} on your PATH ` +
+            `or set "tiko.server.path".`
         );
         return;
     }

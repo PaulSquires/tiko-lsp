@@ -4,6 +4,8 @@ The extension's version is the version of the tiko-lsp server it includes.
 
 ## 0.1.2
 
+- **macOS on Apple silicon** (macOS 13 or later): the server is included, as it is
+  for Windows x64 and Linux x64.
 - A long editing session stays fast. Opening, editing and closing a file used to get
   slower with every file the session had seen, until each took several hundred
   milliseconds; it now stays flat (about 25-40 ms per file over 1,200 files).

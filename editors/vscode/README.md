@@ -9,8 +9,8 @@ language server written in tiko. **The server is included**: install the
 extension, open a `.tiko` file, and it starts. There is nothing else to download
 and no setting to change.
 
-- Platforms: **Windows x64** and **Linux x64**. VS Code installs the build for
-  your platform automatically.
+- Platforms: **Windows x64**, **Linux x64** and **macOS on Apple silicon** (macOS 13
+  or later). VS Code installs the build for your platform automatically.
 - Files: `.tiko`, `.tko`, `.ti`.
 
 ## Getting started
