@@ -15,6 +15,14 @@ The extension's version is the version of the tiko-lsp server it includes.
   it, saves it and restarts the server. When no toolchain is found, the extension offers
   it once per window, with **Don't Ask Again**.
 - The output channel shows the toolchain the server used.
+- **Build and run.** **Tiko: Run** (`Ctrl+F5`, or the ▶ button on a tiko editor), **Tiko:
+  Build** (also under `Ctrl+Shift+B`) and **Tiko: Check (no build)** run `tiko run`,
+  `tiko build` and `tiko check` in the terminal. A project is built when a `tiko.toml` is
+  at or above the file; otherwise the file itself is built. Compiler errors go to the
+  Problems view, through the new `$tiko` problem matcher.
+- New task type `tiko` for `.vscode/tasks.json` (`command`, `file`, `args`, `runArgs`),
+  and settings `tiko.build.arguments` and `tiko.run.arguments`.
+- `tiko-lsp --version` names the tiko compiler it was built with, not FreeBASIC.
 
 ## 0.1.2
 

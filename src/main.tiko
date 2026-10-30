@@ -221,8 +221,8 @@ if( opts.ShowHelp ) then
 end if
 
 if( opts.ShowVers ) then
-    fprintf( stderr, !"%s %s (LSP %s, built with FreeBASIC %s)\n", _
-             LSP_SERVER_NAME, LSP_SERVER_VERSION, LSP_SPEC_VERSION, __FB_VERSION__ )
+    fprintf( stderr, !"%s %s (LSP %s, built with tiko %s)\n", _
+             LSP_SERVER_NAME, LSP_SERVER_VERSION, LSP_SPEC_VERSION, __TIKO_VERSION__ )
     end 0
 end if
 

@@ -182,6 +182,7 @@ async function start(context) {
     }
 
     const tc = toolchainReport(client);
+    lastToolchain = tc;
     if (!tc) return; // a server older than 0.1.3 says nothing; nothing to act on
     if (toolchainFound(tc)) {
         output.appendLine(`toolchain: ${tc.root || '(no single folder)'}` +
@@ -319,6 +320,164 @@ async function locateToolchain(context) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Build and run: the `tiko` task type.
+//
+// Every task is one `tiko build | run | check` process -- the compiler's own
+// subcommands, which cache, link and (for run) start the program -- in VS
+// Code's terminal. What is built:
+//
+//   - a project, when a `tiko.toml` is at or above the active file: the
+//     command gets `--manifest <absolute path>`;
+//   - otherwise the active file itself, by absolute path.
+//
+// Absolute paths in, absolute paths out: tiko prints a diagnostic's file as
+// it was reached, so the `$tiko` problem matcher never depends on a working
+// directory. The compiler is tiko.compilerPath, else the one the server found
+// with the toolchain, else `tiko` on the PATH.
+// ---------------------------------------------------------------------------
+
+const TASK_TYPE = 'tiko';
+const TASK_COMMANDS = ['build', 'run', 'check'];
+/** The server's toolchain report from the last start (see toolchainReport). */
+let lastToolchain;
+
+/** `tiko` on the PATH, without running anything. */
+function tikoOnPath() {
+    const exe = process.platform === 'win32' ? 'tiko.exe' : 'tiko';
+    for (const d of (process.env.PATH || '').split(path.delimiter)) {
+        if (!d) continue;
+        const cand = path.join(d.replace(/^"|"$/g, ''), exe);
+        if (isFile(cand)) return cand;
+    }
+    return undefined;
+}
+
+/** The compiler to build with, or undefined. */
+function compilerForTasks() {
+    const configured = vscode.workspace.getConfiguration('tiko').get('compilerPath', '');
+    if (configured) return configured;
+    if (lastToolchain && lastToolchain.compiler) return lastToolchain.compiler;
+    return tikoOnPath();
+}
+
+/** The nearest tiko.toml at or above `dir`, or undefined. */
+function manifestAbove(dir) {
+    let d = dir;
+    for (;;) {
+        const cand = path.join(d, 'tiko.toml');
+        if (isFile(cand)) return cand;
+        const up = path.dirname(d);
+        if (up === d) return undefined;
+        d = up;
+    }
+}
+
+/**
+ * What a task builds: { manifest } or { file }, plus the folder it belongs to.
+ * `file` names a root explicitly (tasks.json); otherwise the active tiko
+ * editor decides, then a tiko.toml at the top of a workspace folder.
+ */
+function buildSubject(file) {
+    let target = file;
+    if (!target) {
+        const ed = vscode.window.activeTextEditor;
+        if (ed && ed.document.languageId === 'tiko' && ed.document.uri.scheme === 'file') {
+            target = ed.document.uri.fsPath;
+        }
+    }
+    if (target) {
+        const abs = path.resolve(target);
+        const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(abs));
+        // A file named in tasks.json is that file; the active editor's file
+        // belongs to its project when it has one.
+        const manifest = file ? undefined : manifestAbove(path.dirname(abs));
+        if (manifest) return { manifest, folder, label: `${path.basename(path.dirname(manifest))} (tiko.toml)` };
+        return { file: abs, folder, label: path.basename(abs) };
+    }
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+        const manifest = path.join(folder.uri.fsPath, 'tiko.toml');
+        if (isFile(manifest)) return { manifest, folder, label: `${folder.name} (tiko.toml)` };
+    }
+    return undefined;
+}
+
+/** A vscode.Task for `definition`, or undefined when there is nothing to build. */
+function makeTask(definition, subject, compiler) {
+    const cfg = vscode.workspace.getConfiguration('tiko');
+    const args = [definition.command, '--color=never'];
+    if (subject.manifest) args.push('--manifest', subject.manifest);
+    args.push(...(definition.args || cfg.get('build.arguments', [])));
+    if (subject.file) args.push(subject.file);
+    if (definition.command === 'run') {
+        const runArgs = definition.runArgs || cfg.get('run.arguments', []);
+        if (runArgs.length > 0) args.push('--', ...runArgs);
+    }
+    const cwd = subject.manifest ? path.dirname(subject.manifest) : path.dirname(subject.file);
+    const task = new vscode.Task(
+        definition,
+        subject.folder || vscode.TaskScope.Workspace,
+        `${definition.command} ${subject.label}`,
+        'tiko',
+        new vscode.ProcessExecution(compiler, args, { cwd }),
+        '$tiko'
+    );
+    if (definition.command === 'build') task.group = vscode.TaskGroup.Build;
+    task.presentationOptions = {
+        reveal: definition.command === 'run' ? vscode.TaskRevealKind.Always : vscode.TaskRevealKind.Silent,
+        clear: true,
+        showReuseMessage: false,
+    };
+    return task;
+}
+
+function missingCompiler() {
+    vscode.window.showErrorMessage(
+        'Tiko cannot build: no tiko compiler was found. Locate the toolchain, or set "tiko.compilerPath".',
+        'Locate Toolchain...', 'Download tiko'
+    ).then((choice) => {
+        if (choice === 'Locate Toolchain...') vscode.commands.executeCommand('tiko.locateToolchain');
+        else if (choice === 'Download tiko') vscode.env.openExternal(vscode.Uri.parse(DOWNLOAD_URL));
+    });
+}
+
+const taskProvider = {
+    provideTasks() {
+        const subject = buildSubject(undefined);
+        const compiler = compilerForTasks();
+        if (!subject || !compiler) return [];
+        return TASK_COMMANDS.map((command) => makeTask({ type: TASK_TYPE, command }, subject, compiler));
+    },
+    resolveTask(task) {
+        const def = task.definition;
+        if (!def || !TASK_COMMANDS.includes(def.command)) return undefined;
+        const subject = buildSubject(def.file);
+        const compiler = compilerForTasks();
+        if (!subject || !compiler) return undefined;
+        const resolved = makeTask(def, subject, compiler);
+        // tasks.json's own problemMatcher and presentation win over ours.
+        return new vscode.Task(def, task.scope || resolved.scope, task.name || resolved.name, 'tiko',
+            resolved.execution, task.problemMatchers && task.problemMatchers.length ? task.problemMatchers : '$tiko');
+    },
+};
+
+/** Tiko: Build / Tiko: Run / Tiko: Check -- the same tasks, started directly. */
+async function runTiko(command) {
+    const compiler = compilerForTasks();
+    if (!compiler) {
+        missingCompiler();
+        return;
+    }
+    const subject = buildSubject(undefined);
+    if (!subject) {
+        vscode.window.showErrorMessage('Tiko: open a .tiko file, or a folder with a tiko.toml, to build it.');
+        return;
+    }
+    // Tasks started this way do not pass through task.saveBeforeRun.
+    await vscode.workspace.saveAll(false);
+    return vscode.tasks.executeTask(makeTask({ type: TASK_TYPE, command }, subject, compiler));
+}
+
 async function stop() {
     if (!client) return;
     const c = client;
@@ -343,6 +502,10 @@ async function activate(context) {
         vscode.commands.registerCommand('tiko.restartServer', () => restart(context)),
         vscode.commands.registerCommand('tiko.showOutput', () => output.show(true)),
         vscode.commands.registerCommand('tiko.locateToolchain', () => locateToolchain(context)),
+        vscode.commands.registerCommand('tiko.build', () => runTiko('build')),
+        vscode.commands.registerCommand('tiko.run', () => runTiko('run')),
+        vscode.commands.registerCommand('tiko.check', () => runTiko('check')),
+        vscode.tasks.registerTaskProvider(TASK_TYPE, taskProvider),
 
         // initializationOptions are read once, at `initialize`: a change to
         // anything the server is started with needs a restart to take effect.

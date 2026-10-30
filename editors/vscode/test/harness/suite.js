@@ -197,6 +197,70 @@ exports.run = async function run() {
             check('std/ completion through tiko.toolchainPath', stdLabels,
                 stdLabels ? `${stdLabels.length} items after strings., PadLeft among them` : `no PadLeft (toolchain ${toolchain})`);
         }
+
+        // 10. Build and run: the `tiko` task type, the $tiko problem matcher, and
+        //     the commands. The compiler is the toolchain's, found in step 9.
+        const pkgContrib = ext.packageJSON.contributes || {};
+        check('task type tiko and problem matcher $tiko contributed',
+            (pkgContrib.taskDefinitions || []).some((t) => t.type === 'tiko') &&
+            (pkgContrib.problemMatchers || []).some((m) => m.name === 'tiko'));
+        check('Tiko: Build and Tiko: Run registered',
+            commands.includes('tiko.build') && commands.includes('tiko.run'));
+        if (!toolchain) {
+            check('build and run', true, 'skipped: TIKO_TEST_TOOLCHAIN not set');
+        } else {
+            const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const scratch = [path.join(root, 'ran.txt'), path.join(root, 'proj', 'proj-ran.txt'),
+                path.join(root, 'runme.exe'), path.join(root, 'runme'), path.join(root, 'undeclared.exe'),
+                path.join(root, 'undeclared'), path.join(root, 'proj', 'out')];
+            const cleanup = () => scratch.forEach((p) => fs.rmSync(p, { recursive: true, force: true }));
+            cleanup();
+
+            /** Runs the provided task `command` for the active editor; its exit code, or undefined. */
+            const runProvided = async (command) => {
+                const tasks = await vscode.tasks.fetchTasks({ type: 'tiko' });
+                const task = tasks.find((t) => t.definition.command === command);
+                if (!task) return { code: undefined, name: `no '${command}' task among ${tasks.map((t) => t.name).join(', ')}` };
+                return new Promise((resolve) => {
+                    let exec;
+                    const timer = setTimeout(() => { sub.dispose(); resolve({ code: undefined, name: `${task.name}: timed out` }); }, 120000);
+                    const sub = vscode.tasks.onDidEndTaskProcess((e) => {
+                        if (exec && e.execution !== exec) return;
+                        clearTimeout(timer);
+                        sub.dispose();
+                        resolve({ code: e.exitCode, name: task.name });
+                    });
+                    vscode.tasks.executeTask(task).then((x) => { exec = x; });
+                });
+            };
+
+            // a. A compile error the server cannot see lands in Problems.
+            const und = await open('undeclared.tiko');
+            const built = await runProvided('build');
+            const tikoDiags = await waitFor(() => {
+                const d = vscode.languages.getDiagnostics(und.uri).filter((x) => /not declared/.test(x.message));
+                return d.length ? d : undefined;
+            }, 20000);
+            check('build: a compiler error lands in Problems', tikoDiags && built.code === 1,
+                `${built.name} exit ${built.code}; ` +
+                (tikoDiags ? tikoDiags.map((d) => `${d.range.start.line + 1}:${d.range.start.character + 1} ${d.code && d.code.value ? d.code.value : d.code} ${d.message}`).join(' | ') : 'no diagnostic'));
+
+            // b. Run a single file: built, then started in its own folder.
+            await open('runme.tiko');
+            const ranFile = await runProvided('run');
+            const marker = path.join(root, 'ran.txt');
+            check('run: a single file builds and runs', ranFile.code === 0 && fs.existsSync(marker),
+                `${ranFile.name} exit ${ranFile.code}; ran.txt ${fs.existsSync(marker) ? 'written' : 'missing'}`);
+
+            // c. Run a project: the tiko.toml above the active file wins.
+            await open('proj/src/main.tiko');
+            const ranProj = await runProvided('run');
+            const projMarker = path.join(root, 'proj', 'proj-ran.txt');
+            check('run: a tiko.toml project builds and runs', ranProj.code === 0 && fs.existsSync(projMarker) &&
+                /tiko\.toml/.test(ranProj.name),
+                `${ranProj.name} exit ${ranProj.code}; proj-ran.txt ${fs.existsSync(projMarker) ? 'written' : 'missing'}`);
+            cleanup();
+        }
     } catch (err) {
         check('no exception', false, err && err.stack ? err.stack : err);
     }

@@ -1,0 +1,2 @@
+' Built by the harness's build check: the compiler, not the server, finds this.
+print notdeclared

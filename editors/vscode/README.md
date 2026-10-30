@@ -43,6 +43,22 @@ or set the folder yourself:
 
 **Tiko: Show Language Server Output** shows the toolchain the server used.
 
+### Build and run
+
+- **Run:** the **▶** button at the top right of a tiko editor, `Ctrl+F5` (`Cmd+F5` on a
+  Mac), or **Tiko: Run**.
+- **Build:** `Ctrl+Shift+B`, then **tiko: build …**, or **Tiko: Build**.
+- **Check** (every error, nothing written): **Tiko: Check (no build)**.
+
+When a `tiko.toml` is at or above the file, the project is built (`tiko build`,
+`tiko run`). Otherwise the file itself is built, and the program is written next to it.
+Both run in the terminal, so the program can read input. Compiler errors, including
+the ones only the compiler finds, go to the **Problems** view.
+
+`tiko.build.arguments` adds compiler options (`-g`, `-exx`), and `tiko.run.arguments`
+passes arguments to the program. Tasks of type `tiko` in `.vscode/tasks.json` take
+`command` (`build`, `run` or `check`), `file`, `args` and `runArgs`.
+
 ### Legacy FreeBASIC files
 
 Older tiko projects use FreeBASIC's `.bas`, `.bi` and `.inc` extensions. Other
@@ -67,6 +83,8 @@ treat them as tiko, add:
 | `tiko.includePaths` | `[]` | Override: the toolchain's `inc` folders, for an unusual layout. |
 | `tiko.packagePaths` | `[]` | Where `#import` packages are found, if not in the `pkg` folder beside an include path. |
 | `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about each folder's `tiko.toml` (`tiko metadata`), so imports resolve exactly as the compiler resolves them. Never run for diagnostics. Empty: the compiler in the toolchain folder, else a `tiko` on the `PATH`. |
+| `tiko.build.arguments` | `[]` | Compiler options for Build and Run, such as `-g` or `-exx`. |
+| `tiko.run.arguments` | `[]` | Arguments **Tiko: Run** passes to the program. |
 | `tiko.server.path` | `""` | Use a different `tiko-lsp` executable instead of the included one. |
 | `tiko.server.arguments` | `["--stdio"]` | Server arguments. Add `"--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"` to see what the server is doing. |
 | `tiko.trace.server` | `"off"` | Log the LSP traffic in the **Tiko Language Server** output channel. |

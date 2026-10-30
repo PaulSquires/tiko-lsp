@@ -34,7 +34,10 @@
     "language server"
   ],
   "main": "./extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onTaskType:tiko",
+    "workspaceContains:tiko.toml"
+  ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
@@ -78,6 +81,23 @@
       {
         "command": "tiko.locateToolchain",
         "title": "Locate Toolchain...",
+        "category": "Tiko"
+      },
+      {
+        "command": "tiko.build",
+        "title": "Build",
+        "category": "Tiko",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "tiko.run",
+        "title": "Run",
+        "category": "Tiko",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tiko.check",
+        "title": "Check (no build)",
         "category": "Tiko"
       }
     ],
@@ -127,6 +147,22 @@
           "default": "",
           "markdownDescription": "A `tiko` the server may ASK about each workspace folder's `tiko.toml` (`tiko metadata`): imports then resolve where the compiler resolves them, `-i` options included, and the `tiko/metadata` request returns the package's targets. Never run for diagnostics. Empty: the compiler in `tiko.toolchainPath`, else a `tiko` on the `PATH`. Sent as `initializationOptions.compilerPath`."
         },
+        "tiko.build.arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra compiler options for **Tiko: Build** and **Tiko: Run**, such as `-g` (debug information) or `-exx` (runtime checks). A project's `tiko.toml` profiles still apply."
+        },
+        "tiko.run.arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Command-line arguments passed to the program by **Tiko: Run** (after `--`)."
+        },
         "tiko.trace.server": {
           "type": "string",
           "enum": [
@@ -138,7 +174,100 @@
           "description": "Traces the communication between VS Code and tiko-lsp in the 'Tiko Language Server' output channel."
         }
       }
-    }
+    },
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "tiko.run",
+          "when": "resourceLangId == tiko",
+          "group": "navigation@0"
+        },
+        {
+          "command": "tiko.build",
+          "when": "resourceLangId == tiko",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "tiko.build",
+          "when": "editorLangId == tiko || workspaceFolderCount > 0"
+        },
+        {
+          "command": "tiko.run",
+          "when": "editorLangId == tiko || workspaceFolderCount > 0"
+        },
+        {
+          "command": "tiko.check",
+          "when": "editorLangId == tiko || workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "tiko.run",
+        "key": "ctrl+f5",
+        "mac": "cmd+f5",
+        "when": "editorLangId == tiko && !inDebugMode"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "tiko",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "build",
+              "run",
+              "check"
+            ],
+            "description": "tiko build, tiko run (build, then run the program) or tiko check (every diagnostic, nothing written)."
+          },
+          "file": {
+            "type": "string",
+            "description": "A root file to build instead of the project: absolute, or relative to the workspace folder. Empty: the tiko.toml at or above the active file, else the active file."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Compiler options, such as -g or -exx. Default: tiko.build.arguments."
+          },
+          "runArgs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Arguments for the program (run only). Default: tiko.run.arguments."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "tiko",
+        "owner": "tiko",
+        "source": "tiko",
+        "fileLocation": [
+          "autoDetect",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.*)\\((\\d+),(\\d+)\\): (error|warning|note) (TKO\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    ]
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

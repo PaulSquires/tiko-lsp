@@ -1,0 +1,5 @@
+' Run by the harness through proj/tiko.toml: leaves proj-ran.txt in the project folder.
+dim as long f = freefile
+open "proj-ran.txt" for output as #f
+print #f, "project mode"
+close #f
