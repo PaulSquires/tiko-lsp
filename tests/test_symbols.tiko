@@ -321,6 +321,44 @@ scope
     AssertEqStr( S_(t).Doc_, "", "a comment on the same line is a remark, not doc" )
 end scope
 
+'' Internal design-record numbers -- RFC- and four digits from 0 -- never reach
+'' a popup; public standards (RFC 3986, RFC-3339) do. A parenthetical goes with
+'' its parentheses, anything else with its sentence.
+scope
+    Analyse( "'' Locale formatting styles (RFC-0007 section 3)." & LF & _
+             "sub A1( )" & LF & "end sub" & LF & LF & _
+             "'' Calendar arithmetic. Locale formatting is RFC-0007. Output is" & LF & _
+             "'' whatever the C library says." & LF & _
+             "sub A2( )" & LF & "end sub" & LF & LF & _
+             "'' Validation first (RFC-0001 section 6.1) -- Rust's rule set." & LF & _
+             "sub A3( )" & LF & "end sub" & LF & LF & _
+             "'' What a filter answers, as bit flags (" & chr(67) & ":" & chr(92) & "dev" & chr(92) & "docs" & chr(92) & "RFC-0001" & LF & _
+             "'' section 2.2): a set of them." & LF & _
+             "sub A4( )" & LF & "end sub" & LF & LF & _
+             "'' Parses a URI (RFC 3986) and a time (RFC-3339)." & LF & _
+             "sub A5( )" & LF & "end sub" & LF & LF & _
+             "'' RFC-0006 fixes the pass ORDER but not the" & LF & _
+             "'' rounding. Ties go left." & LF & _
+             "sub A6( )" & LF & "end sub" & LF & LF & _
+             "'' Plain documentation, with (parentheses) and e.g. no references." & LF & _
+             "sub A7( )" & LF & "end sub" )
+
+    AssertEqStr( S_(IndexOfName( "A1" )).Doc_, "Locale formatting styles.", _
+                 "a parenthesised reference goes with its parentheses" )
+    AssertEqStr( S_(IndexOfName( "A2" )).Doc_, "Calendar arithmetic. Output is" & LF & "whatever the C library says.", _
+                 "a reference in running text takes its sentence with it" )
+    AssertEqStr( S_(IndexOfName( "A3" )).Doc_, "Validation first -- Rust's rule set.", _
+                 "and the text around a parenthetical closes up" )
+    AssertEqStr( S_(IndexOfName( "A4" )).Doc_, "What a filter answers, as bit flags: a set of them.", _
+                 "a parenthetical across lines, with a local path in it, goes whole" )
+    AssertEqStr( S_(IndexOfName( "A5" )).Doc_, "Parses a URI (RFC 3986) and a time (RFC-3339).", _
+                 "a public RFC stays" )
+    AssertEqStr( S_(IndexOfName( "A6" )).Doc_, "Ties go left.", _
+                 "a sentence spanning lines goes whole" )
+    AssertEqStr( S_(IndexOfName( "A7" )).Doc_, "Plain documentation, with (parentheses) and e.g. no references.", _
+                 "documentation without a reference is untouched" )
+end scope
+
 '' ----------------------------------------------------------------------------
 TestGroup( "resolution" )
 
