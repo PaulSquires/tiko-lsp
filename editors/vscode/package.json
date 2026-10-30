@@ -1,9 +1,10 @@
 {
   "name": "tiko",
   "displayName": "Tiko",
-  "description": "Language support for tiko, the FreeBASIC-compatible language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included.",
+  "description": "Language support for the tiko programming language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included. Tiko is a FreeBASIC-compatible language.",
   "version": "0.1.2",
   "publisher": "PaulSquires",
+  "homepage": "https://tiko-lang.net/",
   "license": "MIT",
   "icon": "images/icon.png",
   "galleryBanner": {
@@ -14,7 +15,6 @@
     "type": "git",
     "url": "https://github.com/PaulSquires/tiko-lsp"
   },
-  "homepage": "https://github.com/PaulSquires/tiko-lsp/tree/main/editors/vscode#readme",
   "bugs": {
     "url": "https://github.com/PaulSquires/tiko-lsp/issues"
   },
