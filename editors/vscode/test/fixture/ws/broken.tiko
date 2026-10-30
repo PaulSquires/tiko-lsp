@@ -1,0 +1,4 @@
+sub Broken( )
+    if 1 then
+        print "x"
+end sub

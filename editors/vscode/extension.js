@@ -11,8 +11,13 @@
 //
 //   1. `tiko.server.path` in the settings -- the escape hatch for anyone whose
 //      build lives somewhere unusual;
-//   2. `tiko-lsp` on the PATH;
-//   3. `bin/tiko-lsp(.exe)` inside a workspace folder, so that opening the
+//   2. `server/tiko-lsp(.exe)` inside this extension -- the copy a Marketplace
+//      install carries. Each published .vsix is platform-specific and holds
+//      exactly one binary (release/vscode/package.sh). It comes BEFORE the
+//      PATH so a stale copy there cannot shadow the one installed with the
+//      extension; a developer's own build is named with the setting;
+//   3. `tiko-lsp` on the PATH;
+//   4. `bin/tiko-lsp(.exe)` inside a workspace folder, so that opening the
 //      tiko-lsp repository itself just works after a build.
 //
 // If none of those finds it, the error says exactly what to do -- an editor
@@ -53,20 +58,57 @@ function onPath() {
     return undefined;
 }
 
+/**
+ * The bundled server, executable. A .vsix is a zip, and one packed on Windows
+ * carries no Unix mode bits, so on Linux and macOS the binary may arrive as 0644
+ * and spawn would fail with EACCES. Set the bits once; if that is impossible (a
+ * read-only install), starting it will say so.
+ *
+ * On macOS, a binary carrying the com.apple.quarantine attribute is held by
+ * Gatekeeper when it is run -- the tiko compiler itself blocks in syspolicyd
+ * until the attribute is cleared. Whether VS Code marks the files it unpacks
+ * from a Marketplace download is not something this extension controls, so
+ * the attribute is removed from the server, and only from it, if present.
+ */
+function bundled(context) {
+    const cand = context.asAbsolutePath(path.join('server', EXE));
+    if (!isFile(cand)) return undefined;
+    if (process.platform !== 'win32') {
+        try {
+            const mode = fs.statSync(cand).mode;
+            if ((mode & 0o111) !== 0o111) fs.chmodSync(cand, mode | 0o755);
+        } catch {
+            // Reported by the start that follows, with the path in the message.
+        }
+    }
+    if (process.platform === 'darwin') {
+        try {
+            const { execFileSync } = require('child_process');
+            execFileSync('/usr/bin/xattr', ['-d', 'com.apple.quarantine', cand], { stdio: 'ignore' });
+        } catch {
+            // Not quarantined (xattr exits non-zero when the attribute is absent).
+        }
+    }
+    return cand;
+}
+
 /** The server binary, or undefined -- see the order at the top of the file. */
-function findServer() {
+function findServer(context) {
     const configured = vscode.workspace.getConfiguration('tiko').get('server.path', '');
     // Settings win outright: a path a user named is used even when it is
     // wrong, because guessing past an explicit instruction is how a tool
     // becomes impossible to point somewhere. The error then names that path.
-    if (configured) return { path: configured, configured: true };
+    if (configured) return { path: configured, configured: true, source: 'tiko.server.path' };
+
+    const inside = bundled(context);
+    if (inside) return { path: inside, configured: false, source: 'included with the extension' };
 
     const fromPath = onPath();
-    if (fromPath) return { path: fromPath, configured: false };
+    if (fromPath) return { path: fromPath, configured: false, source: 'PATH' };
 
     for (const folder of vscode.workspace.workspaceFolders || []) {
         const cand = path.join(folder.uri.fsPath, 'bin', EXE);
-        if (isFile(cand)) return { path: cand, configured: false };
+        if (isFile(cand)) return { path: cand, configured: false, source: 'workspace bin' };
     }
     return undefined;
 }
@@ -80,11 +122,14 @@ function notFound(message) {
 }
 
 async function start(context) {
-    const found = findServer();
+    const found = findServer(context);
     if (!found) {
+        // Only reachable without a bundled server: a platform no .vsix is
+        // published for, or a development package (`npm run package`).
         notFound(
-            `${SERVER_NAME} was not found. Put it on your PATH, or set "tiko.server.path" ` +
-            `to the executable. On Windows, yyjson64.dll must sit beside it.`
+            `${SERVER_NAME} was not found. This extension includes the server for Windows x64, ` +
+            `Linux x64 and macOS on Apple silicon only; elsewhere, put ${SERVER_NAME} on your PATH ` +
+            `or set "tiko.server.path".`
         );
         return;
     }
@@ -122,7 +167,7 @@ async function start(context) {
     };
 
     client = new LanguageClient('tiko', 'Tiko Language Server', serverOptions, clientOptions);
-    output.appendLine(`starting ${found.path} ${args.join(' ')}`);
+    output.appendLine(`starting ${found.path} ${args.join(' ')}  (${found.source})`);
     try {
         await client.start();
     } catch (err) {

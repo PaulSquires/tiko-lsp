@@ -8,7 +8,8 @@ before each first publish, because they change.
 
 A new user starts their editor, opens its extension store, types **tiko**, installs one
 thing, opens a `.tiko` file and has a running server. They never download a binary, edit a
-setting or install a dependency by hand. Windows x86-64 and Linux x86-64 only.
+setting or install a dependency by hand. Windows x86-64, Linux x86-64 and, since
+2026-10-30, macOS on Apple silicon (arm64, macOS 13+).
 
 ## How the plan is shaped
 
@@ -108,12 +109,14 @@ green. Still owed: the tarball smoke test on **Fedora 44**
 | `release/build-windows.sh` | Git Bash: `build\_run_tests.bat` (the server and the whole suite; cJSON linked statically) → gates → smoke → `dist/tiko-lsp-windows-x86_64.zip`. About 14 s. |
 | `release/build-linux.sh` | `wsl -d Ubuntu -- bash release/build-linux.sh`: copies the tree to `$HOME` (never builds on `/mnt/c`), `build/_run_tests.sh`, then `strip`, gates, smoke → `dist/tiko-lsp-linux-x86_64.tar.gz`. About 30 s. |
 | `release/smoke.py <exe> <ver>` | Standard-library Python, used on both platforms: `--version`, then one LSP session (`initialize` → `initialized` → `shutdown` → `exit`). Requires `serverInfo` = tiko-lsp + the version, a null `shutdown` result, clean framing on stdout, and exit code 0 within 30 s. |
-| `release/smoke-linux.sh [tarball]` | For any Linux test host: extracts the tarball into a fresh temp dir, checks the exec bit, runs `smoke.py` |
+| `release/build-macos.sh` | **On the Mac** (tiko-lang M11, 2026-10-30): `build/_run_tests.sh` with the Mac toolchain, then `strip -x`, an ad hoc re-sign, gates (arm64 only; links only `/usr/lib/libSystem` and `/usr/lib/libncurses`; minimum macOS ≤ 13.0; `codesign --verify --strict`), smoke → `dist/tiko-lsp-macos-arm64.tar.gz`, copied back to Windows with `scp` for packaging. |
+| `release/smoke-linux.sh [tarball]` | For any Linux or macOS test host: extracts the tarball into a fresh temp dir, checks the exec bit, runs `smoke.py` |
 | `release/pack.py` | Builds the archive. `THIRD-PARTY-NOTICES.txt` is **assembled from the licence files** (cJSON's and `LICENSE-tiko-rt`, both from the toolchain that built the binary), so it can't drift from what was linked. CRLF in the zip, LF in the tarball. |
 
 ```
 tiko-lsp-windows-x86_64.zip     tiko-lsp.exe (1.1 MB)                    LICENSE  THIRD-PARTY-NOTICES.txt   425 KB
 tiko-lsp-linux-x86_64.tar.gz    tiko-lsp (mode 0755, stripped, 1.1 MB)   LICENSE  THIRD-PARTY-NOTICES.txt   441 KB
+tiko-lsp-macos-arm64.tar.gz     tiko-lsp (mode 0755, stripped, signed)   LICENSE  THIRD-PARTY-NOTICES.txt   340 KB
 ```
 
 `dist/` and `obj/` are gitignored.
@@ -153,6 +156,15 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 
 **Depends on:** Phase 1 only.
 
+**Status (2026-10-17):** the code work (A.2, A.3, A.4) is done and passes on Windows.
+
+- Built and tested here: two platform VSIX files, and a clean-profile test of the
+  Windows one with 13 of 13 checks passing.
+- **Not done:**
+  - the A.4 run on Linux (no VS Code in WSL yet);
+  - the interactive A.4 rows;
+  - everything that needs your accounts (A.1, A.5–A.8).
+
 ### A. Decisions
 
 - **A-D1. Extension ID `PaulSquires.tiko`.** Rename `name` from `tiko-lsp`. The ID is
@@ -168,8 +180,10 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 - **A-D5. Repository link.** Either make `tiko-lsp` public before the first publish, or
   leave `repository` out of `package.json` until it is. A dead link on a listing looks
   abandoned.
-- **A-D6. No universal VSIX.** Only `win32-x64` and `linux-x64` are published. macOS and
-  ARM users see "not available for your platform", which is true.
+- **A-D6. No universal VSIX.** Only `win32-x64`, `linux-x64` and (since 2026-10-30)
+  `darwin-arm64` are published. Intel Macs and other ARM users see "not available for your
+  platform", which is true. On macOS the extension also clears `com.apple.quarantine` from
+  its server before starting it, because a quarantined binary blocks in syspolicyd.
 - **A-D7. Open VSX is part of Track A.** It takes the same two VSIX files, so it costs one
   extra command per release, and it covers VSCodium, Cursor, Windsurf and Kiro.
 
@@ -203,6 +217,10 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
     `freebasic`, `lsp`, `language server`; at most 30), `categories` + `Linters` and
     `Formatters`, `galleryBanner`, `bugs` and `homepage` (A-D5);
   - `extensions` → `.tiko`, `.tko`, `.ti` (A-D2).
+
+  **Done.** The icon is the tiko mascot, `images/icon.png`, copied from tiko-lang's
+  `brand/png/tiko-mascot-512.png` (SVG isn't allowed). `galleryBanner` is `#1E1838`,
+  dark. The lockfile's `name` follows the rename.
 - `extension.js`:
   - add the bundled lookup, `context.asAbsolutePath('server/tiko-lsp[.exe]')` (A-D3);
   - on Linux, `fs.chmodSync(path, 0o755)` before starting it, because a VSIX packed on
@@ -214,31 +232,73 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 - `CHANGELOG.md`: new.
 - `release/bump.py`: add the `editors/vscode/package.json` version site to `SITES`.
 
+**Done**, with these specifics:
+
+- The lookup order and the Linux chmod are in `extension.js`. The output channel's first
+  line names the binary and where it was found ("included with the extension", "PATH",
+  ...).
+- The README is rewritten as the **Marketplace listing**, with absolute links only.
+  vsce resolves relative links against the repository root, and this extension lives in
+  a subdirectory, so relative links would break.
+- `.vscodeignore` also drops `test/**`, `node_modules/**/*.d.ts` and `*.map`.
+- `bump.py` gained the `package.json` site and both lockfile sites, and now applies
+  several sites in one file correctly.
+- vsce warns that the package has 214 files (166 of them JS) and suggests bundling with
+  esbuild. That is optional, and not done.
+
 ### A.3 Packaging (`release/vscode/package.sh`)
 
-For each target, empty `editors/vscode/server/`, copy **only that target's** binary in
-from `dist/`, then:
+For each target, empty `editors/vscode/server/` and fill it **from the release archive** in
+`dist/`: the binary, `LICENSE` and `THIRD-PARTY-NOTICES.txt`. Then:
 
 ```bash
 npx @vscode/vsce package --target win32-x64 -o dist/tiko-win32-x64.vsix
 npx @vscode/vsce package --target linux-x64 -o dist/tiko-linux-x64.vsix
 ```
 
-Gate: unzip each VSIX and assert it holds exactly one server binary, the right one.
+Gates:
+
+- the extension version equals the server version (A-D4);
+- each VSIX's `server/` holds exactly the right binary plus the two text files;
+- the manifest's `TargetPlatform` matches the target;
+- the binary is byte-identical (sha256) to the one in the archive.
+
+**Done; measured 2026-10-17:**
+
+- `tiko-win32-x64.vsix`: 214 files, 724 KB.
+- `tiko-linux-x64.vsix`: 214 files, 745 KB.
 
 ### A.4 Local verification (before any upload)
 
-Clean profiles, nothing on PATH, no settings:
-`code --user-data-dir <D> --extensions-dir <E> --install-extension dist/tiko-<t>.vsix`.
+**Automated:** `bash release/vscode/test.sh dist/tiko-<target>.vsix`.
+
+1. It installs the VSIX into a fresh `--user-data-dir` and `--extensions-dir` (under
+   `editors/vscode/test-results/`, gitignored).
+2. It drops every PATH directory that holds a `tiko-lsp`.
+3. It opens `editors/vscode/test/fixture/ws` with the harness extension
+   (`editors/vscode/test/harness/suite.js`) as the test runner.
+4. The harness checks the **installed** extension:
+   - it came from the clean extensions dir and carries its server;
+   - the running `tiko-lsp` process **is the bundled executable**;
+   - `.tiko` is language `tiko`;
+   - hover, completion after `p.`, definition, a diagnostic for an unclosed `if`, and
+     formatting all work;
+   - `.bas` stays unclaimed.
+
+Workspace trust is switched off for that run (see below).
+
+**Windows 11, VS Code 1.141.0, 2026-10-17: 13/13 PASS**, in about 7 s. An earlier run
+failed for an environmental reason: `C:\dev\tiko-lsp\bin` was on PATH, which is why the
+script now strips such directories. **Linux: not run.** WSL Ubuntu has no VS Code; it
+needs `code` installed there (a WSLg window).
+
+Rows the harness can't check, for the interactive pass:
 
 | Check | Windows 11 | Ubuntu 24.04 (WSLg) | Fedora 44 (WSLg) |
 | --- | --- | --- | --- |
-| Output channel shows `tiko-lsp X.Y.Z ready` | ☐ | ☐ | ☐ |
-| Hover on a symbol | ☐ | ☐ | ☐ |
-| Completion after `.` | ☐ | ☐ | ☐ |
-| Diagnostic for an unclosed `if` | ☐ | ☐ | ☐ |
-| Format Document | ☐ | ☐ | ☐ |
-| `.bas` **not** claimed by default; claimed after adding `files.associations` | ☐ | ☐ | ☐ |
+| `release/vscode/test.sh` (the 13 checks above) | ✅ 13/13 | ☐ | ☐ |
+| Output channel shows `tiko-lsp X.Y.Z ready` and "(included with the extension)" | ☐ | ☐ | ☐ |
+| `.bas` claimed after adding `files.associations` | ☐ | ☐ | ☐ |
 | `tiko.server.path` set to a missing file gives the named error | ☐ | ☐ | ☐ |
 | Restricted Mode (untrusted folder): the extension stays off, with no crash | ☐ | ☐ | ☐ |
 
@@ -300,8 +360,9 @@ From Git Bash on Windows 11:
 | 2 | `bash release/build-windows.sh` | Phase 1 gates |
 | 3 | `wsl -d Ubuntu -- bash release/build-linux.sh` | glibc ≤ 2.35, suite green |
 | 4 | `sh release/smoke-linux.sh` on Fedora 44 (and `wsl -d Ubuntu -- sh release/smoke-linux.sh`) | `smoke ok` |
-| 5 | `bash release/vscode/package.sh` | one binary per VSIX |
-| 6 | A.4 matrix on at least Windows 11 + one Linux | green |
+| 4b | Mac: sync the tree, `bash release/build-macos.sh` there, `sh release/smoke-linux.sh` there, `scp` the tarball into `dist/` | gates + `smoke ok` |
+| 5 | `bash release/vscode/package.sh` | one binary per VSIX, versions in lockstep |
+| 6 | `bash release/vscode/test.sh dist/tiko-win32-x64.vsix`, and the linux-x64 one on a Linux desktop | all checks PASS |
 | 7 | `git tag vX.Y.Z && git push origin main vX.Y.Z` | |
 | 8 | A.5, then A.6 | both listings show X.Y.Z for both platforms |
 
@@ -574,7 +635,7 @@ feeds that number.
 | O4 | Entra ID publishing with a personal Microsoft account. | A.8 item 4; deadline 2026-12-01 |
 | O5 | Zero-config toolchain discovery (P1-D4). | the "no setting" goal for Win32/std completions |
 | O6 | Code signing for the Windows exe. | nothing, unless a scan flags it |
-| O7 | A PNG icon (at least 128×128) for the listings. | A.8 item 6 |
+| O7 | ~~A PNG icon (at least 128×128) for the listings.~~ **Done**: the tiko mascot, 512×512. | — |
 | O8 | `--version` says "built with FreeBASIC 1.20.0" (from `__FB_VERSION__`). In a public listing it should name tiko. Server change: `src/main.tiko`. | nothing; cosmetic |
 
 ## Sources (read 2026-10-16)

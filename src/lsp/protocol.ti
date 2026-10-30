@@ -12,7 +12,7 @@
 #include once "../analysis/semantic.ti"
 
 const LSP_SERVER_NAME    = "tiko-lsp"
-const LSP_SERVER_VERSION = "0.1.0"
+const LSP_SERVER_VERSION = "0.1.2"
 
 '' The specification version this server is written against.
 const LSP_SPEC_VERSION   = "3.17"

@@ -2,5 +2,10 @@
 .gitignore
 *.vsix
 syntaxes/gen_tmlanguage.py
+test/**
+test-results/**
 node_modules/@vscode/vsce/**
 node_modules/.bin/**
+# Type declarations and source maps are never loaded at run time.
+node_modules/**/*.d.ts
+node_modules/**/*.map

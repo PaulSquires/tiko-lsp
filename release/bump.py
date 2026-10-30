@@ -20,6 +20,10 @@ ROOT = Path(__file__).resolve().parent.parent
 # (file relative to the repo root, regex with one group around the version)
 SITES = [
     ("src/lsp/protocol.ti", r'^const LSP_SERVER_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"'),
+    # Track A: the VS Code extension is versioned in lockstep with the server it bundles.
+    ("editors/vscode/package.json", r'^  "version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
+    ("editors/vscode/package-lock.json", r'\A\{\s*"name": "tiko",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
+    ("editors/vscode/package-lock.json", r'"": \{\s*"name": "tiko",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
 ]
 
 
@@ -29,22 +33,27 @@ def main(argv):
         return 2
     version = argv[1]
 
-    planned = []
+    # Every site is applied in memory first -- a file may hold several -- and
+    # nothing is written until all of them matched.
+    texts = {}
+    report = []
     for rel, pattern in SITES:
-        path = ROOT / rel
-        with open(path, encoding="utf-8", newline="") as f:
-            text = f.read()
+        if rel not in texts:
+            with open(ROOT / rel, encoding="utf-8", newline="") as f:
+                texts[rel] = f.read()
+        text = texts[rel]
         hits = list(re.finditer(pattern, text, re.MULTILINE))
         if len(hits) != 1:
             print(f"{rel}: pattern matched {len(hits)} times, expected 1", file=sys.stderr)
             return 1
         m = hits[0]
-        planned.append((rel, path, m.group(1), text[: m.start(1)] + version + text[m.end(1):]))
+        texts[rel] = text[: m.start(1)] + version + text[m.end(1):]
+        report.append(f"{rel}: {m.group(1)} -> {version}")
 
-    for rel, path, old, new_text in planned:
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(new_text)
-        print(f"{rel}: {old} -> {version}")
+    for rel, text in texts.items():
+        with open(ROOT / rel, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+    print("\n".join(report))
     return 0
 
 

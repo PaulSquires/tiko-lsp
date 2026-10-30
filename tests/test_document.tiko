@@ -277,4 +277,25 @@ scope
     AssertTrue ( mgr.Find( "file:///doc51.bas" ) = 0, "an odd-numbered document is gone" )
 end scope
 
+'' AN EDITOR OPENS AND CLOSES FILES ONE AT A TIME, all session long. std/containers' Map
+'' (tiko-lang before 92036e012) never cleared the tombstones a Remove leaves, so after
+'' eight open/close cycles its table held no empty slot and Put stored nothing: every
+'' document opened from then on was lost -- its didChange and didClose were "not open",
+'' its diagnostics never refreshed. One document at a time, forty times, with one other
+'' kept open throughout as an editor's pinned tab would be.
+scope
+    dim as DocumentManager mgr
+    mgr.Open( "file:///pinned.tiko", "tiko", 1, "x" )
+    dim as long lost = 0
+    for i as long = 1 to 40
+        dim as string u = "file:///cycle" & i & ".tiko"
+        mgr.Open( u, "tiko", 1, "y" )
+        if( mgr.Find( u ) = 0 orelse mgr.Count( ) <> 2 ) then lost += 1
+        if( mgr.Close( u ) = false ) then lost += 1
+    next
+    AssertEqInt( lost, 0, "forty open/close cycles lose no document" )
+    AssertEqInt( mgr.Count( ), 1, "and the pinned one is all that is left open" )
+    AssertTrue ( mgr.Find( "file:///pinned.tiko" ) <> 0, "still findable" )
+end scope
+
 end TestSummary( "document" )

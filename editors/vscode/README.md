@@ -1,83 +1,107 @@
 # Tiko for VS Code
 
-Language support for **tiko** -- the FreeBASIC-compatible language of tiko-lang
--- served by [tiko-lsp](../../README.md). The VS Code twin of the
-[Zed extension](../zed): a language called Tiko, the path to a binary, and the
-toolchain settings the server needs. Everything else -- diagnostics,
-completion, hover, go to definition, references, rename, signature help,
-semantic tokens, inlay hints, formatting and quick fixes -- comes from the
-server.
+Language support for **tiko**, the FreeBASIC-compatible language: diagnostics,
+completion, hover, go to definition, find references, rename, signature help,
+semantic colouring, inlay hints, formatting and quick fixes.
 
-Files: `.tiko`, `.tko`, `.ti`, and the legacy `.bas`, `.bi`, `.inc`.
+All of it comes from [tiko-lsp](https://github.com/PaulSquires/tiko-lsp), a
+language server written in tiko. **The server is included**: install the
+extension, open a `.tiko` file, and it starts. There is nothing else to download
+and no setting to change.
 
-## Build and install
+- Platforms: **Windows x64**, **Linux x64** and **macOS on Apple silicon** (macOS 13
+  or later). VS Code installs the build for your platform automatically.
+- Files: `.tiko`, `.tko`, `.ti`.
 
-```bash
-cd editors/vscode
-npm install
-npm run package
-code --install-extension tiko-lsp.vsix
-```
+## Getting started
 
-`npm run package` writes `tiko-lsp.vsix`. The extension is plain JavaScript
-(`extension.js`), so there is no compile step.
+1. Install **Tiko** from the Extensions view (search for `tiko`).
+2. Open a folder containing tiko sources, then open a `.tiko` file.
+3. To see the server's own messages, run **Tiko: Show Language Server Output**.
 
-## Where it looks for the server
+### Win32, runtime and `std` names
 
-In order:
-
-1. `tiko.server.path` in your settings;
-2. `tiko-lsp` on your `PATH`;
-3. `bin/tiko-lsp.exe` inside a workspace folder -- so opening the tiko-lsp
-   repository itself works after a build.
-
-If none of those finds it, the extension says so and offers to open the
-setting. On Windows, `yyjson64.dll` must sit beside the executable (the build
-puts it there).
-
-## Settings
+The server reads your project without a compiler. To complete, hover and show
+signatures for the names declared in the tiko toolchain's headers, such as
+`windows.bi` and the runtime, point it at the toolchain's `inc` folder:
 
 ```jsonc
 {
-  "tiko.server.path": "C:/dev/tiko-lsp/bin/tiko-lsp.exe",
-
-  // The toolchain's inc: Win32, AfxNova and runtime names complete, hover and
-  // show signatures. Its sibling pkg -- what #import "std/strings" names -- is
-  // found on its own.
-  "tiko.includePaths": ["C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc"],
-
-  // Only if pkg is not beside an include path.
-  "tiko.packagePaths": [],
-
-  // Server arguments. Add "--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"
-  // to see what the server is doing; it never writes to stdout.
-  "tiko.server.arguments": ["--stdio"],
-
-  // The LSP traffic, in the "Tiko Language Server" output channel.
-  "tiko.trace.server": "off"
+  "tiko.includePaths": ["C:/tiko/toolchains/tiko-windows/inc"]
 }
 ```
 
-`includePaths` and `packagePaths` are sent as `initializationOptions`, which a
-server reads once: changing them, the path or the arguments offers a restart.
-**Tiko: Restart Language Server** does it by hand.
+The `pkg` folder beside it, which is where `#import "std/strings"` is found, is
+picked up automatically. Changing these settings offers to restart the server.
 
-## Colour
+### Legacy FreeBASIC files
 
-VS Code does not load tree-sitter grammars, so colour before the server is up
-comes from a TextMate grammar, `syntaxes/tiko.tmLanguage.json`. Its word lists
-are generated from the Zed highlights query (`python
-syntaxes/gen_tmlanguage.py`), so both editors colour the same words. Once the
-server is running, its semantic tokens refine it.
+Older tiko projects use FreeBASIC's `.bas`, `.bi` and `.inc` extensions. Other
+languages use those too, so this extension does not claim them by default. To
+treat them as tiko, add:
+
+```jsonc
+{
+  "files.associations": {
+    "*.bas": "tiko",
+    "*.bi": "tiko",
+    "*.inc": "tiko"
+  }
+}
+```
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `tiko.includePaths` | `[]` | The toolchain's `inc` folders: Win32, runtime and other header names then complete, hover and show signatures. |
+| `tiko.packagePaths` | `[]` | Where `#import` packages are found, if not in the `pkg` folder beside an include path. |
+| `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about each folder's `tiko.toml` (`tiko metadata`), so imports resolve exactly as the compiler resolves them. Never run for diagnostics. |
+| `tiko.server.path` | `""` | Use a different `tiko-lsp` executable instead of the included one. |
+| `tiko.server.arguments` | `["--stdio"]` | Server arguments. Add `"--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"` to see what the server is doing. |
+| `tiko.trace.server` | `"off"` | Log the LSP traffic in the **Tiko Language Server** output channel. |
+
+**Tiko: Restart Language Server** restarts the server by hand.
+
+## Which server runs
+
+In order:
+
+1. `tiko.server.path`, if set;
+2. the server included with the extension;
+3. `tiko-lsp` on your `PATH`;
+4. `bin/tiko-lsp(.exe)` inside a workspace folder.
+
+The output channel's first line names the binary and where it was found. If none
+is found (on a platform the extension has no build for), the extension says so
+and offers to open the setting.
 
 ## Workspace trust
 
-The extension does not run in Restricted Mode: starting the server means
-running an executable named in settings or found in the workspace.
+The extension does not run in Restricted Mode, because starting the server means
+running an executable.
 
-## What is verified
+## Colour
 
-See the commit that added this directory for what was measured against a real
-VS Code. In short: the extension installs from the `.vsix`, activates on a
-`.bas` file, starts the server with the configured arguments and
-`initializationOptions`, and the server answers VS Code's requests.
+Before the server is up, colour comes from a TextMate grammar. Once it is
+running, the server's semantic tokens refine it.
+
+## Building from source
+
+The extension is plain JavaScript (`extension.js`), so there is no compile step.
+From `editors/vscode` in the tiko-lsp repository:
+
+```bash
+npm install
+npm run package
+code --install-extension tiko.vsix
+```
+
+That development package includes no server. It finds one through
+`tiko.server.path`, the `PATH`, or `bin/` in the workspace. The platform packages
+that are published are built by `release/vscode/package.sh`.
+
+## Licence
+
+MIT. The included server's third-party notices are in
+`server/THIRD-PARTY-NOTICES.txt` inside the installed extension.
