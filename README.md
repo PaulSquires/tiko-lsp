@@ -169,9 +169,20 @@ Needs the tiko toolchain (`tiko-lang/toolchains/tiko-linux`), and again nothing 
 sh build/_compile.sh
 ```
 
-There is no Windows-only code outside a single `#ifdef __FB_WIN32__` in
-[src/rpc/transport.tiko](src/rpc/transport.tiko), where stdin and stdout are put into
-binary mode.
+### macOS (Apple silicon)
+
+Needs the tiko toolchain for macOS (`tiko-lang/toolchains/tiko-macos`); the same script:
+
+```bash
+TIKO_LSP_TIKO=../tiko-lang/toolchains/tiko-macos/bin/tiko sh build/_compile.sh
+```
+
+The result links only macOS's own `libSystem` and `libncurses`, and runs on macOS 13 or
+later. `release/build-macos.sh` is the release build.
+
+Platform code is `#ifdef __FB_WIN32__` / `#else` throughout: the `#else` side is POSIX and
+serves Linux and macOS alike. It declares the few C functions it needs itself rather than
+through `crt/unistd.bi`, which has no macOS section.
 
 ## Running
 

@@ -12,7 +12,15 @@
     #include once "crt/io.bi"
     #include once "crt/fcntl.bi"
 #else
-    #include once "crt/unistd.bi"
+    '' POSIX read( ), declared here rather than through crt/unistd.bi: that header
+    '' has a Linux section and no macOS one (#error unsupported platform), and READ
+    '' is a keyword, so the C function needs a name of its own either way. Its
+    '' signature is the same on every POSIX system; stdin is descriptor 0.
+    extern "C"
+        declare function tr_read_ alias "read" ( byval fd as long, byval buf as any ptr, _
+                                                 byval n as uinteger ) as integer
+    end extern
+    const TR_STDIN_FD = 0
 #endif
 
 using strings
@@ -45,8 +53,7 @@ private function ReadSomeStdin( byval buf as any ptr, byval maxBytes as long ) a
     #ifdef __FB_WIN32__
         return _read( _fileno( stdin ), buf, maxBytes )
     #else
-        '' READ IS A KEYWORD: crt/linux/unistd.bi declares the C function as read_.
-        return read_( STDIN_FILENO, buf, maxBytes )
+        return clng( tr_read_( TR_STDIN_FD, buf, maxBytes ) )
     #endif
 end function
 

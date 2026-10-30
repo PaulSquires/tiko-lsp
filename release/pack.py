@@ -2,8 +2,10 @@
 
     python3 release/pack.py windows <tiko-lsp.exe> <toolchain-root>
     python3 release/pack.py linux   <tiko-lsp>     <toolchain-root>
+    python3 release/pack.py macos   <tiko-lsp>     <toolchain-root>
 
-Writes dist/tiko-lsp-windows-x86_64.zip or dist/tiko-lsp-linux-x86_64.tar.gz.
+Writes dist/tiko-lsp-windows-x86_64.zip, dist/tiko-lsp-linux-x86_64.tar.gz or
+dist/tiko-lsp-macos-arm64.tar.gz.
 The names carry no version on purpose: releases/latest/download/<name> is then
 a stable URL for every client that downloads the server (docs/deployment.md,
 P1-D3). Members sit at the archive root:
@@ -60,7 +62,7 @@ def text_bytes(text, crlf):
 
 
 def main(argv):
-    if len(argv) != 4 or argv[1] not in ("windows", "linux"):
+    if len(argv) != 4 or argv[1] not in ("windows", "linux", "macos"):
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
     plat, binary, toolchain = argv[1], Path(argv[2]), argv[3]
@@ -83,7 +85,7 @@ def main(argv):
             for name, data, _ in members:
                 z.writestr(zipfile.ZipInfo(name, time.localtime(now)[:6]), data, zipfile.ZIP_DEFLATED)
     else:
-        out = DIST / "tiko-lsp-linux-x86_64.tar.gz"
+        out = DIST / ("tiko-lsp-linux-x86_64.tar.gz" if plat == "linux" else "tiko-lsp-macos-arm64.tar.gz")
         with tarfile.open(out, "w:gz") as t:
             for name, data, mode in members:
                 info = tarfile.TarInfo(name)
