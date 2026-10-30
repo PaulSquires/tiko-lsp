@@ -1047,8 +1047,13 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
 
             case TK_KEYWORD
                 if( depth = 0 andalso t.Kw = KW_AS ) then
+                    '' The span starts EMPTY (typeTo < typeFrom) and grows with each
+                    '' token the loop below takes. Starting it at k + 1 named a token
+                    '' that need not exist: `dim x as` as a file's last line -- typed,
+                    '' not yet finished -- read stmt[ Count ] and stopped the server
+                    '' (runtime error 6) on every keystroke.
                     typeFrom = k + 1
-                    typeTo = k + 1
+                    typeTo = k
                     '' The type runs to the next depth-0 comma, `=`, or the end.
                     dim as long d2 = 0
                     for j as long = k + 1 to stmt.Count( ) - 1

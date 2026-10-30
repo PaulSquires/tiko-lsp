@@ -1,0 +1,27 @@
+'' ############################################################################
+''  analysis/intrinsics.ti -- codetips for the built-in procedures
+''
+''  `left`, `mid`, `instr` and the rest are part of the language, declared in no
+''  header any workspace holds, and most of them lex as keywords. Nothing the
+''  parser extracts describes them, so signature help, hover and completion knew
+''  nothing about them.
+''
+''  The descriptions are tkEdit's own codetips (codetips.txt, beside this file,
+''  embedded at build time): one `NAME=Label(params)` line per built-in, square
+''  brackets marking what is optional. A declared procedure of the same name
+''  always wins over the codetip -- the codetip is the answer only when no
+''  declaration is.
+'' ############################################################################
+
+#pragma once
+
+'' The codetip of a built-in -- "Mid(str, start [,n])" -- or "" when `name_` is
+'' none. Any case.
+declare function IntrinsicCodetip( byref name_ as string ) as string
+
+'' How many codetips there are (for the tests).
+declare function IntrinsicCount( ) as long
+
+'' Every built-in with a codetip, as the codetip spells it ("Left", "InStr"), in
+'' the file's order.
+declare function IntrinsicNames( ) as containers.Array( of string )

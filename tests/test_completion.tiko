@@ -262,7 +262,23 @@ scope
     AssertEqInt( KindOf( "MAX_ITEMS" ), CMP_CONSTANT, "a const is a Constant" )
     AssertEqInt( KindOf( "count" ), CMP_VARIABLE, "a parameter is a Variable" )
     AssertEqInt( KindOf( "sub" ), CMP_KEYWORD, "a keyword is a Keyword" )
-    AssertTrue ( CountKeywords( ) > 200, "the whole reserved list is there" )
+    '' Every reserved word is offered -- as a Keyword, or, for a built-in with a
+    '' codetip (left, mid), once, as the Function it is, the codetip its detail.
+    dim reserved as containers.Array( of string ) = AllKeywords( )
+    dim as long offered = 0
+    for i as long = 0 to reserved.Count( ) - 1
+        if( Has( reserved[i] ) ) then offered += 1
+    next
+    AssertEqInt( offered, reserved.Count( ), "the whole reserved list is there" )
+    AssertTrue ( CountKeywords( ) > 100, "most of it as keywords" )
+    AssertEqInt( KindOf( "left" ), CMP_FUNCTION, "a built-in is a Function" )
+    scope
+        dim as string leftDetail
+        for i as long = 0 to g_Items.Count( ) - 1
+            if( lcase( g_Items[i].Label ) = "left" ) then leftDetail = g_Items[i].Detail_
+        next
+        AssertEqStr( leftDetail, "Left(string, n)", "with its codetip as the detail" )
+    end scope
 end scope
 
 scope

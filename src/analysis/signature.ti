@@ -57,6 +57,11 @@ declare function ParseSignature( byref name_ as string, byref detail as string, 
                                  byref fullLabel as string, _
                                  byref params as SigParamArray ) as boolean
 
+'' Splits a built-in's codetip (intrinsics.ti) into parameters: "Mid(str, start [,n])"
+'' gives str, start and n, each with its [start, end) in `tip`, which is the label to
+'' show as it is. False when `tip` has no parameter list.
+declare function ParseCodetip( byref tip as string, byref params as SigParamArray ) as boolean
+
 '' ----------------------------------------------------------------------------
 ''  The call the caret is inside
 '' ----------------------------------------------------------------------------

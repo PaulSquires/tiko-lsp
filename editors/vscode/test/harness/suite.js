@@ -171,6 +171,24 @@ exports.run = async function run() {
         const legacy = await open('legacy.bas');
         check('legacy.bas is not tiko by default', legacy.languageId !== 'tiko', legacy.languageId);
 
+        // 8b. Built-ins -- declared nowhere, lexed as keywords -- answer from
+        //     their codetips: signature help inside left( and hover on mid.
+        const bi = await open('builtins.tiko');
+        const sigAt = at(bi, 'left( s, ', 0, 'left( s, '.length);
+        const sh = await waitFor(async () => {
+            const h = await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider', bi.uri, sigAt);
+            return h && h.signatures && h.signatures.length ? h : undefined;
+        }, READY_MS);
+        check('signature help inside left( ... )',
+            sh && sh.signatures[0].label === 'Left(string, n)' && sh.activeParameter === 1,
+            sh ? `${sh.signatures[0].label}, parameter ${sh.activeParameter}` : 'none');
+        const midHover = await waitFor(async () => {
+            const t = hoverText(await vscode.commands.executeCommand('vscode.executeHoverProvider', bi.uri, at(bi, 'mid', 0, 1)));
+            return t.includes('Mid(') ? t : undefined;
+        }, READY_MS);
+        check('hover on mid shows its codetip', midHover,
+            midHover ? midHover.split('\n').find((l) => l.includes('Mid(')) : 'no hover');
+
         // 9. The toolchain: the setting and the command exist, and naming a
         //    toolchain folder in tiko.toolchainPath -- nothing else -- makes
         //    std/ names complete. TIKO_TEST_TOOLCHAIN is that folder; without

@@ -283,6 +283,15 @@ What was found goes back in `initialize`, as
 The VS Code extension offers **Locate Toolchain...** when `includeDirs` and `packageDir`
 are both empty.
 
+### Built-ins -- codetips
+
+`left`, `mid`, `instr` and the other built-in procedures are declared in no header, and
+most lex as keywords. Their signature help, hover and completion detail come from
+`src/analysis/codetips.txt` (`NAME=Label(params)`, square brackets for the optional
+parts), embedded with `#embed` and read once at start-up (`analysis/intrinsics.ti`). It
+is a copy of tkEdit's `keywords/codetips.txt`; keep the two in step. A declaration of the
+same name always wins over a codetip.
+
 ### Toolchain headers -- Win32, AfxNova, the runtime
 
 `#include once "windows.bi"` names a file in the TOOLCHAIN's `inc`, which no workspace

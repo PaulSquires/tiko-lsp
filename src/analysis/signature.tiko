@@ -4,6 +4,7 @@
 
 #import "std/containers"
 #include once "signature.ti"
+#include once "intrinsics.ti"
 #include once "../utils/position.ti"
 
 '' ----------------------------------------------------------------------------
@@ -50,6 +51,42 @@ private function ParamName( byref label as string ) as string
     '' unnamed parameter in a DECLARE looks like.
     if( lcase( out_ ) = "as" ) then return ""
     return out_
+end function
+
+function ParseCodetip( byref tip as string, byref params as SigParamArray ) as boolean
+    params.Clear( )
+    dim as long open_ = instr( tip, "(" )
+    dim as long close_ = instrrev( tip, ")" )
+    if( open_ = 0 orelse close_ < open_ ) then return false
+
+    '' Commas split, whatever bracket they sit in: "Mid(str, start [,n])" is str,
+    '' start and n. Each piece is then trimmed of blanks and the optional-part
+    '' brackets, and its [start, end) is kept as offsets into `tip` (0-based, and
+    '' ASCII, so bytes are UTF-16 units).
+    dim as long p = open_          '' 0-based index of the first byte after '('
+    while( p < close_ - 1 )        '' close_ - 1 is the 0-based index of ')'
+        dim as long e = p
+        while( e < close_ - 1 andalso tip[e] <> asc( "," ) )
+            e += 1
+        wend
+        dim as long a = p, b = e   '' [a, b)
+        while( a < b andalso instr( " []", chr( tip[a] ) ) > 0 )
+            a += 1
+        wend
+        while( b > a andalso instr( " []", chr( tip[b - 1] ) ) > 0 )
+            b -= 1
+        wend
+        if( b > a ) then
+            dim as SigParam sp
+            sp.Label = mid( tip, a + 1, b - a )
+            sp.Name_ = sp.Label
+            sp.LabelStart = a
+            sp.LabelEnd = b
+            params.Push( sp )
+        end if
+        p = e + 1
+    wend
+    return true
 end function
 
 function ParseSignature( byref name_ as string, byref detail as string, _
@@ -260,6 +297,8 @@ function FindCallContext( byref text_ as string, byref tokens as TokenArray, _
         if( tokens[i].Kind = TK_IDENT ) then nameTok = i
         '' After a dot a member may be spelled like a keyword: LogEvent.Str(.
         if( tokens[i].Kind = TK_KEYWORD andalso IsMemberAccess( text_, tokens, i ) ) then nameTok = i
+        '' And a built-in IS a keyword -- left, mid, instr -- with a codetip to show.
+        if( tokens[i].Kind = TK_KEYWORD andalso len( IntrinsicCodetip( TokenText( text_, tokens[i] ) ) ) > 0 ) then nameTok = i
         exit for
     next
 

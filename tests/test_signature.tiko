@@ -17,6 +17,7 @@
 #include once "assert.ti"
 #include once "../src/analysis/parser.ti"
 #include once "../src/analysis/signature.ti"
+#include once "../src/analysis/intrinsics.ti"
 
 const LF = chr(10)
 
@@ -285,6 +286,56 @@ private sub TestFindCallable( )
 end sub
 
 '' ############################################################################
+''  Built-ins: the codetips (analysis/intrinsics.ti)
+'' ############################################################################
+private sub TestIntrinsics( )
+    TestGroup( "built-ins: codetips" )
+
+    AssertTrue( IntrinsicCount( ) > 150, "the codetips are embedded and read (" & IntrinsicCount( ) & ")" )
+    AssertEqStr( IntrinsicCodetip( "mid" ), "Mid(str, start [,n])", "mid, by any case" )
+    AssertEqStr( IntrinsicCodetip( "LEFT" ), "Left(string, n)", "LEFT" )
+    AssertEqStr( IntrinsicCodetip( "NotABuiltin" ), "", "a name with no codetip has none" )
+    dim names as containers.Array( of string ) = IntrinsicNames( )
+    dim as boolean sawInStr = false
+    for i as long = 0 to names.Count( ) - 1
+        if( names[i] = "InStr" ) then sawInStr = true
+    next
+    AssertEqInt( names.Count( ), IntrinsicCount( ), "one name per codetip" )
+    AssertTrue( sawInStr, "spelled as the codetip spells it: InStr" )
+
+    '' Splitting: commas split whatever bracket they sit in, and each parameter is
+    '' trimmed of blanks and of the optional-part brackets.
+    dim params as SigParamArray
+    dim as string tip = "Mid(str, start [,n])"
+    AssertTrue( ParseCodetip( tip, params ), "Mid's codetip has a parameter list" )
+    AssertEqInt( params.Count( ), 3, "three parameters" )
+    if( params.Count( ) = 3 ) then
+        AssertEqStr( params[0].Label, "str", "str" )
+        AssertEqStr( params[1].Label, "start", "start" )
+        AssertEqStr( params[2].Label, "n", "n, out of its brackets" )
+        AssertEqStr( mid( tip, params[2].LabelStart + 1, params[2].LabelEnd - params[2].LabelStart ), "n", _
+                     "and its offsets name it inside the label" )
+    end if
+    AssertTrue( ParseCodetip( "InStr([start,] string, [Any] substring)", params ), "InStr" )
+    AssertEqInt( params.Count( ), 3, "InStr: start, string, substring" )
+    if( params.Count( ) = 3 ) then AssertEqStr( params[1].Label, "string", "the second is string" )
+    AssertTrue( ParseCodetip( "Timer()", params ), "Timer() has a parameter list ..." )
+    AssertEqInt( params.Count( ), 0, "... with nothing in it" )
+    AssertTrue( ParseCodetip( "Cls [mode]", params ) = false, "no parentheses, no parameter list" )
+
+    '' The call: a built-in lexes as a keyword, and is the callee all the same.
+    dim as CallContext ctx
+    Analyse( "dim as string s = left( name_, " )
+    AssertTrue( ContextAfter( "left( name_, ", ctx ), "`left( name_, ` is a call" )
+    AssertEqStr( lcase( CalleeName( ctx ) ), "left", "of left" )
+    AssertEqInt( ctx.ActiveArg, 1, "in its second argument" )
+    Analyse( "print MID( s, " )
+    AssertTrue( ContextAfter( "MID( s, ", ctx ), "MID, in capitals, too" )
+    Analyse( "x = if( a, " )
+    AssertTrue( ContextAfter( "if( a, ", ctx ) = false, "a keyword with no codetip is no callee" )
+end sub
+
+'' ############################################################################
 ''  Main
 '' ############################################################################
 print "tiko-lsp -- signature, call context and argument site tests"
@@ -293,5 +344,6 @@ TestParseSignature( )
 TestCallContext( )
 TestArgSites( )
 TestFindCallable( )
+TestIntrinsics( )
 
 end TestSummary( "signature" )

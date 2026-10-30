@@ -23,6 +23,11 @@ The extension's version is the version of the tiko-lsp server it includes.
 - New task type `tiko` for `.vscode/tasks.json` (`command`, `file`, `args`, `runArgs`),
   and settings `tiko.build.arguments` and `tiko.run.arguments`.
 - `tiko-lsp --version` names the tiko compiler it was built with, not FreeBASIC.
+- **Built-ins have codetips.** `left(`, `mid(`, `instr(` and about 190 other built-in
+  procedures show their parameters while you type a call, show their codetip on hover,
+  and are offered by completion as functions. The codetips are tkEdit's own.
+- Typing `dim x as` at the end of a file no longer stops the server. It read one token
+  past the end of the statement before the type was typed.
 
 ## 0.1.2
 

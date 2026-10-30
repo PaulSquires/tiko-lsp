@@ -8,6 +8,7 @@
 #include once "completion.ti"
 #include once "../analysis/completion.ti"
 #include once "../analysis/includes.ti"
+#include once "../analysis/intrinsics.ti"
 #include once "../workspace/index_builder.ti"
 #include once "../lsp/publish.ti"
 #include once "../utils/logging.ti"
@@ -243,6 +244,24 @@ private function OnHover( byref srv as Server, _
         end if
         if( len(markdown) = 0 ) then
             markdown = BuiltinConstantHoverMarkdown( doc->Text( ), doc->Tokens( ), offset )
+        end if
+        '' A built-in procedure -- left, mid, instr -- by its codetip. Last, so a
+        '' declaration of the same name anywhere the file can see answers instead.
+        if( len(markdown) = 0 ) then
+            dim as long ti = TokenIndexAt( doc->Tokens( ), offset )
+            if( ti >= 0 ) then
+                dim as Token tok = doc->Tokens( )[ti]
+                if( ( tok.Kind = TK_IDENT orelse tok.Kind = TK_KEYWORD ) andalso _
+                    IsMemberAccess( doc->Text( ), doc->Tokens( ), ti ) = false ) then
+                    dim as string tip = IntrinsicCodetip( TokenText( doc->Text( ), tok ) )
+                    if( len(tip) > 0 ) then
+                        markdown = "```tiko" & chr(10) & tip & chr(10) & "```" & chr(10) & _
+                                   "Built-in. Square brackets mark optional arguments."
+                        wordStart = tok.Start_
+                        wordEnd   = tok.Start_ + tok.Length_
+                    end if
+                end if
+            end if
         end if
     end if
 
