@@ -517,4 +517,85 @@ scope
     AssertTrue( g_Items.Count( ) >= 0, "`sub ` mid-word does not crash" )
 end scope
 
+'' ----------------------------------------------------------------------------
+TestGroup( "after a declaration's as: types only" )
+
+scope
+    Analyse( "type Customer" & LF & "    Name_ as string" & LF & "end type" & LF & _
+             "enum Colour" & LF & "    Red" & LF & "end enum" & LF & _
+             "type Handle as long" & LF & _
+             "sub Work( )" & LF & "    dim as long total" & LF & "    dim p as " )
+
+    dim as long at_ = len(g_Src)
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, at_ ).Kind_, CMPCTX_TYPE, "`dim p as ` is a type context" )
+    CollectCompletions( g_Src, g_Tokens, g_Syms, at_, g_Items )
+    AssertTrue( Has( "Customer" ), "a type the file declares is offered" )
+    AssertTrue( Has( "Colour" ), "and an enum" )
+    AssertTrue( Has( "Handle" ), "and an alias" )
+    AssertTrue( Has( "long" ) andalso Has( "string" ) andalso Has( "ustring" ), "and the built-in type words" )
+    AssertTrue( Has( "int32" ), "and tiko's typedefs" )
+    AssertTrue( Has( "total" ) = false, "but not a local" )
+    AssertTrue( Has( "Work" ) = false, "nor a procedure" )
+    AssertTrue( Has( "if" ) = false andalso Has( "print" ) = false, "nor a statement keyword" )
+    AssertTrue( Has( "Name_" ) = false, "nor a field" )
+
+    Analyse( "type Customer" & LF & "end type" & LF & "dim p as Cu" )
+    dim as CompletionContext cp = CompletionContextAt( g_Src, g_Tokens, len(g_Src) )
+    AssertEqInt( cp.Kind_, CMPCTX_TYPE, "a partial word after `as` is still a type context" )
+    AssertEqStr( cp.Prefix, "cu", "with the partial word as the prefix" )
+
+    Analyse( "function F( byval n as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_TYPE, "a parameter's `as` is a type context" )
+    Analyse( "function F( ) as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_TYPE, "a result's `as` is a type context" )
+    Analyse( "dim as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_TYPE, "`dim as ` is a type context" )
+
+    Analyse( "#import " & chr(34) & "std/strings" & chr(34) & " as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "an import's `as` names an alias, not a type" )
+    Analyse( "open " & chr(34) & "f.txt" & chr(34) & " for input as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "OPEN's `as` takes a file number" )
+    Analyse( "select case as " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "`select case as` is not a type context" )
+    Analyse( "dim p as" & LF )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "the line after a trailing `as` is not a type context" )
+    Analyse( "if x then " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "a space after another keyword is an ordinary position" )
+    Analyse( "dim p as" )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "the cursor still on `as` is the word `as`" )
+end scope
+
+'' ----------------------------------------------------------------------------
+TestGroup( "member completion through a pointer: ->" )
+
+scope
+    Analyse( "type Widget" & LF & "    w as long" & LF & "    h as long" & LF & "end type" & LF & _
+             "type Other" & LF & "    zz as long" & LF & "end type" & LF & _
+             "dim pw as Widget ptr" & LF & "pw->" )
+
+    dim as CompletionContext c1 = CompletionContextAt( g_Src, g_Tokens, len(g_Src) )
+    AssertEqInt( c1.Kind_, CMPCTX_MEMBER, "right after `->` is a member context" )
+    AssertEqStr( c1.BaseName, "pw", "and the base is what is left of it" )
+    CollectCompletions( g_Src, g_Tokens, g_Syms, len(g_Src), g_Items )
+    AssertTrue( Has( "w" ) andalso Has( "h" ), "the pointed-to type's members are offered" )
+    AssertTrue( Has( "zz" ) = false, "and not another type's" )
+    AssertEqInt( CountKeywords( ), 0, "and no keywords" )
+
+    Analyse( "type Widget" & LF & "    w as long" & LF & "end type" & LF & "dim pw as Widget ptr" & LF & "pw->w" )
+    dim as CompletionContext c2 = CompletionContextAt( g_Src, g_Tokens, len(g_Src) )
+    AssertEqInt( c2.Kind_, CMPCTX_MEMBER, "a partial member name after `->` is still a member context" )
+    AssertEqStr( c2.Prefix, "w", "with the partial word as the prefix" )
+
+    Analyse( "type Inner" & LF & "    v as long" & LF & "end type" & LF & _
+             "type Outer" & LF & "    pin as Inner ptr" & LF & "end type" & LF & _
+             "dim po as Outer ptr" & LF & "po->pin->" )
+    CollectCompletions( g_Src, g_Tokens, g_Syms, len(g_Src), g_Items )
+    AssertTrue( Has( "v" ) andalso Has( "pin" ) = false, "a chain of `->` is walked like a chain of dots" )
+
+    Analyse( "if a > " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "a comparison's `>` is no member access" )
+    Analyse( "x = a - " )
+    AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "nor is a minus" )
+end scope
+
 end TestSummary( "completion" )

@@ -33,7 +33,7 @@ const MAX_INCLUDED_ITEMS = 1000
 ''  anywhere -- and so are duplicates of what this file already offered, which
 ''  is what a header and its implementation file look like together.
 private function AddIncludedSymbols( byref srv as Server, byval doc as TextDocumentPtr, _
-                                     byref prefix as string, _
+                                     byref prefix as string, byval typesOnly as boolean, _
                                      byref items as CompletionItemArray ) as boolean
 
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
@@ -71,6 +71,7 @@ private function AddIncludedSymbols( byref srv as Server, byval doc as TextDocum
             dim as SymbolInfo sym = srv.Index->SymbolAt( f, i )
             if( sym.IsLocal ) then continue for
             if( len(sym.Name_) = 0 ) then continue for
+            if( typesOnly andalso IsTypeSymbol( sym ) = false ) then continue for
             if( len(want) > 0 andalso left( sym.LowerName, len(want) ) <> want ) then continue for
             if( seen_.Contains( sym.LowerName ) ) then continue for
 
@@ -436,6 +437,21 @@ private function OnCompletion( byref srv as Server, _
     dim as long charNo = clng( posVal.Member( "character" ).AsLongInt( 0 ) )
     dim as long offset = clng( doc->PositionToOffset( lineNo, charNo ) )
 
+    '' A space asks only after a declaration's `as` (`dim p as `); anywhere
+    '' else it is just a space, and the answer is nothing, at once.
+    dim as string trigger = req.Params( ).Member( "context" ).Member( "triggerCharacter" ).AsString( "" )
+    if( trigger = " " ) then
+        if( CompletionContextAt( doc->Text( ), doc->Tokens( ), offset ).Kind_ <> CMPCTX_TYPE ) then
+            return rb.NewArray( )
+        end if
+    end if
+    '' Likewise a `>`: only the end of `->` (`a > b`, `x >= 1` get nothing).
+    if( trigger = ">" ) then
+        if( CompletionContextAt( doc->Text( ), doc->Tokens( ), offset ).Kind_ <> CMPCTX_MEMBER ) then
+            return rb.NewArray( )
+        end if
+    end if
+
     dim as CompletionItemArray items
     CollectCompletions( doc->Text( ), doc->Tokens( ), doc->Symbols( ), offset, items )
 
@@ -460,9 +476,9 @@ private function OnCompletion( byref srv as Server, _
         onModule = IsImportAlias_( doc, ctx.BaseName )
     end if
 
-    if( ctx.Kind_ = CMPCTX_SCOPE andalso indexUsable ) then
+    if( ( ctx.Kind_ = CMPCTX_SCOPE orelse ctx.Kind_ = CMPCTX_TYPE ) andalso indexUsable ) then
         EnsureWorkspaceIndex( srv )
-        incomplete_ = AddIncludedSymbols( srv, doc, ctx.Prefix, items )
+        incomplete_ = AddIncludedSymbols( srv, doc, ctx.Prefix, ctx.Kind_ = CMPCTX_TYPE, items )
 
     elseif( onModule ) then
         EnsureWorkspaceIndex( srv )

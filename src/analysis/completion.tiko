@@ -3,8 +3,15 @@
 '' ############################################################################
 
 #import "std/containers"
+#import "std/strings"
 #include once "completion.ti"
 #include once "intrinsics.ti"
+
+'' The reserved words a type can begin with, offered after a declaration's
+'' `as`. Any that the keyword table does not hold is skipped.
+const TYPE_KEYWORDS = "any boolean byte const double function integer long longint " & _
+                      "short single string sub ubyte uinteger ulong ulongint ushort " & _
+                      "ustring wstring zstring"
 
 '' ############################################################################
 ''  Context
@@ -28,9 +35,13 @@ private function TokenBefore( byref tokens as TokenArray, byval offset as long )
     return found
 end function
 
+'' A member access: `.`, or `->` through a pointer -- `p->x` is `(*p).x`, and
+'' its members are the pointed-to type's, which is what the declared type
+'' NAME already names (`as Point ptr` reads as Point).
 private function IsDot( byref text_ as string, byref t as Token ) as boolean
     if( t.Kind <> TK_OP ) then return false
-    return TokenText( text_, t ) = "."
+    dim as string op = TokenText( text_, t )
+    return op = "." orelse op = "->"
 end function
 
 '' Reads the member chain that ends at the dot `dotIdx`, right to left:
@@ -88,6 +99,36 @@ function ReadMemberChain( byref text_ as string, byref tokens as TokenArray, _
     return true
 end function
 
+'' True when token `asIdx` is an `as` that a TYPE follows: `dim p as `,
+'' `function f( ) as `, `x as ` in a parameter list. Not the `as` of
+'' `#import "std/strings" as s` or `name "a" as "b"` (a string before it),
+'' `open "f" for input as #1` (an OPEN statement), or `select case as const`.
+private function IsTypeAs_( byref text_ as string, byref tokens as TokenArray, _
+                            byval asIdx as long ) as boolean
+    if( tokens[asIdx].Kind <> TK_KEYWORD ) then return false
+    if( lcase( TokenText( text_, tokens[asIdx] ) ) <> "as" ) then return false
+    if( asIdx = 0 ) then return false
+
+    dim as Token prev = tokens[asIdx - 1]
+    if( prev.Kind = TK_STRING orelse prev.Kind = TK_EOL ) then return false
+    if( prev.Kind = TK_KEYWORD andalso lcase( TokenText( text_, prev ) ) = "case" ) then return false
+
+    '' The statement's first token.
+    dim as long j = asIdx
+    while( j > 0 )
+        dim as TokenKind k = tokens[j - 1].Kind
+        if( k = TK_EOL orelse k = TK_COLON ) then exit while
+        j -= 1
+    wend
+    if( tokens[j].Kind = TK_KEYWORD ) then
+        select case lcase( TokenText( text_, tokens[j] ) )
+            case "open", "name"
+                return false
+        end select
+    end if
+    return true
+end function
+
 function CompletionContextAt( byref text_ as string, byref tokens as TokenArray, _
                               byval offset as long ) as CompletionContext
     dim as CompletionContext ctx
@@ -109,14 +150,23 @@ function CompletionContextAt( byref text_ as string, byref tokens as TokenArray,
         end if
     end if
 
-    '' `something.` -- the cursor is right after the dot.
+    '' `something.` or `something->` -- the cursor is right after the dot.
     if( IsDot( text_, last_ ) ) then
         ctx.Kind_ = CMPCTX_MEMBER
         ReadMemberChain( text_, tokens, i, ctx )
         return ctx
     end if
 
-    '' A partial word. It may or may not follow a dot.
+    '' `dim p as |` -- past the `as` and on its line: a type comes next.
+    if( last_.Kind = TK_KEYWORD andalso offset > last_.Start_ + last_.Length_ ) then
+        dim as long gap = offset - ( last_.Start_ + last_.Length_ )
+        if( instr( mid( text_, last_.Start_ + last_.Length_ + 1, gap ), chr(10) ) = 0 ) then
+            if( IsTypeAs_( text_, tokens, i ) ) then ctx.Kind_ = CMPCTX_TYPE
+        end if
+        return ctx
+    end if
+
+    '' A partial word. It may follow a dot or a type's `as`.
     if( last_.Kind = TK_IDENT orelse last_.Kind = TK_KEYWORD ) then
         if( offset <= last_.Start_ + last_.Length_ ) then
             ctx.Prefix = lcase( mid( text_, last_.Start_ + 1, offset - last_.Start_ ) )
@@ -125,6 +175,9 @@ function CompletionContextAt( byref text_ as string, byref tokens as TokenArray,
                 if( IsDot( text_, tokens[i - 1] ) ) then
                     if( ReadMemberChain( text_, tokens, i - 1, ctx ) ) then ctx.Kind_ = CMPCTX_MEMBER
                 end if
+            end if
+            if( ctx.Kind_ = CMPCTX_SCOPE andalso i >= 1 ) then
+                if( IsTypeAs_( text_, tokens, i - 1 ) ) then ctx.Kind_ = CMPCTX_TYPE
             end if
         end if
     end if
@@ -159,6 +212,15 @@ function IsOfferedMember( byref sym as SymbolInfo ) as boolean
     if( sym.Kind_ = SYM_CONSTRUCTOR orelse sym.Kind_ = SYM_OPERATOR ) then return false
     if( sym.LowerName = "constructor" orelse sym.LowerName = "destructor" ) then return false
     return true
+end function
+
+function IsTypeSymbol( byref sym as SymbolInfo ) as boolean
+    if( len(sym.Name_) = 0 ) then return false
+    select case sym.Kind_
+        case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_INTERFACE, SYM_NAMESPACE
+            return true
+    end select
+    return false
 end function
 
 '' The type name in `as <type>...`.
@@ -440,6 +502,30 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
                 case SYM_FIELD, SYM_METHOD, SYM_PROPERTY, SYM_ENUMMEMBER
                     AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
             end select
+        next
+        exit sub
+    end if
+
+    '' -- after a declaration's `as` --------------------------------------------
+    ''
+    '' Types only: what the file declares, tiko's typedefs, and the reserved
+    '' words a type can begin with. A local or `if` here is never the answer.
+    if( ctx.Kind_ = CMPCTX_TYPE ) then
+        for i as long = 0 to syms.Count( ) - 1
+            if( IsTypeSymbol( syms.Items[i] ) ) then AddSymbolItem( items, syms.Items[i], CMPGROUP_FILE )
+        next
+
+        dim tds as containers.Array( of string ) = AllBuiltinTypedefs( )
+        for i as long = 0 to tds.Count( ) - 1
+            AddItem( items, tds[i], CMP_STRUCT, _
+                     "type " & tds[i] & " as " & BuiltinTypedefTarget( tds[i] ), _
+                     "", CMPGROUP_KEYWORD )
+        next
+
+        dim tws as containers.Array( of string ) = strings.Split( TYPE_KEYWORDS, " " )
+        for i as long = 0 to tws.Count( ) - 1
+            if( IsKeyword( tws[i] ) = false ) then continue for
+            AddItem( items, tws[i], CMP_KEYWORD, "keyword", "", CMPGROUP_KEYWORD )
         next
         exit sub
     end if

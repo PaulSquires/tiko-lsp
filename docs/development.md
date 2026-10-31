@@ -228,7 +228,7 @@ Zed (`~/.config/zed/settings.json` — via a language-server extension entry):
 ```
 
 VS Code: install the extension in [editors/vscode](../editors/vscode) (`npm install`,
-`npm run package`, `code --install-extension tiko-lsp.vsix`), then set
+`npm run package`, `code --install-extension tiko.vsix`), then set
 `tiko.server.path` and `tiko.includePaths` -- see its README.
 
 Sublime Text: install the LSP package, then link [editors/sublime](../editors/sublime)

@@ -55,6 +55,9 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     '' Phase 5. The trigger characters are the ones after which a client should
     '' ask WITHOUT being asked to: a dot begins a member expression, and a
     '' colon ends a statement, so the next thing typed is a fresh identifier.
+    '' A space is one only after a declaration's `as` -- `dim p as ` offers
+    '' the types; the handler answers every other space with nothing. A `>`
+    '' is one only as the end of `->`, a member access through a pointer.
     ''
     '' resolveProvider is FALSE: every item already carries its detail and its
     '' documentation, so there is no second round trip to serve.
@@ -64,6 +67,8 @@ function LspBuildCapabilities( byref rb as JsonBuilder ) as JsonNode
     dim as JsonNode triggers = rb.NewArray( )
     rb.PushStr( triggers, "." )
     rb.PushStr( triggers, ":" )
+    rb.PushStr( triggers, " " )
+    rb.PushStr( triggers, ">" )
     rb.SetNode( completion, "triggerCharacters", triggers )
 
     rb.SetNode( caps, "completionProvider", completion )

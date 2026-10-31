@@ -36,6 +36,8 @@
   "main": "./extension.js",
   "activationEvents": [
     "onTaskType:tiko",
+    "onDebugResolve:tiko",
+    "onDebugDynamicConfigurations:tiko",
     "workspaceContains:tiko.toml"
   ],
   "capabilities": {
@@ -209,6 +211,57 @@
         "key": "ctrl+f5",
         "mac": "cmd+f5",
         "when": "editorLangId == tiko && !inDebugMode"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "tiko",
+        "label": "Tiko",
+        "languages": [
+          "tiko"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "A root file to build instead of the project: absolute, or relative to the workspace folder. Empty: the tiko.toml at or above the active file, else the active file."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Compiler options, such as -g or -exx. Default: tiko.build.arguments."
+              },
+              "runArgs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Arguments for the program. Default: tiko.run.arguments."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "tiko",
+            "request": "launch",
+            "name": "Run tiko program"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Tiko: Run",
+            "description": "Build and run with tiko run.",
+            "body": {
+              "type": "tiko",
+              "request": "launch",
+              "name": "Run tiko program"
+            }
+          }
+        ]
       }
     ],
     "taskDefinitions": [
