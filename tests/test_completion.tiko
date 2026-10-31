@@ -598,4 +598,46 @@ scope
     AssertEqInt( CompletionContextAt( g_Src, g_Tokens, len(g_Src) ).Kind_, CMPCTX_SCOPE, "nor is a minus" )
 end scope
 
+'' ----------------------------------------------------------------------------
+TestGroup( "a type named after a reserved word" )
+
+scope
+    '' POINT, COLOR, LINE and DRAW are keywords; tiko and fbc both take them
+    '' as type names. The name used to read as "", so no symbol was offered
+    '' and `p.` fell back to every member in the file.
+    Analyse( "type Point" & LF & "    x as long" & LF & "    y as long" & LF & "end type" & LF & _
+             "union Color" & LF & "    rgba as ulong" & LF & "end union" & LF & _
+             "enum Line" & LF & "    Solid" & LF & "end enum" & LF & _
+             "type Foo extends Object" & LF & "    ff as long" & LF & "end type" & LF & _
+             "dim p as Point" & LF & "p." )
+
+    dim as long found = 0
+    for i as long = 0 to g_Syms.Count( ) - 1
+        select case g_Syms.Items[i].Name_
+            case "Point", "Color", "Line", "Foo" : found += 1
+        end select
+    next
+    AssertEqInt( found, 4, "type Point, union Color, enum Line and type Foo extends Object are all symbols" )
+
+    Analyse( "enum explicit" & LF & "    A = 1" & LF & "end enum" )
+    dim as boolean namedExplicit = false
+    for i as long = 0 to g_Syms.Count( ) - 1
+        if( g_Syms.Items[i].LowerName = "explicit" ) then namedExplicit = true
+    next
+    AssertTrue( namedExplicit = false, "`enum explicit` is an unnamed enum, not one called explicit" )
+    Analyse( "type Point" & LF & "    x as long" & LF & "    y as long" & LF & "end type" & LF & _
+             "union Color" & LF & "    rgba as ulong" & LF & "end union" & LF & _
+             "type Foo extends Object" & LF & "    ff as long" & LF & "end type" & LF & _
+             "dim p as Point" & LF & "p." )
+
+    CollectCompletions( g_Src, g_Tokens, g_Syms, len(g_Src), g_Items )
+    AssertTrue( Has( "x" ) andalso Has( "y" ), "p. offers Point's members" )
+    AssertTrue( Has( "rgba" ) = false andalso Has( "ff" ) = false, "and not another type's" )
+
+    Analyse( "type Point" & LF & "    x as long" & LF & "end type" & LF & "enum Line" & LF & "    Solid" & LF & "end enum" & LF & "dim q as " )
+    CollectCompletions( g_Src, g_Tokens, g_Syms, len(g_Src), g_Items )
+    AssertTrue( Has( "Point" ) andalso Has( "Line" ), "after `as`, a keyword-named type is offered" )
+    AssertEqInt( KindOf( "Point" ), CMP_STRUCT, "as the type it is, not the keyword" )
+end scope
+
 end TestSummary( "completion" )

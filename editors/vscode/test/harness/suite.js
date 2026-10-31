@@ -138,9 +138,9 @@ exports.run = async function run() {
         const labels = await waitFor(async () => {
             const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', hello.uri, member);
             const l = (list ? list.items : []).map(labelOf);
-            return l.includes('x') && l.includes('y') ? l : undefined;
+            return l.includes('x') && l.includes('y') && !l.includes('w') ? l : undefined;
         }, READY_MS);
-        check('completion after p. has x and y', labels, labels ? labels.slice(0, 10).join(', ') : 'missing');
+        check('completion after p. has x and y, not w', labels, labels ? labels.slice(0, 10).join(', ') : 'missing');
 
         // 4b. A space after a declaration's `as` asks, and gets types only;
         //     a space anywhere else gets nothing. The command also returns VS
