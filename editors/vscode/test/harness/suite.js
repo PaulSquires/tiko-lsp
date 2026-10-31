@@ -142,6 +142,34 @@ exports.run = async function run() {
         }, READY_MS);
         check('completion after p. has x and y', labels, labels ? labels.slice(0, 10).join(', ') : 'missing');
 
+        // 4b. A space after a declaration's `as` asks, and gets types only;
+        //     a space anywhere else gets nothing. The command also returns VS
+        //     Code's own word-based items (kind Text), which a typed space never
+        //     shows -- only the server's items are checked.
+        const fromServer = (list) => (list ? list.items : [])
+            .filter((i) => i.kind !== vscode.CompletionItemKind.Text).map(labelOf);
+        const afterAs = at(hello, 'dim q as ', 0, 'dim q as '.length);
+        const typeList = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', hello.uri, afterAs, ' ');
+        const typeLabels = fromServer(typeList);
+        check('space after `as` offers types only', typeLabels.includes('Widget') && typeLabels.includes('long') &&
+            !typeLabels.includes('Greet') && !typeLabels.includes('if'),
+            `${typeLabels.length} item(s), Widget ${typeLabels.includes('Widget') ? 'in' : 'missing'}, Greet ${typeLabels.includes('Greet') ? 'in' : 'out'}`);
+        const afterPrint = at(hello, 'print ', 0, 'print '.length);
+        const spaceList = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', hello.uri, afterPrint, ' ');
+        const spaceLabels = fromServer(spaceList);
+        check('space elsewhere offers nothing', spaceLabels.length === 0, spaceLabels.slice(0, 10).join(', ') || 'nothing');
+
+        // 4c. `->` through a pointer offers the pointed-to type's members, as
+        //     `.` does; the `>` that ends it is the trigger.
+        const afterArrow = at(hello, 'pq->', 0, 'pq->'.length);
+        const arrowList = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', hello.uri, afterArrow, '>');
+        const arrowLabels = fromServer(arrowList);
+        check('completion after pq-> has w only', arrowLabels.includes('w') && !arrowLabels.includes('x') &&
+            !arrowLabels.includes('Greet'), arrowLabels.slice(0, 10).join(', ') || 'nothing');
+        const arrowHover = hoverText(await vscode.commands.executeCommand('vscode.executeHoverProvider', hello.uri,
+            at(hello, 'pq->w', 0, 'pq->'.length)));
+        check('hover on pq->w shows the field', /w as long/.test(arrowHover), arrowHover.split(/\r?\n/).find((l) => l.trim()) || 'no hover');
+
         // 5. Go to definition from the call lands on the sub.
         const defs = await waitFor(async () => {
             const d = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', hello.uri, call);
@@ -277,6 +305,29 @@ exports.run = async function run() {
             check('run: a tiko.toml project builds and runs', ranProj.code === 0 && fs.existsSync(projMarker) &&
                 /tiko\.toml/.test(ranProj.name),
                 `${ranProj.name} exit ${ranProj.code}; proj-ran.txt ${fs.existsSync(projMarker) ? 'written' : 'missing'}`);
+
+            // d. Run > Run Without Debugging with no launch.json: the tiko
+            //    debugger type resolves it into `tiko run`, and no debug
+            //    session starts (before, VS Code offered the Marketplace).
+            cleanup();
+            await open('runme.tiko');
+            let sessions = 0;
+            const sessSub = vscode.debug.onDidStartDebugSession(() => { sessions += 1; });
+            const ended = new Promise((resolve) => {
+                const timer = setTimeout(() => { sub.dispose(); resolve(undefined); }, 120000);
+                const sub = vscode.tasks.onDidEndTaskProcess((e) => {
+                    clearTimeout(timer);
+                    sub.dispose();
+                    resolve(e);
+                });
+            });
+            await vscode.commands.executeCommand('workbench.action.debug.run');
+            const runEnd = await ended;
+            sessSub.dispose();
+            check('Run Without Debugging runs the program', runEnd && runEnd.exitCode === 0 &&
+                fs.existsSync(marker) && sessions === 0,
+                `${runEnd ? runEnd.execution.task.name + ' exit ' + runEnd.exitCode : 'no task ended'}; ` +
+                `ran.txt ${fs.existsSync(marker) ? 'written' : 'missing'}; ${sessions} debug session(s)`);
             cleanup();
         }
     } catch (err) {

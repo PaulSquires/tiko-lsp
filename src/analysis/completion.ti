@@ -81,6 +81,7 @@ enum CompletionContextKind
     CMPCTX_SCOPE  = 0   '' an ordinary identifier position
     CMPCTX_MEMBER = 1   '' immediately after `something.`
     CMPCTX_NONE   = 2   '' inside a comment or a string: nothing to offer
+    CMPCTX_TYPE   = 3   '' after a declaration's `as`: types only
 end enum
 
 '' A generic does not instantiate as a TYPE field; its alias does.
@@ -121,6 +122,10 @@ declare sub CollectCompletions( byref text_ as string, byref tokens as TokenArra
 '' destructor or operators: `lg.constructor` is no call anyone can write, and a
 '' type with a full set of them (FB.Logger_) put them at the top of the list.
 declare function IsOfferedMember( byref sym as SymbolInfo ) as boolean
+
+'' Whether a symbol may follow a declaration's `as`: a type, union, enum or
+'' alias -- and a namespace, which qualifies one (`as ns.Widget`).
+declare function IsTypeSymbol( byref sym as SymbolInfo ) as boolean
 
 declare function DeclaredTypeName( byref sym as SymbolInfo ) as string
 

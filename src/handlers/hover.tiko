@@ -79,7 +79,9 @@ private function ContinuesChain_( byval doc as TextDocumentPtr, byval ti as long
     end if
     if( j >= n ) then return false
     dim as Token t = doc->Tokens( )[j]
-    return t.Kind = TK_OP andalso TokenText( doc->Text( ), t ) = "."
+    if( t.Kind <> TK_OP ) then return false
+    dim as string op = TokenText( doc->Text( ), t )
+    return op = "." orelse op = "->"
 end function
 
 private function MemberHover_( byref srv as Server, byval doc as TextDocumentPtr, _

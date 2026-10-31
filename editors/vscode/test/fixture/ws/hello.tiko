@@ -10,3 +10,11 @@ end sub
 dim p as Point
 p.x = 1
 Greet( "world" )
+
+' `Point` is also a reserved word (POINT), so the `as` check uses this one.
+type Widget
+    w as long
+end type
+dim q as Widget
+dim pq as Widget ptr = @q
+pq->w = 2

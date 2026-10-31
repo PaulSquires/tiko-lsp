@@ -467,22 +467,78 @@ const taskProvider = {
     },
 };
 
-/** Tiko: Build / Tiko: Run / Tiko: Check -- the same tasks, started directly. */
-async function runTiko(command) {
+/**
+ * Tiko: Build / Tiko: Run / Tiko: Check -- the same tasks, started directly.
+ * `more` carries a launch configuration's file, args and runArgs.
+ */
+async function runTiko(command, more) {
     const compiler = compilerForTasks();
     if (!compiler) {
         missingCompiler();
         return;
     }
-    const subject = buildSubject(undefined);
+    const definition = Object.assign({ type: TASK_TYPE, command }, more || {});
+    const subject = buildSubject(definition.file);
     if (!subject) {
         vscode.window.showErrorMessage('Tiko: open a .tiko file, or a folder with a tiko.toml, to build it.');
         return;
     }
     // Tasks started this way do not pass through task.saveBeforeRun.
     await vscode.workspace.saveAll(false);
-    return vscode.tasks.executeTask(makeTask({ type: TASK_TYPE, command }, subject, compiler));
+    return vscode.tasks.executeTask(makeTask(definition, subject, compiler));
 }
+
+// ---------------------------------------------------------------------------
+// Run > Run Without Debugging (Ctrl+F5) and Start Debugging (F5).
+//
+// VS Code sends both through a debugger for the active file's language; with
+// none contributed it offers to search the Marketplace for one. The `tiko`
+// debugger type exists so that both find something: its configuration is
+// resolved into a `tiko run` task, and resolving returns undefined, which
+// ends the launch without starting a debug session. There is no debug adapter
+// behind it -- under F5 the program runs without a debugger, and says so once.
+// ---------------------------------------------------------------------------
+
+let saidNoDebugger = false;
+
+const RUN_CONFIG = { type: 'tiko', request: 'launch', name: 'Run tiko program' };
+
+// Offered in Run and Debug's picker. A provider object of its own: VS Code
+// resolves through EVERY provider registered for a type, so registering the
+// one below twice would run the program twice.
+const dynamicDebugProvider = {
+    provideDebugConfigurations() {
+        return [Object.assign({}, RUN_CONFIG)];
+    },
+};
+
+const debugProvider = {
+    provideDebugConfigurations() {
+        return [Object.assign({}, RUN_CONFIG)];
+    },
+    // F5 / Ctrl+F5 with no launch.json arrive with an empty configuration.
+    resolveDebugConfiguration(folder, config) {
+        if (!config.type && !config.request && !config.name) {
+            return Object.assign({}, RUN_CONFIG, { noDebug: config.noDebug });
+        }
+        return config;
+    },
+    // After ${workspaceFolder} and friends are substituted: run, and start no session.
+    async resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
+        if (!config.noDebug && !saidNoDebugger) {
+            saidNoDebugger = true;
+            vscode.window.showInformationMessage(
+                'Tiko cannot debug in VS Code yet: the program runs without a debugger.');
+        }
+        const more = {};
+        if (config.file) more.file = folder && !path.isAbsolute(config.file)
+            ? path.join(folder.uri.fsPath, config.file) : config.file;
+        if (Array.isArray(config.args)) more.args = config.args;
+        if (Array.isArray(config.runArgs)) more.runArgs = config.runArgs;
+        await runTiko('run', more);
+        return undefined;
+    },
+};
 
 async function stop() {
     if (!client) return;
@@ -512,6 +568,9 @@ async function activate(context) {
         vscode.commands.registerCommand('tiko.run', () => runTiko('run')),
         vscode.commands.registerCommand('tiko.check', () => runTiko('check')),
         vscode.tasks.registerTaskProvider(TASK_TYPE, taskProvider),
+        vscode.debug.registerDebugConfigurationProvider('tiko', debugProvider),
+        vscode.debug.registerDebugConfigurationProvider('tiko', dynamicDebugProvider,
+            vscode.DebugConfigurationProviderTriggerKind.Dynamic),
 
         // initializationOptions are read once, at `initialize`: a change to
         // anything the server is started with needs a restart to take effect.
