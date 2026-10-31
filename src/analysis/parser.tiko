@@ -365,18 +365,31 @@ end sub
 ''  Handles the dotted forms -- `sub Customer.SetName` and
 ''  `constructor Foo.Bar` -- because the name in a diagnostic should read the
 ''  way the user wrote it.
+''
+''  A reserved word is a name where a name is expected -- first, or after a
+''  dot: tiko and fbc both accept `type Point`, `type Color`, `enum Line`
+''  (POINT, COLOR and LINE are keywords). Anywhere else it ends the name, so
+''  `type Foo extends Bar` is Foo. EXPLICIT is never one: `enum explicit` is an
+''  unnamed enum with the modifier (AfxNova's AfxScrRun.bi).
 '' ----------------------------------------------------------------------------
 private function ReadName( byref text_ as string, byref tokens as TokenArray, _
                            byval first_ as long, byval last_ as long ) as string
     dim as string name_ = ""
     dim as long i = first_
+    dim as boolean wantName = true
 
     while( i <= last_ )
         dim as Token t = tokens[i]
-        if( t.Kind = TK_IDENT ) then
+        dim as boolean keywordName = false
+        if( t.Kind = TK_KEYWORD andalso wantName ) then
+            keywordName = ( lcase( TokenText( text_, t ) ) <> "explicit" )
+        end if
+        if( t.Kind = TK_IDENT orelse keywordName ) then
             name_ &= TokenText( text_, t )
+            wantName = false
         elseif( t.Kind = TK_OP andalso TokenText( text_, t ) = "." ) then
             name_ &= "."
+            wantName = true
         else
             exit while
         end if
