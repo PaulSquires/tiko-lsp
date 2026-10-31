@@ -1,0 +1,10 @@
+[package]
+name = "proj2"
+
+[target.one]
+kind = "exe"
+main = "src/one.tiko"
+
+[target.two]
+kind = "exe"
+main = "src/two.tiko"

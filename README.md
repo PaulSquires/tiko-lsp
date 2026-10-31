@@ -236,7 +236,9 @@ itself does; the [install steps](https://tiko-lang.net/#install) cover it.
 What gets built:
 
 - **A project:** when a `tiko.toml` is in the file's folder or a folder above it, that
-  project is built (`tiko build`, `tiko run`). Its profiles and targets apply.
+  project is built (`tiko build`, `tiko run`). Its profiles and targets apply. When it
+  has more than one exe target, **Run** runs the one holding the open file, or asks once
+  which to run (**Tiko: Select Run Target...** changes it).
 - **A single file:** otherwise, the file you are editing. The program is written next to
   it (`hello.exe` on Windows, `hello` elsewhere).
 
@@ -402,6 +404,7 @@ the flags. The flags win when both are set.
 Commands (Command Palette, `Ctrl+Shift+P`):
 
 - **Tiko: Run** (`Ctrl+F5`), **Tiko: Build**, **Tiko: Check (no build)**
+- **Tiko: Select Run Target...**
 - **Tiko: Locate Toolchain…**
 - **Tiko: Restart Language Server**
 - **Tiko: Show Language Server Output**
