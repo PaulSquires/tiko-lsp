@@ -1,0 +1,5 @@
+' Target two of proj2/tiko.toml, which has two: leaves two-ran.txt in the project folder.
+dim as long f = freefile
+open "two-ran.txt" for output as #f
+print #f, "two"
+close #f

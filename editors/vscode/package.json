@@ -101,6 +101,11 @@
         "command": "tiko.check",
         "title": "Check (no build)",
         "category": "Tiko"
+      },
+      {
+        "command": "tiko.selectRunTarget",
+        "title": "Select Run Target...",
+        "category": "Tiko"
       }
     ],
     "configuration": {
@@ -202,6 +207,10 @@
         {
           "command": "tiko.check",
           "when": "editorLangId == tiko || workspaceFolderCount > 0"
+        },
+        {
+          "command": "tiko.selectRunTarget",
+          "when": "editorLangId == tiko || workspaceFolderCount > 0"
         }
       ]
     },
@@ -226,6 +235,10 @@
               "file": {
                 "type": "string",
                 "description": "A root file to build instead of the project: absolute, or relative to the workspace folder. Empty: the tiko.toml at or above the active file, else the active file."
+              },
+              "target": {
+                "type": "string",
+                "description": "The tiko.toml target to run, when it has more than one exe target. Empty: the one holding the active file, else the one chosen with Tiko: Select Run Target..."
               },
               "args": {
                 "type": "array",
@@ -283,6 +296,10 @@
           "file": {
             "type": "string",
             "description": "A root file to build instead of the project: absolute, or relative to the workspace folder. Empty: the tiko.toml at or above the active file, else the active file."
+          },
+          "target": {
+            "type": "string",
+            "description": "The tiko.toml target to run (run only), when it has more than one exe target."
           },
           "args": {
             "type": "array",

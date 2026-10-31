@@ -329,6 +329,33 @@ exports.run = async function run() {
                 `${runEnd ? runEnd.execution.task.name + ' exit ' + runEnd.exitCode : 'no task ended'}; ` +
                 `ran.txt ${fs.existsSync(marker) ? 'written' : 'missing'}; ${sessions} debug session(s)`);
             cleanup();
+
+            // e. A tiko.toml with two exe targets: `tiko run` must name one
+            //    (TKO0170). Run Without Debugging from two.tiko runs `two` --
+            //    the only target holding the active file -- with no question
+            //    asked, and the task list offers a run per target.
+            const two = path.join(root, 'proj2', 'two-ran.txt');
+            const one = path.join(root, 'proj2', 'one-ran.txt');
+            const proj2Clean = () => [one, two, path.join(root, 'proj2', 'out')].forEach((p) => fs.rmSync(p, { recursive: true, force: true }));
+            proj2Clean();
+            await open('proj2/src/two.tiko');
+            const ended2 = new Promise((resolve) => {
+                const timer = setTimeout(() => { sub.dispose(); resolve(undefined); }, 120000);
+                const sub = vscode.tasks.onDidEndTaskProcess((e) => {
+                    clearTimeout(timer);
+                    sub.dispose();
+                    resolve(e);
+                });
+            });
+            await vscode.commands.executeCommand('workbench.action.debug.run');
+            const run2 = await ended2;
+            const runNames = (await vscode.tasks.fetchTasks({ type: 'tiko' }))
+                .filter((t) => t.definition.command === 'run').map((t) => t.name);
+            check('two exe targets: the active file picks the target', run2 && run2.exitCode === 0 &&
+                fs.existsSync(two) && !fs.existsSync(one) && runNames.length === 2,
+                `${run2 ? run2.execution.task.name + ' exit ' + run2.exitCode : 'no task ended'}; ` +
+                `two-ran.txt ${fs.existsSync(two) ? 'written' : 'missing'}; tasks: ${runNames.join(', ')}`);
+            proj2Clean();
         }
     } catch (err) {
         check('no exception', false, err && err.stack ? err.stack : err);

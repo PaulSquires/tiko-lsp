@@ -46,7 +46,7 @@ or set the folder yourself:
 ### Build and run
 
 - **Run:** the **▶** button at the top right of a tiko editor, `Ctrl+F5` (`Cmd+F5` on a
-  Mac), or **Tiko: Run**.
+  Mac), **Run ▸ Run Without Debugging**, or **Tiko: Run**.
 - **Build:** `Ctrl+Shift+B`, then **tiko: build …**, or **Tiko: Build**.
 - **Check** (every error, nothing written): **Tiko: Check (no build)**.
 
@@ -55,9 +55,14 @@ When a `tiko.toml` is at or above the file, the project is built (`tiko build`,
 Both run in the terminal, so the program can read input. Compiler errors, including
 the ones only the compiler finds, go to the **Problems** view.
 
+`tiko run` runs one target. When the `tiko.toml` has more than one exe target, the one
+whose `main` or `sources` hold the open file runs; if that does not decide it, you are
+asked once per project, and **Tiko: Select Run Target...** changes the answer.
+
 `tiko.build.arguments` adds compiler options (`-g`, `-exx`), and `tiko.run.arguments`
 passes arguments to the program. Tasks of type `tiko` in `.vscode/tasks.json` take
-`command` (`build`, `run` or `check`), `file`, `args` and `runArgs`.
+`command` (`build`, `run` or `check`), `file`, `target`, `args` and `runArgs`; a
+`tiko` entry in `.vscode/launch.json` takes `file`, `target`, `args` and `runArgs`.
 
 ### Legacy FreeBASIC files
 

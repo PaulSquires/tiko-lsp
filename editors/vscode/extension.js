@@ -413,6 +413,8 @@ function makeTask(definition, subject, compiler) {
     const cfg = vscode.workspace.getConfiguration('tiko');
     const args = [definition.command, '--color=never'];
     if (subject.manifest) args.push('--manifest', subject.manifest);
+    // `tiko run` runs ONE target: a manifest with several exe targets needs it named.
+    if (subject.manifest && definition.target) args.push(definition.target);
     args.push(...(definition.args || cfg.get('build.arguments', [])));
     if (subject.file) args.push(subject.file);
     if (definition.command === 'run') {
@@ -423,7 +425,7 @@ function makeTask(definition, subject, compiler) {
     const task = new vscode.Task(
         definition,
         subject.folder || vscode.TaskScope.Workspace,
-        `${definition.command} ${subject.label}`,
+        `${definition.command} ${subject.manifest && definition.target ? definition.target + ' ' : ''}${subject.label}`,
         'tiko',
         new vscode.ProcessExecution(compiler, args, { cwd }),
         '$tiko'
@@ -447,12 +449,120 @@ function missingCompiler() {
     });
 }
 
+// ---------------------------------------------------------------------------
+// The run target: `tiko run` builds and runs ONE exe target, and a tiko.toml
+// with two or more of them needs it named (TKO0170). Chosen in this order:
+//
+//   1. `target` in launch.json or tasks.json;
+//   2. the only exe target whose main or sources hold the active file;
+//   3. the one picked before for this tiko.toml (Tiko: Select Run Target...);
+//   4. a pick list, remembered for next time.
+//
+// The targets are the compiler's own answer, `tiko metadata`, which prints
+// them even when the module graph has errors (it then exits 1).
+// ---------------------------------------------------------------------------
+
+/** @type {vscode.ExtensionContext | undefined} */
+let extContext;
+const RUN_TARGET_KEY = 'tiko.runTarget:';
+
+function samePath(a, b) {
+    const n = (p) => path.resolve(p).replace(/\\/g, '/');
+    return process.platform === 'win32' ? n(a).toLowerCase() === n(b).toLowerCase() : n(a) === n(b);
+}
+
+/** The manifest's exe targets as [{ name, main, roots }], or undefined when tiko cannot say. */
+function exeTargets(compiler, manifest) {
+    const { execFile } = require('child_process');
+    return new Promise((resolve) => {
+        execFile(compiler, ['metadata', '--manifest', manifest, '--format', 'json'],
+            { cwd: path.dirname(manifest), timeout: 30000, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+            (err, stdout) => {
+                try {
+                    const meta = JSON.parse(stdout);
+                    const dir = path.dirname(manifest);
+                    resolve((meta.targets || []).filter((t) => t.kind === 'exe').map((t) => ({
+                        name: t.name,
+                        main: t.main ? path.resolve(dir, t.main) : '',
+                        roots: (t.roots || []).map((r) => path.resolve(dir, r)),
+                    })));
+                } catch {
+                    resolve(undefined);
+                }
+            });
+    });
+}
+
+/** Asks which target to run, remembers the answer; undefined when dismissed. */
+async function pickRunTarget(manifest, targets) {
+    const dir = path.dirname(manifest);
+    const choice = await vscode.window.showQuickPick(
+        targets.map((t) => ({ label: t.name, description: t.main ? path.relative(dir, t.main) : '' })),
+        { title: `Run which target of ${path.relative(path.dirname(dir), manifest)}?`,
+          placeHolder: 'Remembered for this tiko.toml; change it with "Tiko: Select Run Target..."' });
+    if (!choice) return undefined;
+    await extContext.workspaceState.update(RUN_TARGET_KEY + manifest, choice.label);
+    return choice.label;
+}
+
+/**
+ * The target `tiko run` should name: a name, '' when none is needed (no
+ * manifest, one exe target, or tiko could not list them -- it then reports
+ * the problem itself), or undefined when the user dismissed the pick list.
+ */
+async function runTargetFor(subject, compiler) {
+    if (!subject.manifest) return '';
+    const targets = await exeTargets(compiler, subject.manifest);
+    if (!targets || targets.length < 2) return '';
+
+    const ed = vscode.window.activeTextEditor;
+    if (ed && ed.document.uri.scheme === 'file') {
+        const file = ed.document.uri.fsPath;
+        const holding = targets.filter((t) => t.roots.some((r) => samePath(r, file)));
+        if (holding.length === 1) return holding[0].name;
+    }
+    const remembered = extContext.workspaceState.get(RUN_TARGET_KEY + subject.manifest, '');
+    if (targets.some((t) => t.name === remembered)) return remembered;
+    return pickRunTarget(subject.manifest, targets);
+}
+
+/** Tiko: Select Run Target... -- the pick list, on demand. */
+async function selectRunTarget() {
+    const compiler = compilerForTasks();
+    if (!compiler) {
+        missingCompiler();
+        return;
+    }
+    const subject = buildSubject(undefined);
+    if (!subject || !subject.manifest) {
+        vscode.window.showInformationMessage('Tiko: there is no tiko.toml at or above the active file, so there is no target to choose.');
+        return;
+    }
+    const targets = await exeTargets(compiler, subject.manifest);
+    if (!targets || targets.length === 0) {
+        vscode.window.showErrorMessage(`Tiko: no exe target could be read from ${subject.manifest}.`);
+        return;
+    }
+    await pickRunTarget(subject.manifest, targets);
+}
+
 const taskProvider = {
-    provideTasks() {
+    // One `run` task per exe target when a tiko.toml has several, so the task
+    // list never offers a run that cannot start.
+    async provideTasks() {
         const subject = buildSubject(undefined);
         const compiler = compilerForTasks();
         if (!subject || !compiler) return [];
-        return TASK_COMMANDS.map((command) => makeTask({ type: TASK_TYPE, command }, subject, compiler));
+        const tasks = [];
+        const targets = subject.manifest ? await exeTargets(compiler, subject.manifest) : undefined;
+        for (const command of TASK_COMMANDS) {
+            if (command === 'run' && targets && targets.length > 1) {
+                for (const t of targets) tasks.push(makeTask({ type: TASK_TYPE, command, target: t.name }, subject, compiler));
+            } else {
+                tasks.push(makeTask({ type: TASK_TYPE, command }, subject, compiler));
+            }
+        }
+        return tasks;
     },
     resolveTask(task) {
         const def = task.definition;
@@ -482,6 +592,11 @@ async function runTiko(command, more) {
     if (!subject) {
         vscode.window.showErrorMessage('Tiko: open a .tiko file, or a folder with a tiko.toml, to build it.');
         return;
+    }
+    if (command === 'run' && !definition.target) {
+        const target = await runTargetFor(subject, compiler);
+        if (target === undefined) return; // the pick list was dismissed
+        if (target) definition.target = target;
     }
     // Tasks started this way do not pass through task.saveBeforeRun.
     await vscode.workspace.saveAll(false);
@@ -535,6 +650,7 @@ const debugProvider = {
             ? path.join(folder.uri.fsPath, config.file) : config.file;
         if (Array.isArray(config.args)) more.args = config.args;
         if (Array.isArray(config.runArgs)) more.runArgs = config.runArgs;
+        if (typeof config.target === 'string' && config.target) more.target = config.target;
         await runTiko('run', more);
         return undefined;
     },
@@ -557,6 +673,7 @@ async function restart(context) {
 }
 
 async function activate(context) {
+    extContext = context;
     output = vscode.window.createOutputChannel('Tiko Language Server');
     context.subscriptions.push(output);
 
@@ -567,6 +684,7 @@ async function activate(context) {
         vscode.commands.registerCommand('tiko.build', () => runTiko('build')),
         vscode.commands.registerCommand('tiko.run', () => runTiko('run')),
         vscode.commands.registerCommand('tiko.check', () => runTiko('check')),
+        vscode.commands.registerCommand('tiko.selectRunTarget', () => selectRunTarget()),
         vscode.tasks.registerTaskProvider(TASK_TYPE, taskProvider),
         vscode.debug.registerDebugConfigurationProvider('tiko', debugProvider),
         vscode.debug.registerDebugConfigurationProvider('tiko', dynamicDebugProvider,
