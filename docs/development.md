@@ -137,7 +137,7 @@ tiko-lsp/
   editors/vscode/  the VS Code extension: the same, plus a TextMate grammar
   editors/sublime/ LSP-tiko, for Sublime Text's LSP package: the same, plus a sublime-syntax
   editors/neovim/  tiko.nvim: the filetype, the client, :TikoInfo/:TikoRestart, a Vim syntax
-  grammar/      tree-sitter-tiko: a tree-sitter grammar for the same language,
+  grammar/      tiko-tree-sitter: a tree-sitter grammar for the same language,
                 for editors that colour and fold without a server
 ```
 

@@ -1,6 +1,6 @@
 /// <reference types="tree-sitter-cli/dsl" />
 
-// tree-sitter-tiko
+// tiko-tree-sitter
 //
 // A grammar for tiko -- the FreeBASIC-compatible language of tiko-lang --
 // written for EDITORS: highlighting, folding, an outline and indentation. It is

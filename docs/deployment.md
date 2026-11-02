@@ -53,14 +53,14 @@ link (A-D5).
 
 | # | Finding | Hits |
 | --- | --- | --- |
-| F1 | `tiko-lsp`, `tree-sitter-tiko` and `tiko-lang` are **PRIVATE** on GitHub. | Phase 2 blocker (B, C, D). A only loses its repository link. |
+| F1 | `tiko-lsp`, `tiko-tree-sitter` and `tiko-lang` are **PRIVATE** on GitHub. | Phase 2 blocker (B, C, D). A only loses its repository link. |
 | F2 | `bin/tiko-lsp` built on Fedora needs **GLIBC_2.42**, and fails on Ubuntu 24.04 (glibc 2.39): `version 'GLIBC_2.42' not found`. | Phase 1: Fedora cannot be the Linux release host. |
 | F3 | `toolchains/tiko-linux/bin/tiko` needs only **GLIBC_2.34**. | Phase 1: any distro whose build passes the glibc gate can be the host. |
 | F4 | The Linux binary links `libtinfo.so.6`, libm and libc, and carries debug info (3.9 MB). | Phase 1: strip it; tinfo is open item O3. |
 | F5 | `tiko-lsp.exe` imported `yyjson64.dll`, `KERNEL32.dll` and `ucrtbase.dll` (814 KB). | Phase 1: link yyjson statically (P1-D2). **Superseded 2026-10-30**: JSON is now tiko's `vendor/cJSON`, linked statically. |
 | F6 | Every client finds the server through settings → PATH → `<workspace>/bin`. None can obtain it itself. | Every track. |
-| F7 | `editors/zed`, `editors/neovim` and `tree-sitter-tiko` have no LICENSE. | B, D. |
-| F8 | The Zed grammar is loaded from `file:///C:/dev/tree-sitter-tiko`. Zed language-extension IDs should equal the language name; the current ID is `tiko-lsp`. | B. |
+| F7 | `editors/zed`, `editors/neovim` and `tiko-tree-sitter` have no LICENSE. | B, D. |
+| F8 | The Zed grammar is loaded from `file:///C:/dev/tiko-tree-sitter`. Zed language-extension IDs should equal the language name; the current ID is `tiko-lsp`. | B. |
 | F9 | Sublime's default channel sends LSP packages to `sublimelsp/repository`. Package Control installs one package per repo, from the repo root, by semver tag. | C. |
 | F10 | nvim-lspconfig and mason-registry are gated on ≥100 stars, or evidence such as 5,000 VS Code Marketplace downloads. | D: Track A's download count can open this gate. |
 | F11 | VS Code Marketplace: **global Azure DevOps PATs retire on 2026-12-01**; Microsoft Entra ID (`--azure-credential`) replaces them. | A: deadline. |
@@ -414,12 +414,12 @@ code with another):
 
 ## Track B: Zed (independent)
 
-**Depends on:** Phase 1 and Phase 2. **Touches:** `editors/zed/`, `tree-sitter-tiko`,
+**Depends on:** Phase 1 and Phase 2. **Touches:** `editors/zed/`, `tiko-tree-sitter`,
 `release/zed/`.
 
 ### B.1 One-time setup
 
-- Make `PaulSquires/tree-sitter-tiko` public and add an MIT `LICENSE` at its root.
+- Make `PaulSquires/tiko-tree-sitter` public and add an MIT `LICENSE` at its root.
 - Add a `LICENSE` to `editors/zed/` (Zed checks the extension directory, not the repo
   root) (F7).
 - Fork `zed-industries/extensions` into your **personal** account; install `pnpm`.
@@ -427,7 +427,7 @@ code with another):
 ### B.2 Client changes
 
 - `extension.toml`: `id = "tiko"`, `name = "Tiko"` (F8);
-  `repository = "https://github.com/PaulSquires/tree-sitter-tiko"`,
+  `repository = "https://github.com/PaulSquires/tiko-tree-sitter"`,
   `rev = <a pushed commit on its main branch>`.
 - `src/lib.rs` implements the shared contract with Zed's API:
   - `zed::current_platform()`;

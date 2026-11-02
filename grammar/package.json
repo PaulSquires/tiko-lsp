@@ -1,5 +1,5 @@
 {
-  "name": "tree-sitter-tiko",
+  "name": "tiko-tree-sitter",
   "version": "0.1.0",
   "description": "A tree-sitter grammar for tiko, written for editors.",
   "license": "MIT",

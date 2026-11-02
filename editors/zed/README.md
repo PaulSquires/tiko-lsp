@@ -118,7 +118,7 @@ semantic tokens, inlay hints, formatting and quick fixes.
 ## What is not verified
 
 - **Syntax highlighting.** This language has **no tree-sitter grammar** yet — a
-  `tree-sitter-tiko` is in progress under [../../grammar](../../grammar) — so
+  `tiko-tree-sitter` is in progress under [../../grammar](../../grammar) — so
   Zed has nothing to colour with unless it renders the server's semantic tokens,
   which was not observed in the run above. The language and the server work
   without one; the file may simply look plain.
@@ -132,11 +132,11 @@ semantic tokens, inlay hints, formatting and quick fixes.
 ## The grammar
 
 Syntax highlighting, folding, the outline and indentation come from
-**tree-sitter-tiko**, which lives at `../../grammar` and is declared here as:
+**tiko-tree-sitter**, which lives at `../../grammar` and is declared here as:
 
 ```toml
 [grammars.tiko]
-repository = "file:///C:/dev/tree-sitter-tiko"
+repository = "file:///C:/dev/tiko-tree-sitter"
 rev = "..."
 ```
 

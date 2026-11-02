@@ -6,7 +6,7 @@
 # `src/parser.c`. The grammar is developed at tiko-lsp/grammar, which is not a
 # repository root -- so it is mirrored to one. Zed loads that mirror through a
 # `file://` URL, and the mirror is ALSO published at
-# github.com/PaulSquires/tree-sitter-tiko, so the push below keeps the two from
+# github.com/PaulSquires/tiko-tree-sitter, so the push below keeps the two from
 # drifting. The push is not what Zed reads: a failed push leaves the local
 # reload working, and says so.
 #
@@ -14,7 +14,7 @@
 set -e
 
 SRC="$(cd "$(dirname "$0")/../../grammar" && pwd)"
-DST="${TIKO_GRAMMAR_REPO:-/c/dev/tree-sitter-tiko}"
+DST="${TIKO_GRAMMAR_REPO:-/c/dev/tiko-tree-sitter}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 [ -d "$DST/.git" ] || { echo "not a git repository: $DST" >&2; exit 1; }

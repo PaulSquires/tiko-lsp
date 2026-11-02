@@ -1,4 +1,4 @@
-# tree-sitter-tiko
+# tiko-tree-sitter
 
 A tree-sitter grammar for **tiko** — the FreeBASIC-compatible language of
 `tiko-lang` — written for **editors**: highlighting, folding, an outline,
@@ -96,7 +96,7 @@ The grammar is a plain tree-sitter grammar and works anywhere one does. The Zed
 extension is in [`../editors/zed`](../editors/zed), and it names this grammar by
 REPOSITORY AND REVISION -- never by a path, and the repository root is where it
 looks for `src/parser.c`. This directory is not a repository root, so it is
-mirrored to one (`C:\dev\tree-sitter-tiko` by default) and loaded through a
+mirrored to one (`C:\dev\tiko-tree-sitter` by default) and loaded through a
 `file://` URL. Run [`../editors/zed/sync-grammar.sh`](../editors/zed/sync-grammar.sh)
 after changing the grammar: it regenerates, mirrors, commits and re-pins the
 revision in `extension.toml`.

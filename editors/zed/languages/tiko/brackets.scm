@@ -1,4 +1,4 @@
-; tree-sitter-tiko -- bracket matching
+; tiko-tree-sitter -- bracket matching
 ;
 ; The block openers are matched to their closers as well as the punctuation,
 ; so jump-to-match works on `sub`/`end sub` the way it does on `(`/`)`.

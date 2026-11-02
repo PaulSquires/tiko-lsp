@@ -1,4 +1,4 @@
-; tree-sitter-tiko -- indentation
+; tiko-tree-sitter -- indentation
 ;
 ; Every block indents its body by one level and outdents on its closer. The
 ; closers are single tokens (`end sub`, not `end` + `sub`), so @outdent lands

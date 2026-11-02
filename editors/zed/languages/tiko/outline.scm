@@ -1,4 +1,4 @@
-; tree-sitter-tiko -- outline / symbol list
+; tiko-tree-sitter -- outline / symbol list
 ;
 ; What belongs in an outline is what a reader navigates by: procedures, the
 ; user-defined types, the namespaces around them, and the macros -- because in

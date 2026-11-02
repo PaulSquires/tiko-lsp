@@ -1,4 +1,4 @@
-; tree-sitter-tiko -- highlights
+; tiko-tree-sitter -- highlights
 ;
 ; TWO SOURCES OF COLOUR, and the split is deliberate.
 ;

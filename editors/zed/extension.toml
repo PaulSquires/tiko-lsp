@@ -11,8 +11,8 @@ authors = ["Paul Squires"]
 # being developed; swap in the GitHub URL once the grammar is published, and
 # change the rev with it.
 [grammars.tiko]
-repository = "file:///C:/dev/tree-sitter-tiko"
-rev = "ac57da018143744a27cda35a3cca35b45503ab10"
+repository = "file:///C:/dev/tiko-tree-sitter"
+rev = "4deac0420e34db9443d00b535f683e4f845f375b"
 
 [language_servers.tiko-lsp]
 name = "tiko-lsp"

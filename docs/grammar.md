@@ -1,6 +1,6 @@
 # The tree-sitter grammar
 
-`grammar/` holds **tree-sitter-tiko**: a tree-sitter grammar for the language
+`grammar/` holds **tiko-tree-sitter**: a tree-sitter grammar for the language
 this server serves. It is a separate artefact from the server — nothing in
 `src/` uses it — and it exists so an editor can colour, fold and outline tiko
 source **without** a language server running, and so the Zed extension has a
@@ -87,7 +87,7 @@ rules did not change.
 - **Zed is wired up, but nothing has rendered it yet.** A Zed extension names a
   grammar by *repository and revision*, never by a path -- and the repository
   root is where it looks for `src/parser.c`. A `file://` URL is allowed, so the
-  grammar is mirrored to a local repository at `C:\dev\tree-sitter-tiko` and
+  grammar is mirrored to a local repository at `C:\dev\tiko-tree-sitter` and
   `editors/zed/extension.toml` pins that revision. `editors/zed/sync-grammar.sh`
   re-mirrors and re-pins after a grammar change. What has NOT happened is a
   reload inside Zed VERIFIED THE LANGUAGE SERVER, not the colours: with the
