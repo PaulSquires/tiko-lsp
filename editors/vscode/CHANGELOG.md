@@ -2,7 +2,7 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
-## Unreleased
+## 0.1.3
 
 - **The toolchain is found for you.** The server looks for the `tiko-lang` folder in your
   home folder, in Downloads (also one level down, where Windows' Extract All puts it), at
@@ -30,6 +30,19 @@ The extension's version is the version of the tiko-lsp server it includes.
   and are offered by completion as functions. The codetips are tkEdit's own.
 - Typing `dim x as` at the end of a file no longer stops the server. It read one token
   past the end of the statement before the type was typed.
+- **Completion knows where a type goes.** After `as ` it offers types only -- your own,
+  typedefs and the built-in ones. After `->` it offers members, as after `.`.
+- **F5 and Ctrl+F5 run the program**, with no `launch.json`: both build and run it
+  through `tiko run`, instead of asking for a debugger from the Marketplace.
+- **A project with several programs**: when `tiko.toml` names more than one exe target,
+  **Tiko: Run** runs the one whose sources hold the file you are in, or asks once and
+  remembers. New command **Tiko: Select Run Target...**, and a `target` property for
+  `tiko` tasks and launch configurations.
+- A type, union or enum named after a reserved word -- `type Point`, `union Color`,
+  `enum Line` -- is a symbol: it is in the outline, and hover, completion and go to
+  definition find it.
+- A typed enum -- `enum Small as uint8` -- is no longer an error.
+- `ustring` is coloured as a built-in type, and `select channel` as one statement.
 
 ## 0.1.2
 
