@@ -163,6 +163,11 @@ w('        1: storage.type.namespace.tiko')
 w('        2: entity.name.namespace.tiko')
 w('')
 w('  keywords:')
+# `select channel` (std/tasks): `channel` is no keyword elsewhere, so only here.
+w('    - match: ' + q(r'(?i)' + WORD_START + r'(select)\s+(channel)' + WORD_END))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('        2: keyword.control.tiko')
 for scope, words in (('keyword.control.tiko', kw_control), ('storage.modifier.tiko', kw_modifier),
                      ('storage.type.tiko', types), ('keyword.other.tiko', kw_decl),
                      ('support.function.builtin.tiko', other)):

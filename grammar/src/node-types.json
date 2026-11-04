@@ -148,6 +148,10 @@
             "named": true
           },
           {
+            "type": "procedure_type",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           },
@@ -264,6 +268,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -484,6 +492,10 @@
             "named": true
           },
           {
+            "type": "procedure_type",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           },
@@ -600,6 +612,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -750,6 +766,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -854,6 +874,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -976,6 +1000,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -1051,6 +1079,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         },
@@ -1076,6 +1108,48 @@
           {
             "type": "identifier",
             "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
           }
         ]
       }
@@ -1114,6 +1188,10 @@
         },
         {
           "type": "preproc",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -1168,6 +1246,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -1301,6 +1383,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -1376,6 +1462,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         },
@@ -1448,6 +1538,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -1570,6 +1664,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -1629,6 +1727,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "member_access",
           "named": true
         },
@@ -1638,6 +1740,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -1713,6 +1819,10 @@
             "named": true
           },
           {
+            "type": "procedure_type",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           },
@@ -1769,6 +1879,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -1848,6 +1962,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -1978,6 +2096,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -2025,6 +2147,222 @@
     }
   },
   {
+    "type": "keyword_field",
+    "named": true,
+    "fields": {
+      "default": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "...",
+            "named": false
+          },
+          {
+            "type": "=",
+            "named": false
+          },
+          {
+            "type": "[",
+            "named": false
+          },
+          {
+            "type": "]",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "type_annotation",
+            "named": true
+          },
+          {
+            "type": "type_literal",
+            "named": true
+          },
+          {
+            "type": "{",
+            "named": false
+          },
+          {
+            "type": "}",
+            "named": false
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "case",
+            "named": false
+          },
+          {
+            "type": "constructor",
+            "named": false
+          },
+          {
+            "type": "continue",
+            "named": false
+          },
+          {
+            "type": "declare",
+            "named": false
+          },
+          {
+            "type": "destructor",
+            "named": false
+          },
+          {
+            "type": "else",
+            "named": false
+          },
+          {
+            "type": "exit",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "loop",
+            "named": false
+          },
+          {
+            "type": "namespace",
+            "named": false
+          },
+          {
+            "type": "next",
+            "named": false
+          },
+          {
+            "type": "operator",
+            "named": false
+          },
+          {
+            "type": "property",
+            "named": false
+          },
+          {
+            "type": "select",
+            "named": false
+          },
+          {
+            "type": "sub",
+            "named": false
+          },
+          {
+            "type": "then",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "union",
+            "named": false
+          },
+          {
+            "type": "until",
+            "named": false
+          }
+        ]
+      },
+      "type": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "label",
     "named": true,
     "fields": {
@@ -2044,6 +2382,76 @@
     "type": "lambda",
     "named": true,
     "fields": {
+      "captures": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "=",
+            "named": false
+          },
+          {
+            "type": "[",
+            "named": false
+          },
+          {
+            "type": "]",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "member_access",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "{",
+            "named": false
+          },
+          {
+            "type": "}",
+            "named": false
+          }
+        ]
+      },
       "close": {
         "multiple": false,
         "required": true,
@@ -2055,6 +2463,16 @@
           {
             "type": "end sub",
             "named": false
+          }
+        ]
+      },
+      "convention": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
           }
         ]
       },
@@ -2216,6 +2634,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -2307,6 +2729,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -2441,6 +2867,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -2543,6 +2973,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "member_access",
             "named": true
           },
@@ -2552,6 +2986,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -2653,6 +3091,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -2764,6 +3206,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         },
@@ -2805,6 +3251,16 @@
           {
             "type": "identifier",
             "named": true
+          }
+        ]
+      },
+      "link": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "link",
+            "named": false
           }
         ]
       },
@@ -2923,6 +3379,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -3162,6 +3622,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -3203,6 +3667,86 @@
         },
         {
           "type": "with_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "procedure_type",
+    "named": true,
+    "fields": {
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "parameter_list",
+          "named": true
+        },
+        {
+          "type": "string",
           "named": true
         }
       ]
@@ -3276,6 +3820,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -3394,6 +3942,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -3446,7 +3998,7 @@
     "fields": {
       "value": {
         "multiple": true,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "(",
@@ -3498,6 +4050,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -3553,6 +4109,10 @@
         },
         {
           "type": "preproc",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -3672,6 +4232,10 @@
           "named": true
         },
         {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
           "type": "result_assignment",
           "named": true
         },
@@ -3774,6 +4338,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "modifier",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -3793,6 +4367,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "member_access",
           "named": true
         },
@@ -3802,6 +4380,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -3929,6 +4511,10 @@
           "named": true
         },
         {
+          "type": "keyword_field",
+          "named": true
+        },
+        {
           "type": "label",
           "named": true
         },
@@ -3966,6 +4552,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -4024,6 +4614,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "member_access",
           "named": true
         },
@@ -4033,6 +4627,10 @@
         },
         {
           "type": "operator",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -4114,6 +4712,10 @@
           "named": true
         },
         {
+          "type": "keyword_field",
+          "named": true
+        },
+        {
           "type": "label",
           "named": true
         },
@@ -4151,6 +4753,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -4254,6 +4860,10 @@
           },
           {
             "type": "operator",
+            "named": true
+          },
+          {
+            "type": "procedure_type",
             "named": true
           },
           {
@@ -4373,6 +4983,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -4520,6 +5134,10 @@
         },
         {
           "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
           "named": true
         },
         {
@@ -4686,6 +5304,10 @@
     "named": false
   },
   {
+    "type": "channel",
+    "named": false
+  },
+  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -4846,6 +5468,10 @@
     "type": "line_continuation",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "link",
+    "named": false
   },
   {
     "type": "loop",

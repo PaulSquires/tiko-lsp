@@ -66,15 +66,23 @@ by whether it is elegant.
 
 | Tree | Files | With an ERROR |
 | --- | ---: | ---: |
-| `tiko-lsp/src` | 77 | 0 |
-| `tiko-lsp/tests` | 15 | 0 |
-| `tiko-lang/src` | 123 | 2 |
-| `tiko-lang/tests` | 3029 | 141 |
-| `PsControls` (FreeBASIC) | 572 | 0 |
-| `AfxNova/src` (FreeBASIC) | 179 | 7 |
+| `tiko-lsp/src` | 89 | 0 |
+| `tiko-lsp/tests` | 14 | 0 |
+| `tiko-lang/src` | 438 | 3 |
+| `tiko-lang/tests` (not `vendor/`) | 2446 | 92 |
+| `tiko-lang/pkg` | 385 | 2 |
+| `tiko-lang/examples` | 845 | 0 |
+| `tiko-lang/by-example/examples` | 309 | 0 |
+| `tiko-lang/tkedit` | 58 | 0 |
+| `AfxNova/src` (FreeBASIC) | 179 | 1 |
+
+Re-measured 2026-11-04. The two `pkg` files are `std/tasks/scheduler.tiko`, which
+opens `extern` in three `#if` branches and closes it once, and `CDialog.tiko`'s
+`IF x DoIt( )` with no THEN; the three in `src` are namespaces closed in an
+`#include`d file (below).
 
 `tiko-lang/tests` is the compiler's own corner-case corpus, and several of the
-141 are deliberately invalid programs that a grammar is *supposed* to reject.
+92 are deliberately invalid programs that a grammar is *supposed* to reject.
 
 Two files in `tiko-lang/src` (`mir/lowerstr.bas`, `parser/parser.bas`) open a
 `namespace` and leave the `end namespace` to a file they `#include` at the

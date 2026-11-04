@@ -38,6 +38,7 @@
   "for" "next" "while" "wend" "do" "loop" "until"
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
+  "channel" "link"
 ] @keyword
 
 [
@@ -61,7 +62,7 @@
 ; ------------------------------------------------------------ preprocessor
 
 (preproc_directive) @keyword.directive
-[ "#include" "#define" "#macro" "#endmacro" ] @keyword.directive
+[ "#include" "#module" "#import" "#export" "#define" "#macro" "#endmacro" ] @keyword.directive
 (preproc_include path: (string) @string.special.path)
 (preproc_import path: (string) @string.special.path)
 (preproc_import alias: (identifier) @module)
@@ -90,6 +91,7 @@
 (generic_parameters (identifier) @type.parameter)
 
 (enum_member name: (identifier) @constant)
+(keyword_field name: (identifier) @variable.member)
 (parameter name: (identifier) @variable.parameter)
 (label name: (identifier) @label)
 (for_statement variable: (identifier) @variable)
@@ -112,7 +114,7 @@
 ; The built-in TYPE names, coloured as types rather than as plain keywords.
 ((identifier) @type.builtin
   (#match? @type.builtin
-   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64)$"))
+   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64)$"))
 
 ; tiko-lang's predeclared constant, `const nullptr as any ptr = 0`. Not a
 ; keyword -- a program may declare its own, which the grammar cannot see --

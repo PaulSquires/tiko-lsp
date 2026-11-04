@@ -336,6 +336,10 @@ AssertClean( "type Customer" & LF & "    declare sub SetName( )" & LF & "end typ
              "a declare inside a type opens nothing" )
 AssertClean( "union U" & LF & "    a as long" & LF & "end union", "a union" )
 AssertClean( "enum Colours" & LF & "    Red" & LF & "end enum", "an enum" )
+AssertClean( "enum Small as uint8" & LF & "    A1" & LF & "end enum", "a typed enum still opens" )
+AssertClean( "enum Color as ubyte" & LF & "    A1" & LF & "end enum", _
+             "a typed enum named by a reserved word still opens" )
+AssertClean( "type T" & LF & "    enum as long" & LF & "end type", "`enum as long` in a TYPE is a field" )
 AssertClean( "namespace App" & LF & "end namespace", "a namespace" )
 AssertClean( "scope" & LF & "end scope", "a scope" )
 AssertClean( "with obj" & LF & "end with", "a with block" )

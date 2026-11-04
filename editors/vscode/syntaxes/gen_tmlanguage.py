@@ -117,6 +117,11 @@ g = {
         },
         "keywords": {
             "patterns": [
+                # `select channel` (std/tasks): `channel` is no keyword elsewhere -- `ch as
+                # Channel( of T )` -- so it is coloured only as the select's second word.
+                {"match": r'(?i)(?<![\w.])(select)\s+(channel)(?![\w$%&!#])',
+                 "captures": {"1": {"name": "keyword.control.tiko"},
+                              "2": {"name": "keyword.control.tiko"}}},
                 {"name": "keyword.control.tiko", "match": r'(?i)(?<![\w.])(' + kw_control + r')(?![\w$%&!#])'},
                 {"name": "storage.modifier.tiko", "match": r'(?i)(?<![\w.])(' + kw_modifier + r')(?![\w$%&!#])'},
                 {"name": "storage.type.tiko", "match": r'(?i)(?<![\w.])(' + types + r')(?![\w$%&!#])'},

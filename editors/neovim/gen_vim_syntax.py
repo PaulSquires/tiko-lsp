@@ -66,6 +66,9 @@ w('')
 for group, ws in groups:
     for line in words(ws):
         w('syn keyword {} {}'.format(group, line))
+# `select channel` (std/tasks): `channel` is no keyword elsewhere, so only here.
+# A keyword beats a match at the same column, so the match starts AT `channel`.
+w('syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"')
 w('')
 w('" Comments: an apostrophe, REM as a whole word, and the nesting block form.')
 w('syn keyword tikoTodo contained TODO FIXME XXX NOTE')

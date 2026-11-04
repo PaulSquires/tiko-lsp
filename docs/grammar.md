@@ -63,14 +63,22 @@ Corpus-driven means judged by whether it parses real code:
 
 | Tree | Files | With an ERROR |
 | --- | ---: | ---: |
-| `tiko-lsp/src` | 77 | 0 |
-| `tiko-lsp/tests` | 15 | 0 |
-| `tiko-lang/src` | 123 | 2 |
-| `tiko-lang/tests` | 3029 | 141 |
-| `PsControls` (FreeBASIC) | 572 | 0 |
-| `AfxNova/src` (FreeBASIC) | 179 | 7 |
+| `tiko-lsp/src` | 89 | 0 |
+| `tiko-lsp/tests` | 14 | 0 |
+| `tiko-lang/src` | 438 | 3 |
+| `tiko-lang/tests` (not `vendor/`) | 2446 | 92 |
+| `tiko-lang/pkg` | 385 | 2 |
+| `tiko-lang/examples` | 845 | 0 |
+| `tiko-lang/by-example/examples` | 309 | 0 |
+| `tiko-lang/tkedit` | 58 | 0 |
+| `AfxNova/src` (FreeBASIC) | 179 | 1 |
 
-`tree-sitter test` runs 20 corpus cases covering declarations, statements, the
+Re-measured 2026-11-04. The two `pkg` files are `std/tasks/scheduler.tiko`, which
+opens `extern` in three `#if` branches and closes it once, and `CDialog.tiko`'s
+`IF x DoIt( )` with no THEN; the three in `src` are namespaces closed in an
+`#include`d file (below).
+
+`tree-sitter test` runs 27 corpus cases covering declarations, statements, the
 preprocessor and the lexical corners; all pass.
 
 tiko's module directives (tiko-lang ADR 0017) are structural nodes of their own:
@@ -107,7 +115,7 @@ rules did not change.
   `parser/parser.bas` open a namespace and leave the closer to a file they
   `#include` at the bottom. Legal, and no file-at-a-time parser can balance it.
 - **What still fails is listed, not rounded away.** In `tiko-lang/tests`
-  (3029 files, the compiler's own corner-case corpus) 141 files carry an
+  (2446 files, the compiler's own corner-case corpus) 92 files carry an
   ERROR — and some of them **should**: `bad-decl.bas`, `bad-expr.bas`,
   `broken.bas`, `missing-end.bas` and `unclosed-paren.bas` are deliberately
   invalid programs, and `field-keyword-name.bas` exists to prove a field may be
