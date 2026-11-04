@@ -70,6 +70,22 @@ function commaSep1(rule) {
   return seq(rule, repeat(seq(',', rule)));
 }
 
+/** A lambda: an anonymous procedure used as a value. `convention` allows
+ *  `function cdecl( ... )`, which only an argument position can afford. */
+function lambdaRule($, convention) {
+  return seq(
+    field('kind', choice(kw('function'), kw('sub'))),
+    ...(convention ? [optional(field('convention', $.identifier))] : []),
+    // A CAPTURE LIST makes it a closure: `sub[ byref total ]( v as int32 )`.
+    optional(field('captures', seq('[', repeat($._nested_atom), ']'))),
+    $.parameter_list,
+    repeat($._signature_tail),
+    $._line_end,
+    repeat($._body_item),
+    field('close', choice(endkw('function'), endkw('sub'))),
+  );
+}
+
 module.exports = grammar({
   name: 'tiko',
 
@@ -113,6 +129,10 @@ module.exports = grammar({
     // token too late for LR.
     [$.access_specifier, $.modifier],
 
+    // Inside parentheses `sub( byval as long )` is a lambda's header or a shape,
+    // and only a line end after it (a lambda's body) tells the two apart.
+    [$._lambda_conv, $._signature_tail],
+
   ],
 
   externals: $ => [$._eof],
@@ -146,8 +166,9 @@ module.exports = grammar({
     // wrapped argument list gets a note against each argument. Reading the
     // underscore without allowing that is how four consecutive lines of this
     // project's own tests stopped parsing.
+    // So may a one-line BLOCK comment: `byval sql as zstring ptr, _  /' SQL '/`.
     line_continuation: _ => token(new RegExp(
-      "_[ \\t]*('[^\\n]*)?\\r?\\n"
+      "_[ \\t]*(/'([^'\\n]|'[^/\\n])*'/[ \\t]*)*('[^\\n]*)?\\r?\\n"
     )),
 
     comment: _ => token(choice(
@@ -195,6 +216,12 @@ module.exports = grammar({
       field('path', $.string),
       optional(seq(kw('as'), field('alias', $.identifier))),
       optional(kw('public')),
+      // A VENDOR PACKAGE says how it links (tiko-lang RFC-0002): `#import
+      // "vendor/raylib6" link dynamic`. Last on the line, after `public`.
+      // ONE TOKEN, like `end sub`: as separate words `link` would be a keyword
+      // everywhere an identifier is (`linkState as LinkState link`).
+      optional(field('link', alias(token(prec(3, new RegExp(
+        '[lL][iI][nN][kK][ \\t]+' + ciAlt(['static', 'dynamic']).source))), 'link'))),
       $._line_end,
     ),
 
@@ -285,6 +312,10 @@ module.exports = grammar({
     _operator_symbol: $ => choice(
       $.operator,
       '=', ',', '.',
+      // A WORD OPERATOR'S ASSIGNING FORM is one token: `operator CInt96.MOD= ( ... )`,
+      // `operator DVARIANT.And= ( ... )`.
+      alias(token(prec(3, ciAlt(['mod=', 'and=', 'or=', 'xor=', 'shl=', 'shr=', 'imp=',
+                                 'eqv=']))), $.operator),
       seq('[', ']'),
       seq('(', ')'),
       // A WORD-NAMED operator -- `cast`, `let`, `for`, `next`, `step` -- takes
@@ -433,7 +464,26 @@ module.exports = grammar({
       $.union_definition,
       $.enum_definition,
       $.bitfield,
+      $.keyword_field,
       $._statement,
+    ),
+
+    // A FIELD NAMED BY A STRUCTURAL WORD: `type as uint32` (raylib), `next as T ptr`
+    // and `function as const zstring ptr` (SDL3), `Select AS FUNCTION ( ... )` (TOM),
+    // `Open as boolean = true`. Only `as` after the word tells it from a block -- which is
+    // why a word whose block reads atoms next (`for`, `if`, `while`, `with`...) is absent.
+    keyword_field: $ => seq(
+      field('name', alias(choice(
+        kw('type'), kw('union'), kw('function'), kw('sub'),
+        kw('property'), kw('operator'), kw('constructor'), kw('destructor'),
+        kw('select'), kw('case'), kw('next'), kw('loop'), kw('until'), kw('then'),
+        kw('else'), kw('exit'), kw('continue'), kw('namespace'), kw('extern'),
+        kw('declare'),
+      ), $.identifier)),
+      kw('as'),
+      field('type', $._type),
+      optional(seq('=', field('default', $._atoms))),
+      $._line_end,
     ),
 
     // `a : 3 as ulong` -- a bitfield. The colon ends a statement everywhere
@@ -457,6 +507,8 @@ module.exports = grammar({
       repeat($.modifier),
       kw('enum'),
       optional(field('name', $.identifier)),
+      // `enum Small as uint8` -- the underlying type (tiko accepts it).
+      optional(seq(kw('as'), field('type', $._type))),
       optional(kw('explicit')),
       $._line_end,
       repeat(choice($._terminator, $.preproc, $.enum_member, $._simple_statement)),
@@ -476,6 +528,9 @@ module.exports = grammar({
     //     type fwd1 as integer, fwd2 as double     each name its own type
     //     type as integer rev1, rev2               one type across the names
     type_alias: $ => seq(
+      // `public type Handler as sub( ... )` -- a module's exported typedef. Every
+      // module in tiko-lang's pkg/ writes its public types this way.
+      repeat($.modifier),
       kw('type'),
       choice(
         seq(
@@ -614,10 +669,19 @@ module.exports = grammar({
 
     select_statement: $ => seq(
       kw('select'),
-      kw('case'),
-      // `select case as const x` -- a jump table rather than a chain of tests.
-      optional(seq(kw('as'), kw('const'))),
-      field('value', $._atoms),
+      choice(
+        seq(
+          kw('case'),
+          // `select case as const x` -- a jump table rather than a chain of tests.
+          optional(seq(kw('as'), kw('const'))),
+          field('value', $._atoms),
+        ),
+        // `select channel` -- std/tasks: waits on whichever arm is ready. Its arms
+        // are ordinary `case` lines: `case receive msg from ch`, `case timeout 1000`.
+        // `channel` is not a keyword (`ch as Channel( of T )`), so it is matched only
+        // here, as the select's own second word.
+        alias(token(prec(3, /[cC][hH][aA][nN][nN][eE][lL]/)), 'channel'),
+      ),
       $._line_end,
       // Between `select case x` and the first `case` there is usually nothing
       // -- but tiko-lang's own code puts a `#define` and a list-macro call
@@ -791,7 +855,7 @@ module.exports = grammar({
       // definition -- nothing else in the language opens a block here.
       $.lambda,
 
-      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME, not a block opener:
+      // A STRUCTURAL WORD AFTER A DOT IS A MEMBER NAME, not a block opener:
       // `rtp.type = nType`. Nothing can follow a dot but a name, so this
       // reading is never in competition with the other one.
       $.member_access,
@@ -823,16 +887,20 @@ module.exports = grammar({
 
       kw('function'), kw('sub'),
       kw('as'),
+
+      // `as Uint32 type` -- the reversed field form, naming the field `type`. SDL3's
+      // event structs and the Direct2D/DXGI headers all have one.
+      kw('type'),
     )))),
 
-    lambda: $ => seq(
-      field('kind', choice(kw('function'), kw('sub'))),
-      $.parameter_list,
-      repeat($._signature_tail),
-      $._line_end,
-      repeat($._body_item),
-      field('close', choice(endkw('function'), endkw('sub'))),
-    ),
+    lambda: $ => lambdaRule($, false),
+
+    // INSIDE AN ARGUMENT LIST a calling convention may come first: `Sort( xs( ),
+    // function cdecl( byval a as T ) as long` ... `)`. Not at a statement's start,
+    // where `sub cdecl(` cannot be told from `sub Name(` opening a procedure.
+    _lambda_conv: $ => lambdaRule($, true),
+    // Aliased as a SYMBOL: an alias over the bare seq would name each piece instead.
+    _lambda_arg: $ => alias($._lambda_conv, $.lambda),
 
     // `.name` AND `->name`: a structural word after either is a member name.
     // `m_pRange->lpvtbl->Select( ... )` is the shape that found the arrow.
@@ -847,6 +915,9 @@ module.exports = grammar({
       kw('for'), kw('do'), kw('while'), kw('if'), kw('then'), kw('else'),
       kw('as'), kw('is'), kw('of'), kw('const'), kw('static'), kw('shared'),
       kw('private'), kw('public'), kw('protected'),
+      // `this.constructor( 0, 1 )` -- delegating to another constructor.
+      kw('constructor'), kw('destructor'), kw('declare'), kw('extern'),
+      kw('loop'), kw('until'), kw('exit'), kw('continue'), kw('field'),
     ), $.identifier))),
 
     type_literal: $ => seq(
@@ -873,7 +944,21 @@ module.exports = grammar({
     ),
 
     // Inside a pair of parentheses a comma is just punctuation again.
-    _nested_atom: $ => choice($._value_atom, ','),
+    // A LAMBDA IS AN ARGUMENT as often as it is a value: `CountIf( xs( ), function(
+    // byval n as int32 ) as boolean` ... `end function )`, and `sub[ byref t ]( )`.
+    _nested_atom: $ => choice($._value_atom, ',', $._lambda_arg, $.procedure_type),
+
+    // ...and the SAME HEADER WITHOUT A BODY is a procedure's SHAPE: `byval cb as sub
+    // cdecl( byval as long ) ptr`, `procptr( Over, sub( byval as double ) )`. Only
+    // what follows the header tells the two apart -- a line end opens a lambda's
+    // body, a `,` or `)` ends a shape -- so both readings go to the GLR parser.
+    // ANY HEADER SHAPE, not only a type's: a macro argument may be a whole
+    // declaration -- `DLOG( sub UDT.method( byref rhs as const long ) )`, `ID(
+    // function fb_ArrayRedimEx )` in fbc's own tests.
+    procedure_type: $ => prec.right(seq(
+      field('kind', choice(kw('function'), kw('sub'))),
+      repeat(choice($._signature_tail, '.')),
+    )),
 
     _type: $ => prec.right(repeat1(choice(
       $.identifier,
@@ -948,6 +1033,11 @@ module.exports = grammar({
         repeat(choice(/[^"\n]/, '""')),
         '"',
       ),
+
+      // AN ESCAPED STRING -- `!"tab\t quote\" "` -- reads `\"` as a quote inside
+      // it. Longest match prefers this reading over the plain one, which would
+      // close at the backslash's quote.
+      seq('!', '"', repeat(choice(/[^"\\\n]/, /\\[^\n]/, '""')), '"'),
 
       // AN UNTERMINATED STRING ENDS AT THE LINE, and that is not a courtesy:
       // fbc accepts one, tiko-lang's own sources contain one, and an editor

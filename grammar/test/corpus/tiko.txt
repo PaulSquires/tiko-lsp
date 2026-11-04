@@ -1,0 +1,203 @@
+================================================================================
+#import with link, and a public typedef
+================================================================================
+
+#import "vendor/raylib6" link dynamic
+#import "std/outcome" public
+public type AskProc as function( byval f as Form ptr, _
+    byref text as ustring ) as long
+--------------------------------------------------------------------------------
+
+(source_file
+  (preproc
+    (preproc_import
+      (string)))
+  (preproc
+    (preproc_import
+      (string)))
+  (type_alias
+    (modifier)
+    (identifier)
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)
+        (identifier))
+      (line_continuation)
+      (parameter
+        (identifier)
+        (identifier)))
+    (identifier)))
+
+================================================================================
+select channel
+================================================================================
+
+select channel
+    case receive msg from quick : print msg
+    case timeout 1000           : print "none"
+end select
+--------------------------------------------------------------------------------
+
+(source_file
+  (select_statement
+    (case_clause
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier))
+    (case_clause
+      (identifier)
+      (number)
+      (identifier)
+      (string))))
+
+================================================================================
+lambdas as arguments, closures and procedure shapes
+================================================================================
+
+print CountIf( nums( ), function( byval n as int32 ) as boolean
+    return n > 5
+end function )
+var bump = sub[ byref count ]( )
+    count += 1
+end sub
+Sort( xs( ), function cdecl( byval a as any ptr ) as int32
+    return 0
+end function )
+dim as sub( byval as double ) pf = procptr( Over, sub( byval as double ) )
+DLOG( sub UDT.method( byref rhs as const long ) )
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (identifier)
+  (identifier)
+  (lambda
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)))
+    (identifier)
+    (identifier)
+    (identifier)
+    (operator)
+    (number))
+  (identifier)
+  (identifier)
+  (lambda
+    (identifier)
+    (identifier)
+    (parameter_list)
+    (identifier)
+    (operator)
+    (number))
+  (identifier)
+  (identifier)
+  (lambda
+    (identifier)
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)
+        (identifier)))
+    (identifier)
+    (identifier)
+    (number))
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier))
+  (identifier)
+  (identifier)
+  (procedure_type
+    (parameter_list
+      (parameter
+        (identifier))))
+  (identifier)
+  (procedure_type
+    (identifier)
+    (identifier)
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)))))
+
+================================================================================
+fields named by structural words, and a typed enum
+================================================================================
+
+type SDL_CommonEvent
+    as Uint32 type
+    type as uint32
+    next as const Node ptr
+    function as const zstring ptr
+end type
+enum Small as uint8
+    A1
+end enum
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    (identifier)
+    (type_annotation
+      (identifier))
+    (keyword_field
+      (identifier))
+    (keyword_field
+      (identifier)
+      (identifier))
+    (keyword_field
+      (identifier)
+      (identifier)))
+  (enum_definition
+    (identifier)
+    (identifier)
+    (enum_member
+      (identifier))))
+
+================================================================================
+escaped strings, word compound operators, a block comment after _
+================================================================================
+
+print !"quote:[\"] tab:[\t]"
+operator CInt96.MOD= ( byref rhs as CInt96 )
+end operator
+declare function f( byval sql as zstring ptr, _  /' SQL '/
+    byval n as long ) as long
+this.constructor( 0, 1 )
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (string)
+  (procedure_definition
+    (qualified_name
+      (identifier)
+      (operator))
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier))))
+  (declare_statement
+    (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)
+        (identifier))
+      (line_continuation)
+      (parameter
+        (identifier)
+        (identifier)))
+    (identifier))
+  (identifier)
+  (member_access)
+  (number)
+  (number))

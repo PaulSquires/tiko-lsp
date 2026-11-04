@@ -17,7 +17,7 @@ syn keyword tikoDeclare as asm constructor declare destructor enum extern field 
 syn keyword tikoDeclare namespace of once operator property scope sub type union with
 syn keyword tikoType any boolean byte double float32 float64 int16 int32 int64 int8
 syn keyword tikoType integer long longint pointer ptr short single string ubyte uint16
-syn keyword tikoType uint32 uint64 uint8 uinteger ulong ulongint ushort wstring zstring
+syn keyword tikoType uint32 uint64 uint8 uinteger ulong ulongint ushort ustring wstring zstring
 syn keyword tikoOperatorWord and andalso eqv imp mod not or orelse shl shr
 syn keyword tikoOperatorWord xor
 syn keyword tikoBuiltin __fastcall __thiscall abs access acos alias append asc asin atan2
@@ -35,8 +35,9 @@ syn keyword tikoBuiltin output overload paint palette pascal peek point poke pre
 syn keyword tikoBuiltin print procptr pset put random read redim restore resume rset
 syn keyword tikoBuiltin rtrim sadd screen seek sgn sin sizeof spc sqr stdcall
 syn keyword tikoBuiltin str strptr swap tab tan threadcall trim typeof ubound ucase
-syn keyword tikoBuiltin unlock unsigned using ustring va_first var varptr view wchr width
-syn keyword tikoBuiltin window winput write wstr
+syn keyword tikoBuiltin unlock unsigned using va_first var varptr view wchr width window
+syn keyword tikoBuiltin winput write wstr
+syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"
 
 " Comments: an apostrophe, REM as a whole word, and the nesting block form.
 syn keyword tikoTodo contained TODO FIXME XXX NOTE

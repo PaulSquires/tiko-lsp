@@ -1762,7 +1762,16 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 end if
 
             case KW_UNION, KW_ENUM, KW_NAMESPACE
-                if( HasTopLevelAs( tokens, stmt, first_ + 1 ) = false ) then
+                '' A TYPED ENUM -- `enum Small as uint8`, which tiko accepts -- has an AS
+                '' too, but after a NAME. A field named by the word has it straight after
+                '' the word: `enum as long`.
+                dim as boolean isBlock = ( HasTopLevelAs( tokens, stmt, first_ + 1 ) = false )
+                if( isBlock = false andalso head.Kw = KW_ENUM andalso hasNext ) then
+                    '' The name may itself be a reserved word: `enum Color as uint8`.
+                    if( nextTok.Kind = TK_IDENT ) then isBlock = true
+                    if( nextTok.Kind = TK_KEYWORD andalso nextTok.Kw <> KW_AS ) then isBlock = true
+                end if
+                if( isBlock ) then
                     dim as string name_ = ""
                     if( hasNext ) then name_ = ReadName( text_, tokens, stmt[first_ + 1], lastIdx )
 

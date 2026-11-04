@@ -105,15 +105,19 @@ contexts:
         2: entity.name.namespace.tiko
 
   keywords:
+    - match: '(?i)(?<![\w.])(select)\s+(channel)(?![\w$%&!#])'
+      captures:
+        1: keyword.control.tiko
+        2: keyword.control.tiko
     - match: '(?i)(?<![\w.])(continue|elseif|return|select|endif|gosub|until|while|case|else|exit|goto|loop|next|step|then|wend|end|for|do|if|to)(?![\w$%&!#])'
       scope: keyword.control.tiko
     - match: '(?i)(?<![\w.])(protected|abstract|explicit|extends|private|virtual|public|shared|static|byref|byval|const)(?![\w$%&!#])'
       scope: storage.modifier.tiko
-    - match: '(?i)(?<![\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|int16|int32|int64|short|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\w$%&!#])'
+    - match: '(?i)(?<![\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|ustring|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|int16|int32|int64|short|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\w$%&!#])'
       scope: storage.type.tiko
     - match: '(?i)(?<![\w.])(constructor|destructor|namespace|function|operator|property|declare|extern|field|scope|union|enum|once|type|with|asm|sub|as|is|of)(?![\w$%&!#])'
       scope: keyword.other.tiko
-    - match: '(?i)(?<![\w.])(defulongint|imagecreate|__fastcall|__thiscall|deflongint|implements|threadcall|cva_start|cvlongint|defushort|mklongint|culngint|cva_copy|defshort|defubyte|encoding|instrrev|overload|preserve|unsigned|va_first|andalso|clngint|cushort|cva_arg|cva_end|cvshort|defbyte|defined|defuint|defulng|dynamic|include|mkshort|palette|procptr|restore|stdcall|ustring|access|append|binary|circle|common|cshort|cubyte|defdbl|defint|deflng|defsng|defstr|delete|export|import|lbound|lprint|option|orelse|output|pascal|preset|random|resume|screen|sizeof|strptr|typeof|ubound|unlock|varptr|window|winput|alias|atan2|cbool|cbyte|cdecl|class|close|color|csign|cuint|culng|cunsg|erase|error|input|instr|lcase|local|ltrim|paint|point|print|redim|rtrim|ucase|using|width|write|acos|asin|base|call|cast|cdbl|cint|clng|cptr|csng|data|draw|frac|line|lock|lset|name|open|peek|poke|pset|read|rset|sadd|seek|swap|trim|view|wchr|wstr|abs|and|asc|atn|chr|cos|cvd|cvi|cvl|cvs|dim|eqv|err|exp|fix|get|iif|imp|int|len|let|lib|log|mid|mkd|mki|mkl|mks|mod|new|not|put|rem|sgn|shl|shr|sin|spc|sqr|str|tab|tan|var|xor|on|or)(?![\w$%&!#])'
+    - match: '(?i)(?<![\w.])(defulongint|imagecreate|__fastcall|__thiscall|deflongint|implements|threadcall|cva_start|cvlongint|defushort|mklongint|culngint|cva_copy|defshort|defubyte|encoding|instrrev|overload|preserve|unsigned|va_first|andalso|clngint|cushort|cva_arg|cva_end|cvshort|defbyte|defined|defuint|defulng|dynamic|include|mkshort|palette|procptr|restore|stdcall|access|append|binary|circle|common|cshort|cubyte|defdbl|defint|deflng|defsng|defstr|delete|export|import|lbound|lprint|option|orelse|output|pascal|preset|random|resume|screen|sizeof|strptr|typeof|ubound|unlock|varptr|window|winput|alias|atan2|cbool|cbyte|cdecl|class|close|color|csign|cuint|culng|cunsg|erase|error|input|instr|lcase|local|ltrim|paint|point|print|redim|rtrim|ucase|using|width|write|acos|asin|base|call|cast|cdbl|cint|clng|cptr|csng|data|draw|frac|line|lock|lset|name|open|peek|poke|pset|read|rset|sadd|seek|swap|trim|view|wchr|wstr|abs|and|asc|atn|chr|cos|cvd|cvi|cvl|cvs|dim|eqv|err|exp|fix|get|iif|imp|int|len|let|lib|log|mid|mkd|mki|mkl|mks|mod|new|not|put|rem|sgn|shl|shr|sin|spc|sqr|str|tab|tan|var|xor|on|or)(?![\w$%&!#])'
       scope: support.function.builtin.tiko
 
   calls:
