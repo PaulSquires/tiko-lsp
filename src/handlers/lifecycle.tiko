@@ -69,7 +69,7 @@ private function OnInitialize( byref srv as Server, _
     '' `#include "windows.bi"` is found in -- the compiler's -i paths, which
     '' live in a build configuration this server never reads. A string is
     '' taken as a one-element list. Without it the server falls back to
-    '' TKO_INCLUDE, then to `inc` beside a `tiko` on PATH (ToolchainIncDir).
+    '' TIKO_INCLUDE, then to `inc` beside a `tiko` on PATH (ToolchainIncDir).
     ''
     '' Read HERE because the index worker starts on `initialized`, after this
     '' response: the directories are fixed before any thread can read them.
@@ -106,7 +106,7 @@ private function OnInitialize( byref srv as Server, _
     '' a user unpacked (or its bin, or its compiler). It fills whichever of includePaths,
     '' packagePaths and compilerPath the client left unset; what the client did set wins.
     ''
-    '' Without it, and with no headers found the older ways (includePaths, TKO_INCLUDE, a
+    '' Without it, and with no headers found the older ways (includePaths, TIKO_INCLUDE, a
     '' `tiko` on PATH), the server looks where the website's instructions leave a toolchain
     '' (DetectToolchainRoot). An EXPLICIT empty string turns that search off.
     CacheToolchainOnPath( )
@@ -176,7 +176,7 @@ private function OnInitialize( byref srv as Server, _
     dim incDirs as PathArray = ToolchainIncDirs( )
     if( incDirs.IsEmpty( ) ) then
         LogInfo( "toolchain headers: none configured (initializationOptions.toolchainPath or " & _
-                 "includePaths, TKO_INCLUDE, a tiko on PATH, or a tiko-lang folder where the " & _
+                 "includePaths, TIKO_INCLUDE, a tiko on PATH, or a tiko-lang folder where the " & _
                  "website's instructions leave one) -- Win32 and library names will be unknown" )
     else
         for i as long = 0 to incDirs.Count( ) - 1

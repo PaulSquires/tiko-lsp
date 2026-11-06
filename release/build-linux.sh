@@ -48,7 +48,7 @@ mkdir -p "$W"
 
 # The toolchain finds its own inc/ and pkg/; a developer's TKO_* overrides
 # would build against something no user has.
-unset TKO_INCLUDE TKO_LIBPATH TKO_PKG
+unset TIKO_INCLUDE TIKO_LIBPATH TIKO_PKG
 export TIKO_LSP_TIKO=$TIKO
 
 echo "== [2/5] server + suite (log: $LOG)"

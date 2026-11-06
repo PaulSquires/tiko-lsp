@@ -273,7 +273,7 @@ function ToolchainPkgDir( ) as string
         if( fs.IsDir( cand ) ) then return cand
     next
 
-    dim as string env_ = environ( "TKO_PKG" )
+    dim as string env_ = environ( "TIKO_PKG" )
     if( len(env_) > 0 ) then return NormalizePath( env_ )
 
     '' BESIDE A `tiko` ON PATH, found without running it: <dir>/pkg in a packaged
@@ -283,7 +283,7 @@ function ToolchainPkgDir( ) as string
 end function
 
 function ToolchainIncDir( ) as string
-    dim as string env_ = environ( "TKO_INCLUDE" )
+    dim as string env_ = environ( "TIKO_INCLUDE" )
     if( len(env_) > 0 ) then return NormalizePath( env_ )
     if( g_pathWalked ) then return g_pathIncDir
     return BesideTikoOnPath_( "inc" )

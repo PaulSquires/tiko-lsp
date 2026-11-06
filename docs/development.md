@@ -269,7 +269,7 @@ Windows, `bin/tiko` on Linux and macOS). The root itself, its `bin` or the compi
 be named (`ToolchainRootFrom`). It fills whichever of `includePaths`, `packagePaths` and
 `compilerPath` the client left unset.
 
-Without it, and with no headers found through `includePaths`, `TKO_INCLUDE` or a `tiko`
+Without it, and with no headers found through `includePaths`, `TIKO_INCLUDE` or a `tiko`
 on PATH, the server looks where tiko-lang.net's instructions leave one
 (`DetectToolchainRoot`): `<home>/tiko-lang`, `<home>/Downloads/tiko-lang`,
 `<home>/Downloads/tiko-*/tiko-lang` (Windows' Extract All), then `C:\tiko-lang`, or
@@ -303,14 +303,14 @@ and runtime names complete, hover, jump to their declaration and show their sign
 "initializationOptions": { "includePaths": ["C:/dev/tiko-editor-tiko/toolchains/tiko-windows/inc"] }
 ```
 
-Without it the server falls back to `TKO_INCLUDE`, then to `inc` beside a `tiko` on PATH.
+Without it the server falls back to `TIKO_INCLUDE`, then to `inc` beside a `tiko` on PATH.
 Directories are searched in order, after the includer's own directory and the workspace
 folders -- the order the compiler uses.
 
 **Packages** (`#import "std/strings"`) are found in the toolchain's `pkg`: by default the
 `pkg` beside a configured include directory -- a packaged toolchain is `<dir>/inc` and
 `<dir>/pkg`, so `includePaths` alone is enough. `initializationOptions.packagePaths` names
-it explicitly; without either, `TKO_PKG`, then `pkg` beside a `tiko` on PATH. After
+it explicitly; without either, `TIKO_PKG`, then `pkg` beside a `tiko` on PATH. After
 `strings.`, completion offers the module's exports, hover shows what an export names
 (`FB.PadLeft`), and `strings.PadLeft(` shows its signature.
 

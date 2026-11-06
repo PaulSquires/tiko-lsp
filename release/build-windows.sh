@@ -16,7 +16,7 @@
 #  The version is read from src/lsp/protocol.ti; set it with release/bump.py.
 #
 #    TIKO_LSP_TIKO    tiko.exe   (default C:/dev/tiko-lang/toolchains/tiko-windows/tiko.exe)
-#    TKO_CLANG        clang.exe  (default C:/Program Files/LLVM/bin/clang.exe) -- its
+#    TIKO_CLANG        clang.exe  (default C:/Program Files/LLVM/bin/clang.exe) -- its
 #                     llvm-objdump reads the gates
 # ============================================================================
 set -e
@@ -25,7 +25,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
 TIKO=${TIKO_LSP_TIKO:-"C:/dev/tiko-lang/toolchains/tiko-windows/tiko.exe"}
-CLANG=${TKO_CLANG:-"C:/Program Files/LLVM/bin/clang.exe"}
+CLANG=${TIKO_CLANG:-"C:/Program Files/LLVM/bin/clang.exe"}
 OBJDUMP="$(dirname "$CLANG")/llvm-objdump.exe"
 EXE="$ROOT/bin/tiko-lsp.exe"
 

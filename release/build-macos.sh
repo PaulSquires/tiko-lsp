@@ -39,7 +39,7 @@ echo "== tiko-lsp $VERSION -- macOS arm64 release build on macOS $(sw_vers -prod
 
 # The toolchain finds its own inc/ and pkg/; a developer's TKO_* overrides would
 # build against something no user has.
-unset TKO_INCLUDE TKO_LIBPATH TKO_PKG
+unset TIKO_INCLUDE TIKO_LIBPATH TIKO_PKG
 export TIKO_LSP_TIKO=$TIKO
 
 echo "== [1/4] server + suite (log: obj/release-macos-suite.log)"

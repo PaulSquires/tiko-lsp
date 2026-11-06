@@ -1,4 +1,4 @@
-' A stand-in for a toolchain header (inc/fb/...), found through TKO_INCLUDE.
+' A stand-in for a toolchain header (inc/fb/...), found through TIKO_INCLUDE.
 namespace FB
 
 '' Joins two paths.

@@ -559,7 +559,7 @@ end scope
 
 '' The toolchain's pkg/: std/strings lives there and in no workspace folder.
 dim shared as string g_pkgEnv
-g_pkgEnv = "TKO_PKG=" & g_Root & NativePath( "\tests\fixtures\modpkg" )
+g_pkgEnv = "TIKO_PKG=" & g_Root & NativePath( "\tests\fixtures\modpkg" )
 setenviron g_pkgEnv
 
 scope
@@ -818,13 +818,13 @@ scope
     AssertFalse( seesMod, "and so do the modules' own files" )
 end scope
 
-setenviron "TKO_PKG="
+setenviron "TIKO_PKG="
 
 '' EXPORTED MACROS: a facade (tiko-lang RFC-0009) is `#define N FB.N` + `#export N`. Its
 '' names are offered after `fs.` as what they name -- FB.PathJoin, in a header found through
-'' the toolchain's include directory (TKO_INCLUDE here) -- and are never symbols.
+'' the toolchain's include directory (TIKO_INCLUDE here) -- and are never symbols.
 dim shared as string g_incEnv
-g_incEnv = "TKO_INCLUDE=" & g_Root & NativePath( "\tests\fixtures\modinc" )
+g_incEnv = "TIKO_INCLUDE=" & g_Root & NativePath( "\tests\fixtures\modinc" )
 setenviron g_incEnv
 setenviron g_pkgEnv
 
@@ -922,8 +922,8 @@ scope
     AssertFalse( inFacade, "workspace/symbol finds only the header's PathJoin" )
 end scope
 
-setenviron "TKO_INCLUDE="
-setenviron "TKO_PKG="
+setenviron "TIKO_INCLUDE="
+setenviron "TIKO_PKG="
 
 '' ############################################################################
 ''  Toolchain headers
