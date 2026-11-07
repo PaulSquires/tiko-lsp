@@ -183,6 +183,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -228,6 +232,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -322,9 +330,245 @@
     }
   },
   {
+    "type": "class_definition",
+    "named": true,
+    "fields": {
+      "base": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      },
+      "interface": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "access_specifier",
+          "named": true
+        },
+        {
+          "type": "asm_block",
+          "named": true
+        },
+        {
+          "type": "bitfield",
+          "named": true
+        },
+        {
+          "type": "declare_statement",
+          "named": true
+        },
+        {
+          "type": "do_statement",
+          "named": true
+        },
+        {
+          "type": "end_statement",
+          "named": true
+        },
+        {
+          "type": "end_with_value",
+          "named": true
+        },
+        {
+          "type": "enum_definition",
+          "named": true
+        },
+        {
+          "type": "exit_statement",
+          "named": true
+        },
+        {
+          "type": "for_statement",
+          "named": true
+        },
+        {
+          "type": "generic_parameters",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_single_line",
+          "named": true
+        },
+        {
+          "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "implements_clause",
+          "named": true
+        },
+        {
+          "type": "inherits_clause",
+          "named": true
+        },
+        {
+          "type": "keyword_field",
+          "named": true
+        },
+        {
+          "type": "label",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "member_access",
+          "named": true
+        },
+        {
+          "type": "modified_statement",
+          "named": true
+        },
+        {
+          "type": "modifier",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "open_statement",
+          "named": true
+        },
+        {
+          "type": "operator",
+          "named": true
+        },
+        {
+          "type": "preproc",
+          "named": true
+        },
+        {
+          "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "procedure_type",
+          "named": true
+        },
+        {
+          "type": "result_assignment",
+          "named": true
+        },
+        {
+          "type": "scope_block",
+          "named": true
+        },
+        {
+          "type": "select_statement",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "type_annotation",
+          "named": true
+        },
+        {
+          "type": "type_definition",
+          "named": true
+        },
+        {
+          "type": "type_literal",
+          "named": true
+        },
+        {
+          "type": "union_definition",
+          "named": true
+        },
+        {
+          "type": "while_statement",
+          "named": true
+        },
+        {
+          "type": "with_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "declare_statement",
     "named": true,
     "fields": {
+      "implements": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
       "kind": {
         "multiple": false,
         "required": true,
@@ -527,6 +771,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -572,6 +820,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -678,6 +930,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -723,6 +979,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -912,6 +1172,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -957,6 +1221,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -1295,6 +1563,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -1340,6 +1612,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -1576,6 +1852,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -1621,6 +1901,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -2000,6 +2284,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -2053,6 +2341,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -2141,6 +2433,200 @@
         },
         {
           "type": "with_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "implements_clause",
+    "named": true,
+    "fields": {
+      "interface": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "inherits_clause",
+    "named": true,
+    "fields": {
+      "base": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "interface_definition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "declare_statement",
+          "named": true
+        },
+        {
+          "type": "generic_parameters",
+          "named": true
+        },
+        {
+          "type": "inherits_clause",
+          "named": true
+        },
+        {
+          "type": "interface_method",
+          "named": true
+        },
+        {
+          "type": "modifier",
+          "named": true
+        },
+        {
+          "type": "preproc",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "interface_method",
+    "named": true,
+    "fields": {
+      "implements": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "constructor",
+            "named": false
+          },
+          {
+            "type": "destructor",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "property",
+            "named": false
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "*",
+            "named": false
+          },
+          {
+            "type": ".",
+            "named": false
+          },
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": false
+          },
+          {
+            "type": "generic_parameters",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter_list",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": false
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "modifier",
+          "named": true
+        },
+        {
+          "type": "parameter_list",
+          "named": true
+        },
+        {
+          "type": "string",
           "named": true
         }
       ]
@@ -2241,6 +2727,10 @@
             "named": false
           },
           {
+            "type": "class",
+            "named": false
+          },
+          {
             "type": "constructor",
             "named": false
           },
@@ -2270,6 +2760,10 @@
           },
           {
             "type": "function",
+            "named": false
+          },
+          {
+            "type": "implements",
             "named": false
           },
           {
@@ -2476,6 +2970,16 @@
           }
         ]
       },
+      "implements": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
       "kind": {
         "multiple": false,
         "required": true,
@@ -2542,6 +3046,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -2587,6 +3095,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -2779,6 +3291,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -2824,6 +3340,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -3434,6 +3954,16 @@
           }
         ]
       },
+      "implements": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
       "kind": {
         "multiple": false,
         "required": true,
@@ -3526,6 +4056,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -3571,6 +4105,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -3676,6 +4214,16 @@
     "type": "procedure_type",
     "named": true,
     "fields": {
+      "implements": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
       "kind": {
         "multiple": false,
         "required": true,
@@ -3854,6 +4402,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -3899,6 +4451,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -4144,6 +4700,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -4189,6 +4749,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -4439,6 +5003,16 @@
           }
         ]
       },
+      "interface": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -4508,6 +5082,14 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "implements_clause",
+          "named": true
+        },
+        {
+          "type": "inherits_clause",
           "named": true
         },
         {
@@ -4712,6 +5294,14 @@
           "named": true
         },
         {
+          "type": "implements_clause",
+          "named": true
+        },
+        {
+          "type": "inherits_clause",
+          "named": true
+        },
+        {
           "type": "keyword_field",
           "named": true
         },
@@ -4898,6 +5488,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -4943,6 +5537,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -5049,6 +5647,10 @@
           "named": true
         },
         {
+          "type": "class_definition",
+          "named": true
+        },
+        {
           "type": "declare_statement",
           "named": true
         },
@@ -5094,6 +5696,10 @@
         },
         {
           "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "interface_definition",
           "named": true
         },
         {
@@ -5308,6 +5914,10 @@
     "named": false
   },
   {
+    "type": "class",
+    "named": false
+  },
+  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -5353,6 +5963,10 @@
     "named": false
   },
   {
+    "type": "end class",
+    "named": false
+  },
+  {
     "type": "end constructor",
     "named": false
   },
@@ -5374,6 +5988,10 @@
   },
   {
     "type": "end if",
+    "named": false
+  },
+  {
+    "type": "end interface",
     "named": false
   },
   {
@@ -5458,6 +6076,18 @@
   },
   {
     "type": "if",
+    "named": false
+  },
+  {
+    "type": "implements",
+    "named": false
+  },
+  {
+    "type": "inherits",
+    "named": false
+  },
+  {
+    "type": "interface",
     "named": false
   },
   {

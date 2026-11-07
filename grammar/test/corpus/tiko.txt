@@ -201,3 +201,93 @@ this.constructor( 0, 1 )
   (member_access)
   (number)
   (number))
+
+================================================================================
+interfaces and classes, and the words used as names
+================================================================================
+
+interface IAnimal
+    sub Speak( )
+    function Name( ) as string
+end interface
+
+interface IPet
+    inherits IAnimal
+    declare function Owner( ) as string
+end interface
+
+class Dog
+    inherits Animal
+    implements IPet, IComparable( of Dog )
+    declare function Name( ) as string implements IAnimal.Name
+end class
+
+type Holder extends Object implements IShow
+    inherits as long
+end type
+
+dim as long inherits = 2
+interface = 3
+print interface
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (interface_definition
+    (identifier)
+    (interface_method
+      (qualified_name
+        (identifier))
+      (parameter_list))
+    (interface_method
+      (qualified_name
+        (identifier))
+      (parameter_list)
+      (identifier)))
+  (interface_definition
+    (identifier)
+    (inherits_clause
+      (qualified_name
+        (identifier)))
+    (declare_statement
+      (qualified_name
+        (identifier))
+      (parameter_list)
+      (identifier)))
+  (class_definition
+    (identifier)
+    (inherits_clause
+      (qualified_name
+        (identifier)))
+    (implements_clause
+      (qualified_name
+        (identifier))
+      (qualified_name
+        (identifier)
+        (generic_parameters
+          (identifier))))
+    (declare_statement
+      (qualified_name
+        (identifier))
+      (parameter_list)
+      (identifier)
+      (qualified_name
+        (identifier)
+        (identifier))))
+  (type_definition
+    (identifier)
+    (identifier)
+    (qualified_name
+      (identifier))
+    (identifier)
+    (type_annotation
+      (identifier)))
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (number)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier))

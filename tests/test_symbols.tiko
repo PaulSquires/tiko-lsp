@@ -175,6 +175,59 @@ scope
     AssertEqStr( S_(g).Detail_, "= 5", "and the value is shown" )
 end scope
 
+'' tiko's INTERFACE and CLASS. An interface's members are bare headers with no
+'' body and no END -- `sub Speak( )` -- which must open nothing, or every line
+'' after the interface is read as the inside of a sub that never ends.
+scope
+    Analyse( "interface IAnimal" & LF & _
+             "    sub Speak( )" & LF & _
+             "    function Name( ) as string" & LF & _
+             "end interface" & LF & _
+             "interface IPet" & LF & _
+             "    inherits IAnimal" & LF & _
+             "    declare function Owner( ) as string" & LF & _
+             "end interface" & LF & _
+             "class Dog" & LF & _
+             "    inherits Animal" & LF & _
+             "    implements IPet, IComparable" & LF & _
+             "  private:" & LF & _
+             "    m_name as string" & LF & _
+             "  public:" & LF & _
+             "    declare function Name( ) as string implements IAnimal.Name" & LF & _
+             "end class" & LF & _
+             "sub Main( )" & LF & _
+             "end sub" )
+
+    AssertEqInt( g_Diags.Count( ), 0, "interfaces and a class parse with no diagnostic" )
+    dim as long ia = Expect( "IAnimal", SYM_INTERFACE, "an interface is a symbol" )
+    dim as long sp = Expect( "Speak", SYM_METHOD, "its bare sub is a method" )
+    AssertEqInt( S_(sp).Parent, ia, "parented to the interface" )
+    AssertTrue ( S_(sp).IsDeclaration, "and a declaration: it has no body" )
+    dim as long ip = Expect( "IPet", SYM_INTERFACE, "the next interface is a sibling, not inside a sub" )
+    AssertEqInt( S_(ip).Parent, -1, "at the top level" )
+    AssertEqInt( S_( Expect( "Owner", SYM_METHOD, "a declare in an interface is a method" ) ).Parent, ip, _
+                 "parented to it" )
+    dim as long dg = Expect( "Dog", SYM_CLASS, "a class is a symbol" )
+    AssertEqInt( S_( Expect( "m_name", SYM_FIELD, "a class holds fields" ) ).Parent, dg, "parented to the class" )
+    AssertEqInt( S_( IndexOfName( "Name" ) ).Kind_, SYM_METHOD, "its first Name is the interface's method" )
+    AssertEqInt( S_( Expect( "Main", SYM_FUNCTION, "a sub after them is a top-level procedure" ) ).Parent, -1, _
+                 "with no parent" )
+    AssertTrue( instr( SymbolHoverMarkdown( S_(dg) ), "class Dog" ) > 0, "hover says class" )
+    AssertTrue( instr( SymbolHoverMarkdown( S_(ia) ), "interface IAnimal" ) > 0, "and interface" )
+
+    Analyse( "interface IFoo" & LF & "    sub Bar( )" )
+    AssertEqInt( g_Diags.Count( ), 1, "an unclosed interface is one diagnostic" )
+    if( g_Diags.Count( ) > 0 ) then
+        AssertTrue( instr( g_Diags[0].Message_, "end interface" ) > 0, "expecting `end interface`: " & g_Diags[0].Message_ )
+    end if
+    Analyse( "end class" )
+    AssertEqInt( g_Diags.Count( ), 1, "a stray `end class` is reported" )
+
+    '' `interface` is no fbc word: not a block unless a name follows.
+    Analyse( "dim as long interface" & LF & "interface = 3" & LF & "print interface" )
+    AssertEqInt( g_Diags.Count( ), 0, "`interface` as a variable opens nothing" )
+end scope
+
 scope
     Analyse( "namespace App" & LF & _
              "    const MAX_ITEMS = 100" & LF & _

@@ -17,6 +17,10 @@
 ; against this grammar (5,497 parse states); the named-child form takes 0.3s.
 (union_definition (identifier) @name) @item
 (enum_definition  "enum"      @context name: (identifier) @name) @item
+; Named children only, as for union and enum (see highlights.scm).
+(class_definition (identifier) @name) @item
+(interface_definition (identifier) @name) @item
+(interface_method (qualified_name) @name) @item
 (namespace_definition "namespace" @context name: (qualified_name) @name) @item
 (type_alias       "type"      @context name: (identifier) @name) @item
 

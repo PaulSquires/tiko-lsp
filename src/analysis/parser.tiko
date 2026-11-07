@@ -37,6 +37,8 @@ private function BlockWord( byval kw as FbKeyword ) as string
         case KW_TYPE        : return "type"
         case KW_UNION       : return "union"
         case KW_ENUM        : return "enum"
+        case KW_CLASS       : return "class"
+        case KW_INTERFACE   : return "interface"
         case KW_NAMESPACE   : return "namespace"
         case KW_SCOPE       : return "scope"
         case KW_WITH        : return "with"
@@ -239,12 +241,14 @@ private function CurrentScope( byref st as ParseState ) as long
     return -1
 end function
 
-'' The innermost open block that is a TYPE, UNION or ENUM, or -1. Fields and
-'' enum members only exist inside one.
+'' The innermost open block that is a TYPE, UNION, ENUM or INTERFACE, or
+'' KW_NONE. Fields and enum members only exist inside one. A CLASS is a TYPE
+'' here: it holds fields, methods and access specifiers just as one does.
 private function CurrentContainerKind( byref st as ParseState ) as FbKeyword
     for i as long = st.Stack_.Count( ) - 1 to 0 step -1
         select case st.Stack_[i].Kind_
-            case KW_TYPE, KW_UNION, KW_ENUM : return st.Stack_[i].Kind_
+            case KW_TYPE, KW_UNION, KW_ENUM, KW_INTERFACE : return st.Stack_[i].Kind_
+            case KW_CLASS : return KW_TYPE
             case KW_SUB, KW_FUNCTION, KW_PROPERTY, KW_CONSTRUCTOR, _
                  KW_DESTRUCTOR, KW_OPERATOR
                 '' A procedure body ends the search: a DIM in a method is a
@@ -1327,7 +1331,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 if( isAccess andalso st.Stack_.Count( ) > 0 ) then
                     dim as long top = st.Stack_.Count( ) - 1
                     select case st.Stack_[top].Kind_
-                        case KW_TYPE, KW_UNION
+                        case KW_TYPE, KW_UNION, KW_CLASS
                             dim as long base_ = IndentDepth( st ) - st.Stack_[top].Bias
                             Mark( st, spec.Start_, base_, base_ + 1 )
                             st.Stack_[top].Bias = 1
@@ -1517,7 +1521,8 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                                 detail = SpanText( text_, tokens, stmt[sigFrom], lastIdx )
                             end if
 
-                            dim as boolean isMember = ( CurrentContainerKind( st ) = KW_TYPE ) orelse _
+                            dim as FbKeyword host = CurrentContainerKind( st )
+                            dim as boolean isMember = ( host = KW_TYPE ) orelse ( host = KW_INTERFACE ) orelse _
                                                       ( instr( display, "." ) > 0 )
 
                             dim as long declIndex = AddSymbol( st, display, ProcKind( pk.Kw, isMember ), _
@@ -1540,8 +1545,8 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     select case nextKw
                         case KW_SUB, KW_FUNCTION, KW_PROPERTY, KW_CONSTRUCTOR, _
                              KW_DESTRUCTOR, KW_OPERATOR, KW_TYPE, KW_UNION, _
-                             KW_ENUM, KW_NAMESPACE, KW_SCOPE, KW_WITH, _
-                             KW_EXTERN, KW_ASM, KW_IF, KW_SELECT
+                             KW_ENUM, KW_CLASS, KW_INTERFACE, KW_NAMESPACE, _
+                             KW_SCOPE, KW_WITH, KW_EXTERN, KW_ASM, KW_IF, KW_SELECT
                             CloseBlock( st, diags, nextKw, head, "end " & BlockWord( nextKw ) )
                     end select
                 end if
@@ -1634,6 +1639,11 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     end select
                 end if
 
+                '' An INTERFACE's members are bare headers -- `sub Speak( )`,
+                '' `function Name( ) as string` -- with no body and no END: each
+                '' declares a method, as a DECLARE does, and opens nothing.
+                dim as boolean inInterface = ( CurrentContainerKind( st ) = KW_INTERFACE )
+
                 if( isResultAssign = false ) then
                     dim as string name_ = ""
                     if( hasNext ) then name_ = ReadName( text_, tokens, stmt[first_ + 1], lastIdx )
@@ -1665,7 +1675,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                             next
                         end if
 
-                        dim as boolean isMember = ( instr( display, "." ) > 0 ) orelse _
+                        dim as boolean isMember = ( instr( display, "." ) > 0 ) orelse inInterface orelse _
                                                   ( CurrentContainerKind( st ) = KW_TYPE )
 
                         '' The signature is everything after the name: the
@@ -1678,11 +1688,12 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
 
                         symIndex = AddSymbol( st, display, ProcKind( head.Kw, isMember ), detail, _
                                               nameStart, nameLen, head.Start_, _
-                                              tokens[lastIdx].Start_ + tokens[lastIdx].Length_ )
+                                              tokens[lastIdx].Start_ + tokens[lastIdx].Length_, _
+                                              false, inInterface )
                         AddParameters( st, text_, tokens, stmt, first_ + 1, symIndex )
                     end if
 
-                    PushBlock( st, head.Kw, name_, head, symIndex )
+                    if( inInterface = false ) then PushBlock( st, head.Kw, name_, head, symIndex )
                 end if
 
             '' -- type-ish blocks ---------------------------------------------------
@@ -1761,7 +1772,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     end if
                 end if
 
-            case KW_UNION, KW_ENUM, KW_NAMESPACE
+            case KW_UNION, KW_ENUM, KW_NAMESPACE, KW_CLASS, KW_INTERFACE
                 '' A TYPED ENUM -- `enum Small as uint8`, which tiko accepts -- has an AS
                 '' too, but after a NAME. A field named by the word has it straight after
                 '' the word: `enum as long`.
@@ -1770,6 +1781,17 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     '' The name may itself be a reserved word: `enum Color as uint8`.
                     if( nextTok.Kind = TK_IDENT ) then isBlock = true
                     if( nextTok.Kind = TK_KEYWORD andalso nextTok.Kw <> KW_AS ) then isBlock = true
+                end if
+                '' tiko's CLASS and INTERFACE always have a name -- `class Dog`,
+                '' `interface IComparable( of T )` -- and `interface` is no fbc
+                '' word: `interface = 3`, or a bare `interface` on its own line,
+                '' is something else entirely.
+                if( head.Kw = KW_CLASS orelse head.Kw = KW_INTERFACE ) then
+                    if( hasNext = false ) then
+                        isBlock = false
+                    elseif( nextTok.Kind <> TK_IDENT andalso nextTok.Kind <> TK_KEYWORD ) then
+                        isBlock = false
+                    end if
                 end if
                 if( isBlock ) then
                     dim as string name_ = ""
@@ -1780,6 +1802,8 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                         dim as SymbolKind k_ = SYM_STRUCT
                         if( head.Kw = KW_ENUM ) then k_ = SYM_ENUM
                         if( head.Kw = KW_NAMESPACE ) then k_ = SYM_NAMESPACE
+                        if( head.Kw = KW_CLASS ) then k_ = SYM_CLASS
+                        if( head.Kw = KW_INTERFACE ) then k_ = SYM_INTERFACE
 
                         dim as long nameFirst, nameLast
                         NameTokens( text_, tokens, stmt, first_ + 1, nameFirst, nameLast )
@@ -1861,7 +1885,7 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                     case KW_AS
                         '' The type-first field form: `as long Extra1, Extra2`.
                         isField = true
-                    case KW_DECLARE, KW_TYPE, KW_UNION, KW_ENUM, KW_END
+                    case KW_DECLARE, KW_TYPE, KW_UNION, KW_ENUM, KW_CLASS, KW_INTERFACE, KW_END
                         '' handled elsewhere, or not a field
                     case else
                         '' A field named after a keyword: `Select as function...`

@@ -737,6 +737,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "class_definition"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interface_definition"
+        },
+        {
+          "type": "SYMBOL",
           "name": "union_definition"
         },
         {
@@ -1484,6 +1492,64 @@
           ]
         },
         {
+          "type": "PREC_RIGHT",
+          "value": 0,
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "TOKEN",
+                  "content": {
+                    "type": "PREC",
+                    "value": 2,
+                    "content": {
+                      "type": "PATTERN",
+                      "value": "[iI][mM][pP][lL][eE][mM][eE][nN][tT][sS]"
+                    }
+                  }
+                },
+                "named": false,
+                "value": "implements"
+              },
+              {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "implements",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "qualified_name"
+                    }
+                  },
+                  {
+                    "type": "REPEAT",
+                    "content": {
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "STRING",
+                          "value": ","
+                        },
+                        {
+                          "type": "FIELD",
+                          "name": "implements",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "qualified_name"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "type": "ALIAS",
           "content": {
             "type": "TOKEN",
@@ -1940,14 +2006,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_line_end"
-        },
-        {
-          "type": "REPEAT",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_type_member"
-          }
+          "name": "_type_body"
         },
         {
           "type": "ALIAS",
@@ -1964,6 +2023,306 @@
           },
           "named": false,
           "value": "end type"
+        }
+      ]
+    },
+    "class_definition": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "modifier"
+          }
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 2,
+              "content": {
+                "type": "PATTERN",
+                "value": "[cC][lL][aA][sS][sS]"
+              }
+            }
+          },
+          "named": false,
+          "value": "class"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_type_header_tail"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_type_body"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "PATTERN",
+                "value": "[eE][nN][dD][ \\t]+[cC][lL][aA][sS][sS]"
+              }
+            }
+          },
+          "named": false,
+          "value": "end class"
+        }
+      ]
+    },
+    "interface_definition": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "modifier"
+          }
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_interface_kw"
+          },
+          "named": false,
+          "value": "interface"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "generic_parameters"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_terminator"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "preproc"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "inherits_clause"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "declare_statement"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "interface_method"
+              }
+            ]
+          }
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 3,
+              "content": {
+                "type": "PATTERN",
+                "value": "[eE][nN][dD][ \\t]+[iI][nN][tT][eE][rR][fF][aA][cC][eE]"
+              }
+            }
+          },
+          "named": false,
+          "value": "end interface"
+        }
+      ]
+    },
+    "interface_method": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "modifier"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "kind",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_procedure_keyword"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "qualified_name"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_signature_tail"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
+    "inherits_clause": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_inherits_kw"
+          },
+          "named": false,
+          "value": "inherits"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "base",
+              "content": {
+                "type": "SYMBOL",
+                "name": "qualified_name"
+              }
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "base",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "qualified_name"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
+    "implements_clause": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PREC",
+              "value": 2,
+              "content": {
+                "type": "PATTERN",
+                "value": "[iI][mM][pP][lL][eE][mM][eE][nN][tT][sS]"
+              }
+            }
+          },
+          "named": false,
+          "value": "implements"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "interface",
+              "content": {
+                "type": "SYMBOL",
+                "name": "qualified_name"
+              }
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "interface",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "qualified_name"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
         }
       ]
     },
@@ -2011,14 +2370,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_line_end"
-        },
-        {
-          "type": "REPEAT",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_type_member"
-          }
+          "name": "_type_body"
         },
         {
           "type": "ALIAS",
@@ -2035,6 +2387,22 @@
           },
           "named": false,
           "value": "end union"
+        }
+      ]
+    },
+    "_type_body": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_type_member"
+          }
         }
       ]
     },
@@ -2102,6 +2470,64 @@
         {
           "type": "SYMBOL",
           "name": "generic_parameters"
+        },
+        {
+          "type": "PREC_RIGHT",
+          "value": 0,
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "TOKEN",
+                  "content": {
+                    "type": "PREC",
+                    "value": 2,
+                    "content": {
+                      "type": "PATTERN",
+                      "value": "[iI][mM][pP][lL][eE][mM][eE][nN][tT][sS]"
+                    }
+                  }
+                },
+                "named": false,
+                "value": "implements"
+              },
+              {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "interface",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "qualified_name"
+                    }
+                  },
+                  {
+                    "type": "REPEAT",
+                    "content": {
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "STRING",
+                          "value": ","
+                        },
+                        {
+                          "type": "FIELD",
+                          "name": "interface",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "qualified_name"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
         }
       ]
     },
@@ -2178,6 +2604,14 @@
         {
           "type": "SYMBOL",
           "name": "access_specifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "inherits_clause"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "implements_clause"
         },
         {
           "type": "SYMBOL",
@@ -2543,6 +2977,38 @@
                   },
                   "named": false,
                   "value": "declare"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "TOKEN",
+                    "content": {
+                      "type": "PREC",
+                      "value": 2,
+                      "content": {
+                        "type": "PATTERN",
+                        "value": "[iI][mM][pP][lL][eE][mM][eE][nN][tT][sS]"
+                      }
+                    }
+                  },
+                  "named": false,
+                  "value": "implements"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "TOKEN",
+                    "content": {
+                      "type": "PREC",
+                      "value": 2,
+                      "content": {
+                        "type": "PATTERN",
+                        "value": "[cC][lL][aA][sS][sS]"
+                      }
+                    }
+                  },
+                  "named": false,
+                  "value": "class"
                 }
               ]
             },
@@ -7094,6 +7560,14 @@
     {
       "type": "SYMBOL",
       "name": "_eof"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_interface_kw"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_inherits_kw"
     }
   ],
   "inline": [],

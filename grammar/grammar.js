@@ -135,7 +135,8 @@ module.exports = grammar({
 
   ],
 
-  externals: $ => [$._eof],
+  // `interface` and `inherits` are contextual: src/scanner.c says why.
+  externals: $ => [$._eof, $._interface_kw, $._inherits_kw],
 
   word: $ => $._word,
 
@@ -281,6 +282,8 @@ module.exports = grammar({
       $.procedure_definition,
       $.declare_statement,
       $.type_definition,
+      $.class_definition,
+      $.interface_definition,
       $.union_definition,
       $.enum_definition,
       $.type_alias,
@@ -381,6 +384,9 @@ module.exports = grammar({
     // words and a string in front of it.
     _signature_tail: $ => choice(
       seq(kw('as'), field('return_type', $._type)),
+      // `declare function Name( ) as string implements IAnimal.Name` -- the
+      // interface member it implements, which ends the return type.
+      prec.right(seq(kw('implements'), commaSep1(field('implements', $.qualified_name)))),
       kw('byref'),
       kw('byval'),
       kw('static'),
@@ -420,24 +426,81 @@ module.exports = grammar({
       kw('type'),
       field('name', $.identifier),
       repeat($._type_header_tail),
-      $._line_end,
-      repeat($._type_member),
+      $._type_body,
       endkw('type'),
+    ),
+
+    // tiko's CLASS: a TYPE that always extends object, with the same body --
+    // fields, methods, access specifiers -- plus `inherits` and `implements`.
+    class_definition: $ => seq(
+      repeat($.modifier),
+      kw('class'),
+      field('name', $.identifier),
+      repeat($._type_header_tail),
+      $._type_body,
+      endkw('class'),
+    ),
+
+    // tiko's INTERFACE. Its members are bare headers -- `sub Speak( )`,
+    // `function Name( ) as string` -- with no body and no END, or DECLAREs, and
+    // `inherits` lines naming the interfaces it extends.
+    interface_definition: $ => seq(
+      repeat($.modifier),
+      alias($._interface_kw, 'interface'),
+      field('name', $.identifier),
+      optional($.generic_parameters),
+      $._line_end,
+      repeat(choice(
+        $._terminator,
+        $.preproc,
+        $.inherits_clause,
+        $.declare_statement,
+        $.interface_method,
+      )),
+      endkw('interface'),
+    ),
+
+    interface_method: $ => seq(
+      repeat($.modifier),
+      field('kind', $._procedure_keyword),
+      field('name', $.qualified_name),
+      repeat($._signature_tail),
+      $._line_end,
+    ),
+
+    // `inherits Animal` in a class (its base) or `inherits IAnimal, IShow` in an
+    // interface; `implements IPet, IComparable( of Dog )` in a class or type.
+    inherits_clause: $ => seq(
+      alias($._inherits_kw, 'inherits'),
+      commaSep1(field('base', $.qualified_name)),
+      $._line_end,
+    ),
+
+    implements_clause: $ => seq(
+      kw('implements'),
+      commaSep1(field('interface', $.qualified_name)),
+      $._line_end,
     ),
 
     union_definition: $ => seq(
       repeat($.modifier),
       kw('union'),
       optional(field('name', $.identifier)),
-      $._line_end,
-      repeat($._type_member),
+      $._type_body,
       endkw('union'),
     ),
+
+    // ONE BODY RULE for TYPE, CLASS and UNION, so the three share its parse
+    // states: written out in each, the class's copy alone cost ~500 large states.
+    _type_body: $ => seq($._line_end, repeat($._type_member)),
 
     _type_header_tail: $ => choice(
       seq(kw('extends'), field('base', $._type)),
       seq(kw('field'), '=', $.number),
       $.generic_parameters,
+      // fbc's spelling on the header line, `type X extends Object implements I`,
+      // which tiko-lang's by-example corpus writes too.
+      prec.right(seq(kw('implements'), commaSep1(field('interface', $.qualified_name)))),
     ),
 
     // `( of T )`, `( of MirFunction ptr )` -- each argument is a TYPE, so it
@@ -458,6 +521,8 @@ module.exports = grammar({
       $._terminator,
       $.preproc,
       $.access_specifier,
+      $.inherits_clause,
+      $.implements_clause,
       $.procedure_definition,
       $.declare_statement,
       $.type_definition,
@@ -478,7 +543,7 @@ module.exports = grammar({
         kw('property'), kw('operator'), kw('constructor'), kw('destructor'),
         kw('select'), kw('case'), kw('next'), kw('loop'), kw('until'), kw('then'),
         kw('else'), kw('exit'), kw('continue'), kw('namespace'), kw('extern'),
-        kw('declare'),
+        kw('declare'), kw('implements'), kw('class'),
       ), $.identifier)),
       kw('as'),
       field('type', $._type),

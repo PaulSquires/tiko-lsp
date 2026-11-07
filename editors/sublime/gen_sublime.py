@@ -33,7 +33,7 @@ structural = ('sub function property constructor destructor operator declare typ
               'namespace extern scope with asm if then else elseif endif select case is for to '
               'step next while wend do loop until exit continue end as of extends field explicit '
               'once private public protected static shared const virtual abstract byref byval '
-              'return goto gosub').split()
+              'return goto gosub class interface inherits implements').split()
 control = set('if then else elseif endif select case for to step next while wend do loop until '
               'exit continue end return goto gosub'.split())
 modifiers = set('private public protected static shared const virtual abstract byref byval '
@@ -153,7 +153,7 @@ w('    - match: ' + q(r'(?i)\b(sub|function|property|constructor|destructor|oper
 w('      captures:')
 w('        1: storage.type.function.tiko')
 w('        2: entity.name.function.tiko')
-w('    - match: ' + q(r'(?i)^\s*(type|union|enum)\s+([A-Za-z_][A-Za-z0-9_]*)'))
+w('    - match: ' + q(r'(?i)^\s*(type|union|enum|class|interface)\s+([A-Za-z_][A-Za-z0-9_]*)'))
 w('      captures:')
 w('        1: storage.type.tiko')
 w('        2: entity.name.type.tiko')

@@ -18,6 +18,9 @@
 ; query analysis against this grammar (5,497 parse states), and Zed starts
 ; the language server only after every query has compiled. There is no
 ; named child to hang a bracket pair on, so the pair is dropped.
+(interface_definition  "interface" @open "end interface" @close)
+; No pair for CLASS: like a union's, a keyword inside `class_definition` costs
+; ~4.5s of query analysis on its own (it shares the type body's states).
 (namespace_definition  "namespace" @open "end namespace" @close)
 (extern_block          "extern"    @open "end extern"    @close)
 (scope_block           "scope"     @open "end scope"     @close)

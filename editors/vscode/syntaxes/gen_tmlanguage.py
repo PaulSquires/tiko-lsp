@@ -26,7 +26,7 @@ structural = ('sub function property constructor destructor operator declare typ
               'namespace extern scope with asm if then else elseif endif select case is for to '
               'step next while wend do loop until exit continue end as of extends field explicit '
               'once private public protected static shared const virtual abstract byref byval '
-              'return goto gosub').split()
+              'return goto gosub class interface inherits implements').split()
 
 control = set('if then else elseif endif select case for to step next while wend do loop until '
               'exit continue end return goto gosub'.split())
@@ -107,7 +107,7 @@ g = {
                 {"match": r'(?i)\b(sub|function|property|constructor|destructor|operator)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)',
                  "captures": {"1": {"name": "storage.type.function.tiko"},
                               "2": {"name": "entity.name.function.tiko"}}},
-                {"match": r'(?i)^\s*(type|union|enum)\s+([A-Za-z_][A-Za-z0-9_]*)',
+                {"match": r'(?i)^\s*(type|union|enum|class|interface)\s+([A-Za-z_][A-Za-z0-9_]*)',
                  "captures": {"1": {"name": "storage.type.tiko"},
                               "2": {"name": "entity.name.type.tiko"}}},
                 {"match": r'(?i)\b(namespace)\s+([A-Za-z_][A-Za-z0-9_.]*)',

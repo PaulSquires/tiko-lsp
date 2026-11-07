@@ -25,7 +25,7 @@ structural = ('sub function property constructor destructor operator declare typ
               'namespace extern scope with asm if then else elseif endif select case is for to '
               'step next while wend do loop until exit continue end as of extends field explicit '
               'once private public protected static shared const virtual abstract byref byval '
-              'return goto gosub').split()
+              'return goto gosub class interface inherits implements').split()
 control = set('if then else elseif endif select case for to step next while wend do loop until '
               'exit continue end return goto gosub'.split())
 modifiers = set('private public protected static shared const virtual abstract byref byval '
@@ -96,7 +96,7 @@ w('syn match   tikoPreProcWord contained "#\\s*\\a\\+\\(\\s\\+once\\>\\)\\="')
 w('')
 w('" The name a procedure or a type declares.')
 w('syn match   tikoFunctionName "\\(\\<\\(sub\\|function\\|property\\|constructor\\|destructor\\|operator\\)\\s\\+\\)\\@<=\\h\\w*\\(\\.\\h\\w*\\)*"')
-w('syn match   tikoTypeName "\\(^\\s*\\(type\\|union\\|enum\\)\\s\\+\\)\\@<=\\h\\w*"')
+w('syn match   tikoTypeName "\\(^\\s*\\(type\\|union\\|enum\\|class\\|interface\\)\\s\\+\\)\\@<=\\h\\w*"')
 w('')
 for a, b in (('tikoControl', 'Conditional'), ('tikoModifier', 'StorageClass'), ('tikoDeclare', 'Keyword'),
              ('tikoType', 'Type'), ('tikoOperatorWord', 'Operator'), ('tikoBuiltin', 'Function'),

@@ -8,6 +8,8 @@
 [
   (procedure_definition)
   (type_definition)
+  (class_definition)
+  (interface_definition)
   (union_definition)
   (enum_definition)
   (namespace_definition)
@@ -32,6 +34,7 @@
   "end destructor" "end operator"
   "end type" "end union" "end enum" "end namespace" "end extern"
   "end scope" "end with" "end select" "end asm" "end if" "end while"
+  "end class" "end interface"
   "endif" "wend" "loop" "next"
   "else" "elseif" "case"
   "#endmacro"

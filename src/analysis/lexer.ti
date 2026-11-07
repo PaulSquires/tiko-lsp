@@ -55,6 +55,8 @@ enum FbKeyword
     KW_TYPE
     KW_UNION
     KW_ENUM
+    KW_CLASS
+    KW_INTERFACE
     KW_NAMESPACE
     KW_SCOPE
     KW_WITH

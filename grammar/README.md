@@ -43,10 +43,16 @@ word `keyword` rule then collides with `identifier` at every turn.
 
 ## The external scanner
 
-`src/scanner.c` contributes exactly one zero-width token: **end of file ends a
+`src/scanner.c` contributes three tokens. The first is zero-width: **end of file ends a
 line**. An editor buffer spends most of its life without a trailing newline —
 the caret is on the last line, still typing it — and a grammar that insists on
 one reports the last statement as broken exactly while it is being written.
+
+The other two are tiko's **contextual words `interface` and `inherits`**. Neither
+is reserved, and as keyword tokens they would lex as keywords wherever a name is
+valid too (`print interface`). The scanner emits one only where the parser can
+take it and a name — not `as`, not `=` — follows: `interface IAnimal`,
+`inherits Animal`.
 
 ## Building and testing
 

@@ -55,6 +55,9 @@ reference lists it.
 | `type as integer rev1, rev2` | The reversed type-alias list. |
 | a file with no trailing newline | Every buffer being typed into. An external scanner contributes one zero-width token: **end of file ends a line**. |
 | an unterminated `"` | fbc accepts it, this project's corpus contains one, and an editor sees one on every keystroke while a string is typed. |
+| `interface IAnimal` ... `end interface`, `class Dog` ... `end class` | tiko's interfaces. An interface's members are bare headers -- `sub Speak( )` with no body and no END -- so they are their own rule (`interface_method`), not a procedure that never closes; `inherits` and `implements` lines are clauses of a class, type or interface body, and `implements IAnimal.Name` may end a DECLARE. |
+| `print interface`, `dim as long inherits = 2` | Neither word is reserved (tiko-lang's `interface-as-name` test keeps every such name), and a keyword token lexes as the keyword wherever a name is valid too. The external scanner emits them, only where the parser can take one AND a name -- not `as`, not `=` -- follows. `class` and `implements` are fbc-reserved, so they are ordinary keywords. |
+| `type X extends Object implements I` | fbc's spelling: `implements` on the header line. |
 | `s = """` … `"""` | tiko's block string: `"""` that ends its line opens one, the first line starting (after blanks) with `"""` closes it. One `string` token, a regular expression with no scanner. `"""abc"""` never matches the opener, so it stays fbc's 5-character string. An unterminated block matches nothing and lexes as before, so the lines under a half-typed block stay code until its closer is written. |
 
 ## Measured
@@ -64,21 +67,24 @@ Corpus-driven means judged by whether it parses real code:
 | Tree | Files | With an ERROR |
 | --- | ---: | ---: |
 | `tiko-lsp/src` | 89 | 0 |
-| `tiko-lsp/tests` | 14 | 0 |
-| `tiko-lang/src` | 438 | 3 |
-| `tiko-lang/tests` (not `vendor/`) | 2446 | 92 |
+| `tiko-lsp/tests` | 53 | 0 |
+| `tiko-lang/src` | 447 | 3 |
+| `tiko-lang/tests` (not `vendor/`) | 2481 | 94 |
 | `tiko-lang/pkg` | 385 | 2 |
-| `tiko-lang/examples` | 845 | 0 |
+| `tiko-lang/examples` | 844 | 0 |
 | `tiko-lang/by-example/examples` | 309 | 0 |
 | `tiko-lang/tkedit` | 58 | 0 |
 | `AfxNova/src` (FreeBASIC) | 179 | 1 |
 
-Re-measured 2026-11-04. The two `pkg` files are `std/tasks/scheduler.tiko`, which
+Re-measured 2026-11-06 (`.tiko`, `.ti`, `.bas`, `.bi`; AfxNova's `.inc` too), after
+interfaces and classes: old vs new parser over the same 4,694 files, 116 -> 99 with an
+ERROR and no file newly failing -- the 17 fixed are tiko-lang's interface tests.
+`tiko-lang/tests` still counts `interface-parse-errors.bas`, deliberately invalid. The two `pkg` files are `std/tasks/scheduler.tiko`, which
 opens `extern` in three `#if` branches and closes it once, and `CDialog.tiko`'s
 `IF x DoIt( )` with no THEN; the three in `src` are namespaces closed in an
 `#include`d file (below).
 
-`tree-sitter test` runs 27 corpus cases covering declarations, statements, the
+`tree-sitter test` runs 28 corpus cases covering declarations, statements, the
 preprocessor and the lexical corners; all pass.
 
 tiko's module directives (tiko-lang ADR 0017) are structural nodes of their own:

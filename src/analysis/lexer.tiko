@@ -16,8 +16,11 @@
 ''
 ''      grep -oE '\( @"[A-Z_0-9]+"' src/compiler/symb-keyword.bas
 ''
-''  The 36 words the block parser reasons about are registered separately,
-''  below, and overwrite their KW_OTHER entry.
+''  tiko's own words are added to it: `inherits` and `implements` (plain
+''  keywords), and `interface`, which is no fbc word at all. The 38 words the
+''  block parser reasons about are registered separately, below, and
+''  overwrite their KW_OTHER entry -- `class` among them, which fbc reserves
+''  and tiko gives a block.
 '' ############################################################################
 
 private function OtherKeywordText( ) as string
@@ -31,7 +34,7 @@ private function OtherKeywordText( ) as string
     "deflng deflongint defshort defsng defstr defubyte defuint defulng " & _
     "defulongint defushort delete dim double draw dynamic encoding eqv " & _
     "erase err error exp explicit export extends field fix frac get " & _
-    "gosub goto iif imagecreate imp implements import include input " & _
+    "gosub goto iif imagecreate imp implements import include inherits input " & _
     "instr instrrev int integer is lbound lcase len let lib line local " & _
     "lock log long longint lprint lset ltrim mid mkd mki mkl mklongint " & _
     "mks mkshort mod name new not on open option or orelse output " & _
@@ -83,6 +86,8 @@ private sub EnsureKeywords( )
     Register( "type",        KW_TYPE )
     Register( "union",       KW_UNION )
     Register( "enum",        KW_ENUM )
+    Register( "class",       KW_CLASS )
+    Register( "interface",   KW_INTERFACE )
     Register( "namespace",   KW_NAMESPACE )
     Register( "scope",       KW_SCOPE )
     Register( "with",        KW_WITH )

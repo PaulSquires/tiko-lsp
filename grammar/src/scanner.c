@@ -1,6 +1,8 @@
 #include "tree_sitter/parser.h"
 
-// The one thing the grammar cannot express: END OF FILE ENDS A LINE.
+// Two things the grammar cannot express.
+//
+// END OF FILE ENDS A LINE.
 //
 // A statement in tiko ends at a newline or a colon, and neither exists after
 // the last line of a buffer that has no trailing newline -- which is every
@@ -10,9 +12,23 @@
 // The token is ZERO WIDTH, so it must only ever be reachable as the tail of a
 // rule that has already consumed text; the grammar uses it through `_line_end`
 // alone, never in a bare repetition.
+//
+// `interface` AND `inherits` ARE CONTEXTUAL WORDS.
+//
+// Neither is reserved -- fbc takes both as names, winddk.bi uses `interface`
+// as a type, a field and a parameter, and tiko-lang's interface-as-name test
+// keeps every such use. As a keyword token either one lexes as the keyword
+// wherever a name is valid too (the `link`/`channel` trap), so `print
+// interface` and `dim as long inherits = 2` break. Here each is a keyword
+// only where the parser can take one (`valid_symbols`) AND a name follows on
+// the line: `interface IAnimal`, `inherits Animal` -- not `inherits as long`,
+// a field, nor `interface = 3`. Anything else is left to the lexer, which
+// reads the word as an identifier.
 
 enum TokenType {
     EOF_LINE_END,
+    INTERFACE_KW,
+    INHERITS_KW,
 };
 
 void *tree_sitter_tiko_external_scanner_create(void) { return NULL; }
@@ -21,11 +37,74 @@ void tree_sitter_tiko_external_scanner_destroy(void *payload) { }
 unsigned tree_sitter_tiko_external_scanner_serialize(void *payload, char *buffer) { return 0; }
 void tree_sitter_tiko_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) { }
 
+static bool is_ident_start(int32_t c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+static bool is_ident_char(int32_t c) {
+    return is_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+static bool same(const char *a, const char *b, int n) {
+    for (int i = 0; i < n; i++) if (a[i] != b[i]) return false;
+    return true;
+}
+
+static int32_t lower(int32_t c) {
+    return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+
+// After the keyword: blanks, then a name that is not `as`.
+static bool name_follows(TSLexer *lexer) {
+    if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') lexer->advance(lexer, false);
+    if (!is_ident_start(lexer->lookahead)) return false;
+
+    int32_t a = lower(lexer->lookahead);
+    lexer->advance(lexer, false);
+    if (a != 'a' || lower(lexer->lookahead) != 's') return true;
+    lexer->advance(lexer, false);
+    return is_ident_char(lexer->lookahead);     // `asset` is a name, `as` is not
+}
+
 bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
                                             const bool *valid_symbols) {
     if (valid_symbols[EOF_LINE_END] && lexer->eof(lexer)) {
         lexer->result_symbol = EOF_LINE_END;
         return true;
     }
-    return false;
+
+    // Error recovery offers every token at once; a keyword guessed there
+    // would only make the recovery worse.
+    bool want_interface = valid_symbols[INTERFACE_KW];
+    bool want_inherits = valid_symbols[INHERITS_KW];
+    if (want_interface && want_inherits && valid_symbols[EOF_LINE_END]) return false;
+    if (!want_interface && !want_inherits) return false;
+
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r') {
+        lexer->advance(lexer, true);
+    }
+
+    char word[10];
+    int n = 0;
+    while (is_ident_char(lexer->lookahead)) {
+        if (n == 9) return false;
+        word[n++] = (char)lower(lexer->lookahead);
+        lexer->advance(lexer, false);
+    }
+    word[n] = 0;
+
+    enum TokenType found;
+    if (want_interface && n == 9 && same(word, "interface", 9)) {
+        found = INTERFACE_KW;
+    } else if (want_inherits && n == 8 && same(word, "inherits", 8)) {
+        found = INHERITS_KW;
+    } else {
+        return false;
+    }
+
+    lexer->mark_end(lexer);
+    if (!name_follows(lexer)) return false;
+    lexer->result_symbol = found;
+    return true;
 }

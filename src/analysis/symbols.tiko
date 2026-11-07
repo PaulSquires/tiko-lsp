@@ -21,7 +21,7 @@ end function
 function SymbolTable.IsContainer( byval index_ as long ) as boolean
     if( index_ < 0 orelse index_ >= this.Items.Count( ) ) then return false
     select case this.Items[index_].Kind_
-        case SYM_STRUCT, SYM_CLASS, SYM_ENUM, SYM_NAMESPACE : return true
+        case SYM_STRUCT, SYM_CLASS, SYM_INTERFACE, SYM_ENUM, SYM_NAMESPACE : return true
     end select
     return false
 end function
@@ -153,7 +153,8 @@ end function
 function SymbolKindName( byval kind as SymbolKind ) as string
     select case kind
         case SYM_NAMESPACE   : return "namespace"
-        case SYM_CLASS       : return "type"
+        case SYM_CLASS       : return "class"
+        case SYM_INTERFACE   : return "interface"
         case SYM_STRUCT      : return "type"
         case SYM_ENUM        : return "enum"
         case SYM_ENUMMEMBER  : return "enum member"
@@ -189,7 +190,9 @@ function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
         case SYM_CONSTRUCTOR          : keyword_ = "constructor "
         case SYM_PROPERTY             : keyword_ = "property "
         case SYM_OPERATOR             : keyword_ = "operator "
-        case SYM_STRUCT, SYM_CLASS    : keyword_ = "type "
+        case SYM_STRUCT               : keyword_ = "type "
+        case SYM_CLASS                : keyword_ = "class "
+        case SYM_INTERFACE            : keyword_ = "interface "
         case SYM_ENUM                 : keyword_ = "enum "
         case SYM_NAMESPACE            : keyword_ = "namespace "
         case SYM_CONSTANT             : keyword_ = "const "

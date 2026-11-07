@@ -25,6 +25,10 @@
 ; A NAMED child is accepted, which is why the enum is matched through its
 ; `(identifier)` instead.
 (enum_definition (identifier) @name) @item
+; Named children only, as for union and enum (see highlights.scm).
+(class_definition (identifier) @name) @item
+(interface_definition (identifier) @name) @item
+(interface_method (qualified_name) @name) @item
 (namespace_definition "namespace" @context name: (qualified_name) @name) @item
 (type_alias       "type"      @context name: (identifier) @name) @item
 

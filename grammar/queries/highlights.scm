@@ -39,6 +39,7 @@
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
   "channel" "link"
+  "class" "interface" "inherits" "implements"
 ] @keyword
 
 [
@@ -46,6 +47,7 @@
   "end destructor" "end operator"
   "end type" "end union" "end enum" "end namespace" "end extern"
   "end scope" "end with" "end select" "end asm" "end if" "end while"
+  "end class" "end interface"
 ] @keyword
 
 (end_statement) @keyword
@@ -87,6 +89,14 @@
 (union_definition (identifier) @type)
 (enum_definition name: (identifier) @type)
 (type_alias name: (identifier) @type)
+; CLASS AND INTERFACE are matched through the named child, as union and enum
+; are: no field or keyword inside either definition. A class's `extends` base
+; is a direct identifier too, and is a type as well.
+(class_definition (identifier) @type)
+(interface_definition (identifier) @type)
+(interface_method (qualified_name (identifier) @function))
+(inherits_clause (qualified_name (identifier) @type))
+(implements_clause (qualified_name (identifier) @type))
 (namespace_definition name: (qualified_name (identifier) @module))
 (generic_parameters (identifier) @type.parameter)
 
