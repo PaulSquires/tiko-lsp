@@ -12,7 +12,7 @@ authors = ["Paul Squires"]
 # change the rev with it.
 [grammars.tiko]
 repository = "file:///C:/dev/tiko-tree-sitter"
-rev = "8fa480c46adeac28992b345af7379fff98e1ec00"
+rev = "b2d36e881fc231d6f7f66a3a20372630f1d726f9"
 
 [language_servers.tiko-lsp]
 name = "tiko-lsp"
