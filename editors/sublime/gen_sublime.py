@@ -168,6 +168,15 @@ w('    - match: ' + q(r'(?i)' + WORD_START + r'(select)\s+(channel)' + WORD_END)
 w('      captures:')
 w('        1: keyword.control.tiko')
 w('        2: keyword.control.tiko')
+# A property's sections, `get` / `set` alone on their line and `end get` / `end set`: neither
+# word is reserved -- `set` names containers.Set -- so only there.
+w('    - match: ' + q(r"(?i)^\s*(get|set)\s*(?=$|')"))
+w('      captures:')
+w('        1: keyword.other.tiko')
+w('    - match: ' + q(r'(?i)' + WORD_START + r'(end)\s+(get|set)' + WORD_END))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('        2: keyword.other.tiko')
 for scope, words in (('keyword.control.tiko', kw_control), ('storage.modifier.tiko', kw_modifier),
                      ('storage.type.tiko', types), ('keyword.other.tiko', kw_decl),
                      ('support.function.builtin.tiko', other)):

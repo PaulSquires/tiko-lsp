@@ -44,6 +44,19 @@
 ] @keyword
 
 (end_statement) @keyword
+
+; A PROPERTY'S SECTIONS, `get` ... `end get` and `set` ... `end set`, need no
+; grammar rule: the opener alone on its line is a bare identifier straight under
+; the property, and the closer is `end <value>`. Neither word is reserved --
+; `set` names std's containers.Set -- so only those two places are coloured. As
+; parser nodes they cost +1.4 MB of parser.c (their tokens reach every body).
+(procedure_definition
+  kind: "property"
+  (identifier) @keyword
+  (#match? @keyword "^[sS][eE][tT]$"))
+(end_with_value
+  (identifier) @keyword
+  (#match? @keyword "^[gGsS][eE][tT]$"))
 (exit_statement) @keyword
 (modifier) @keyword
 (access_specifier) @keyword

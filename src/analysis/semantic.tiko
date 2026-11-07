@@ -81,6 +81,23 @@ private function ClaimRank( byref sym as SymbolInfo ) as long
     return 4
 end function
 
+'' A PROPERTY'S `set` SECTION: `set` alone on its line, or after `end`. `get` is a
+'' reserved word and a keyword token already; `set` is not reserved -- it names std's
+'' containers.Set -- so it is a keyword only in those two places.
+private function IsSetSection( byref text_ as string, byref tokens as TokenArray, byval i as long ) as boolean
+    if( lcase( TokenText( text_, tokens[i] ) ) <> "set" ) then return false
+    if( i > 0 ) then
+        dim as Token prev_ = tokens[i - 1]
+        if( prev_.Kind = TK_KEYWORD andalso prev_.Kw = KW_END ) then return true
+        if( prev_.Kind <> TK_EOL ) then return false
+    end if
+    if( i + 1 >= tokens.Count( ) ) then return true
+    select case tokens[i + 1].Kind
+        case TK_EOL, TK_EOF, TK_COMMENT : return true
+    end select
+    return false
+end function
+
 sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                            byref tokens as TokenArray, byref symbols as SymbolTable, _
                            byref out_ as SemTokenArray )
@@ -137,7 +154,9 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                 '' The declaration site first: it is exact, and it is the only
                 '' place the `declaration` modifier is honest.
                 dim as long packed = 0
-                if( declAt.TryGet( tok.Start_, packed ) = false ) then
+                if( IsSetSection( text_, tokens, i ) ) then
+                    packed = SEMTYPE_KEYWORD * 16
+                elseif( declAt.TryGet( tok.Start_, packed ) = false ) then
                     if( byName.TryGet( lcase( TokenText( text_, tok ) ), packed ) = false ) then
                         '' One of tiko-lang's own typedefs, int32 and the rest.
                         '' Only here, after the file's own names: a file that

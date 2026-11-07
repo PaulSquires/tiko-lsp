@@ -272,6 +272,30 @@ private sub TestBuiltinConstants( )
     AssertEqInt( ModsAt( 1, 0 ), SEMMOD_STATIC, "a file's own nullptr is its variable, not readonly" )
 end sub
 
+private sub TestPropertySections( )
+    TestGroup( "a property's get / set sections" )
+
+    ''         0         1         2
+    ''         0123456789012345678901234
+    Analyse( "property A.B as long" & LF & _           '' line 0
+             "get" & LF & _                            '' line 1
+             "    value = 1" & LF & _                  '' line 2
+             "end get" & LF & _                        '' line 3
+             "set  ' a comment" & LF & _               '' line 4
+             "    dim s as Set( of long )" & LF & _    '' line 5
+             "End Set" & LF & _                        '' line 6
+             "end property" & LF & _                   '' line 7
+             "set = 3" & LF & _                        '' line 8
+             "x = set" & LF )                          '' line 9
+
+    AssertEqInt( TypeAt( 1, 0 ), SEMTYPE_KEYWORD, "get is a keyword" )
+    AssertEqInt( TypeAt( 4, 0 ), SEMTYPE_KEYWORD, "set alone on its line is a keyword, a comment after it" )
+    AssertEqInt( TypeAt( 6, 4 ), SEMTYPE_KEYWORD, "and after end, any case" )
+    AssertTrue( TypeAt( 5, 13 ) <> SEMTYPE_KEYWORD, "Set( of long ) is not" )
+    AssertTrue( TypeAt( 8, 0 ) <> SEMTYPE_KEYWORD, "nor set = 3" )
+    AssertTrue( TypeAt( 9, 4 ) <> SEMTYPE_KEYWORD, "nor x = set" )
+end sub
+
 '' ############################################################################
 ''  Main
 '' ############################################################################
@@ -284,5 +308,6 @@ TestEncoding( )
 TestUtf16( )
 TestFixedWidthTypes( )
 TestBuiltinConstants( )
+TestPropertySections( )
 
 end TestSummary( "semantic tokens" )

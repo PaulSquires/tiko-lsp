@@ -122,6 +122,14 @@ g = {
                 {"match": r'(?i)(?<![\w.])(select)\s+(channel)(?![\w$%&!#])',
                  "captures": {"1": {"name": "keyword.control.tiko"},
                               "2": {"name": "keyword.control.tiko"}}},
+                # A property's sections, `get` / `set` alone on their line and `end get` /
+                # `end set`: neither word is reserved -- `set` names containers.Set -- so
+                # only there.
+                {"match": r"(?i)^\s*(get|set)\s*(?=$|')",
+                 "captures": {"1": {"name": "keyword.other.tiko"}}},
+                {"match": r'(?i)(?<![\w.])(end)\s+(get|set)(?![\w$%&!#])',
+                 "captures": {"1": {"name": "keyword.control.tiko"},
+                              "2": {"name": "keyword.other.tiko"}}},
                 {"name": "keyword.control.tiko", "match": r'(?i)(?<![\w.])(' + kw_control + r')(?![\w$%&!#])'},
                 {"name": "storage.modifier.tiko", "match": r'(?i)(?<![\w.])(' + kw_modifier + r')(?![\w$%&!#])'},
                 {"name": "storage.type.tiko", "match": r'(?i)(?<![\w.])(' + types + r')(?![\w$%&!#])'},

@@ -69,6 +69,10 @@ for group, ws in groups:
 # `select channel` (std/tasks): `channel` is no keyword elsewhere, so only here.
 # A keyword beats a match at the same column, so the match starts AT `channel`.
 w('syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"')
+# A property's sections: `set` alone on its line, and after `end` (`get` is a keyword already).
+# Neither word is reserved -- `set` names containers.Set -- so only there.
+w('syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|\'\)"')
+w('syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"')
 w('')
 w('" Comments: an apostrophe, REM as a whole word, and the nesting block form.')
 w('syn keyword tikoTodo contained TODO FIXME XXX NOTE')

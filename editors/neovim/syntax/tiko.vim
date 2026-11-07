@@ -39,6 +39,8 @@ syn keyword tikoBuiltin swap tab tan threadcall trim typeof ubound ucase unlock 
 syn keyword tikoBuiltin using va_first var varptr view wchr width window winput write
 syn keyword tikoBuiltin wstr
 syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"
+syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|'\)"
+syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"
 
 " Comments: an apostrophe, REM as a whole word, and the nesting block form.
 syn keyword tikoTodo contained TODO FIXME XXX NOTE

@@ -190,6 +190,25 @@
           }
         },
         {
+          "match": "(?i)^\\s*(get|set)\\s*(?=$|')",
+          "captures": {
+            "1": {
+              "name": "keyword.other.tiko"
+            }
+          }
+        },
+        {
+          "match": "(?i)(?<![\\w.])(end)\\s+(get|set)(?![\\w$%&!#])",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            },
+            "2": {
+              "name": "keyword.other.tiko"
+            }
+          }
+        },
+        {
           "name": "keyword.control.tiko",
           "match": "(?i)(?<![\\w.])(continue|elseif|return|select|endif|gosub|until|while|case|else|exit|goto|loop|next|step|then|wend|end|for|do|if|to)(?![\\w$%&!#])"
         },
