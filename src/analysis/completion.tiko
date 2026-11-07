@@ -99,12 +99,48 @@ function ReadMemberChain( byref text_ as string, byref tokens as TokenArray, _
     return true
 end function
 
+'' True when token `idx` opens a generic's type argument: the `of` right after
+'' a `(` -- `containers.Array( of ` -- or a `,` in such a list --
+'' `Map( of string, `. `of` is no keyword; the `(` before it is what makes it
+'' one. A `,` in any other parentheses (`f( a, `) is an argument's.
+private function IsTypeArg_( byref text_ as string, byref tokens as TokenArray, _
+                             byval idx as long ) as boolean
+    dim as long open_ = -1
+
+    if( tokens[idx].Kind = TK_IDENT ) then
+        if( lcase( TokenText( text_, tokens[idx] ) ) <> "of" ) then return false
+        open_ = idx - 1
+    elseif( tokens[idx].Kind = TK_COMMA ) then
+        dim as long depth = 0
+        dim as long j = idx - 1
+        while( j >= 0 andalso open_ < 0 )
+            select case tokens[j].Kind
+                case TK_EOL
+                    return false
+                case TK_RPAREN
+                    depth += 1
+                case TK_LPAREN
+                    if( depth = 0 ) then open_ = j else depth -= 1
+            end select
+            j -= 1
+        wend
+        if( open_ < 0 ) then return false
+        if( tokens[open_ + 1].Kind <> TK_IDENT ) then return false
+        if( lcase( TokenText( text_, tokens[open_ + 1] ) ) <> "of" ) then return false
+    else
+        return false
+    end if
+
+    return open_ >= 0 andalso tokens[open_].Kind = TK_LPAREN
+end function
+
 '' True when token `asIdx` is an `as` that a TYPE follows: `dim p as `,
 '' `function f( ) as `, `x as ` in a parameter list. Not the `as` of
 '' `#import "std/strings" as s` or `name "a" as "b"` (a string before it),
 '' `open "f" for input as #1` (an OPEN statement), or `select case as const`.
 private function IsTypeAs_( byref text_ as string, byref tokens as TokenArray, _
                             byval asIdx as long ) as boolean
+    if( IsTypeArg_( text_, tokens, asIdx ) ) then return true
     if( tokens[asIdx].Kind <> TK_KEYWORD ) then return false
     if( lcase( TokenText( text_, tokens[asIdx] ) ) <> "as" ) then return false
     if( asIdx = 0 ) then return false
@@ -157,8 +193,10 @@ function CompletionContextAt( byref text_ as string, byref tokens as TokenArray,
         return ctx
     end if
 
-    '' `dim p as |` -- past the `as` and on its line: a type comes next.
-    if( last_.Kind = TK_KEYWORD andalso offset > last_.Start_ + last_.Length_ ) then
+    '' `dim p as |`, `Array( of |`, `Map( of string, |` -- past the `as`, the
+    '' `of` or the list's comma, and on its line: a type comes next.
+    if( ( last_.Kind = TK_KEYWORD orelse last_.Kind = TK_IDENT orelse last_.Kind = TK_COMMA ) _
+        andalso offset > last_.Start_ + last_.Length_ ) then
         dim as long gap = offset - ( last_.Start_ + last_.Length_ )
         if( instr( mid( text_, last_.Start_ + last_.Length_ + 1, gap ), chr(10) ) = 0 ) then
             if( IsTypeAs_( text_, tokens, i ) ) then ctx.Kind_ = CMPCTX_TYPE

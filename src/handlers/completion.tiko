@@ -437,7 +437,8 @@ private function OnCompletion( byref srv as Server, _
     dim as long charNo = clng( posVal.Member( "character" ).AsLongInt( 0 ) )
     dim as long offset = clng( doc->PositionToOffset( lineNo, charNo ) )
 
-    '' A space asks only after a declaration's `as` (`dim p as `); anywhere
+    '' A space asks only where a type comes next -- a declaration's `as`
+    '' (`dim p as `), a generic's `( of ` or a comma in its list; anywhere
     '' else it is just a space, and the answer is nothing, at once.
     dim as string trigger = req.Params( ).Member( "context" ).Member( "triggerCharacter" ).AsString( "" )
     if( trigger = " " ) then
