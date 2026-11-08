@@ -174,7 +174,7 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
   **permanent** once published. Display name `Tiko`.
   **Amended 2026-11-08:** the ID is now `PaulSquires.tiko-lang` (`name` `tiko-lang`). The author
   deleted the `PaulSquires.tiko` listing and republishes under the new ID, which is just as
-  permanent. The display name, the `tiko.*` settings and commands, the `tiko` language id
+  permanent, and the display name is `tiko-lang` too. The `tiko.*` settings and commands, the `tiko` language id
   and the `$tiko` problem matcher are unchanged.
 - **A-D2. Legacy extensions are opt-in.** `.bas`, `.bi` and `.inc` are not claimed by
   default, so installing Tiko doesn't take those files from FreeBASIC, VB or PHP/asm
