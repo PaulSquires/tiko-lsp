@@ -45,6 +45,9 @@
 
 (end_statement) @keyword
 
+; tiko's view-kind type, `type Lexer as view`: one token, `as view`.
+(view_kind) @keyword
+
 ; A PROPERTY'S SECTIONS, `get` ... `end get` and `set` ... `end set`, need no
 ; grammar rule: the opener alone on its line is a bare identifier straight under
 ; the property, and the closer is `end <value>`. Neither word is reserved --
@@ -119,7 +122,7 @@
 ; The built-in TYPE names, coloured as types rather than as plain keywords.
 ((identifier) @type
   (#match? @type
-   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64)$"))
+   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64|slice|uslice|wslice)$"))
 ; tiko-lang's predeclared constant, `const nullptr as any ptr = 0`: a
 ; constant, as an enum member is. Not a keyword, so matched here like the
 ; type names above.

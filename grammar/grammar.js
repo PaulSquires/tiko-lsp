@@ -136,7 +136,7 @@ module.exports = grammar({
   ],
 
   // `interface` and `inherits` are contextual: src/scanner.c says why.
-  externals: $ => [$._eof, $._interface_kw, $._inherits_kw],
+  externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw],
 
   word: $ => $._word,
 
@@ -425,6 +425,15 @@ module.exports = grammar({
       repeat($.modifier),
       kw('type'),
       field('name', $.identifier),
+      // tiko's VIEW-KIND type, `type Lexer as view` and nothing else on the
+      // line: a block with an ordinary field body, where `type X as Y` is
+      // otherwise an alias.
+      //
+      // `as view` IS ONE TOKEN, like `( of`: as two, `type X as` must pick the
+      // alias before it can see the word after AS. `view` is reserved, so no
+      // alias names it as its target. The EXTERNAL SCANNER makes it, because
+      // only it can see that `as viewport` is not `as view`.
+      optional(alias($._as_view_kw, $.view_kind)),
       repeat($._type_header_tail),
       $._type_body,
       endkw('type'),

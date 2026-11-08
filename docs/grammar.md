@@ -59,6 +59,7 @@ reference lists it.
 | `print interface`, `dim as long inherits = 2` | Neither word is reserved (tiko-lang's `interface-as-name` test keeps every such name), and a keyword token lexes as the keyword wherever a name is valid too. The external scanner emits them, only where the parser can take one AND a name -- not `as`, not `=` -- follows. `class` and `implements` are fbc-reserved, so they are ordinary keywords. |
 | `type X extends Object implements I` | fbc's spelling: `implements` on the header line. |
 | a property's `set` ... `end set` (and `get` ... `end get`) | **Coloured by the queries, not parsed.** `set` alone on its line is already a bare identifier straight under the property, and `end set` is `end <value>`, so two `#match?` patterns colour exactly those (not `Set( of long )`, `x = set`). Every grammar form measured cost more: a section block +2.5 MB of `parser.c` (1530 -> 1920 large states, its closers reach every nested body), the opener alone as a scanner token +1.4 MB. |
+| `type Lexer as view` … `end type` | tiko's view-kind type (string slices): a TYPE block whose line has an AS. `as view` is one token from the external scanner, which ends it at a word boundary -- `type V as viewport` stays an alias. `s[lo to hi]` needed nothing: the brackets hold atoms. |
 | `s = """` … `"""` | tiko's block string: `"""` that ends its line opens one, the first line starting (after blanks) with `"""` closes it. One `string` token, a regular expression with no scanner. `"""abc"""` never matches the opener, so it stays fbc's 5-character string. An unterminated block matches nothing and lexes as before, so the lines under a half-typed block stay code until its closer is written. |
 
 ## Measured
@@ -85,7 +86,7 @@ opens `extern` in three `#if` branches and closes it once, and `CDialog.tiko`'s
 `IF x DoIt( )` with no THEN; the three in `src` are namespaces closed in an
 `#include`d file (below).
 
-`tree-sitter test` runs 28 corpus cases covering declarations, statements, the
+`tree-sitter test` runs 29 corpus cases covering declarations, statements, the
 preprocessor and the lexical corners; all pass.
 
 tiko's module directives (tiko-lang ADR 0017) are structural nodes of their own:
