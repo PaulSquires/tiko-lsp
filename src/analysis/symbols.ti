@@ -136,7 +136,8 @@ declare function IsMemberAccess( byref text_ as string, byref tokens as TokenArr
 declare function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
 
 '' The hover for one of tiko-lang's fixed-width type names at `offset` --
-'' `type int32 as long` and its size -- or "" when the token there is not one,
+'' `type int32 as long` and its size; or one of its string-slice types, slice,
+'' uslice and wslice, and what they view -- or "" when the token there is not one,
 '' or is a member after a dot. The caller asks only once the name has failed
 '' to resolve, so a file's own int32 wins, as it does in the compiler.
 declare function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _

@@ -320,6 +320,45 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "the string-slice types" )
+
+scope
+    Analyse( "sub Work( )" & LF & "    x" & LF & "end sub" )
+    CompleteAfter( "    x" )
+
+    AssertTrue ( Has( "slice" ) andalso Has( "uslice" ) andalso Has( "wslice" ), _
+                 "slice, uslice and wslice are offered -- slice( p, n ) makes one" )
+    AssertEqInt( KindOf( "uslice" ), CMP_STRUCT, "as a type, as a UDT is" )
+    AssertEqStr( DetailOf( "slice" ), "string slice of ubyte code units", "saying what it views" )
+    AssertEqInt( GroupOf( "wslice" ), CMPGROUP_KEYWORD, "ranked with the language" )
+end scope
+
+scope
+    '' A file's own slice has replaced tiko's: one candidate, the file's.
+    Analyse( "dim shared as long slice" & LF & "x" )
+    CompleteAfter( LF & "x" )
+
+    AssertEqInt( KindOf( "slice" ), CMP_VARIABLE, "a file's own slice wins" )
+    dim as long n = 0
+    for i as long = 0 to g_Items.Count( ) - 1
+        if( lcase( g_Items[i].Label ) = "slice" ) then n += 1
+    next
+    AssertEqInt( n, 1, "and is the only slice offered" )
+end scope
+
+scope
+    '' A VIEW-KIND type's members complete like any type's.
+    Analyse( "type Lexer as view" & LF & "    src as const slice" & LF & "    pos as integer" & LF & _
+             "    declare function NextWord( ) as const slice" & LF & "end type" & LF & _
+             "sub Use( )" & LF & "    dim as Lexer lx" & LF & "    lx." & LF & "end sub" )
+
+    CompleteAfter( "    lx." )
+    AssertTrue( Has( "src" ) andalso Has( "pos" ), "`lx.` offers a view type's fields" )
+    AssertTrue( Has( "NextWord" ), "and its methods" )
+    AssertFalse( Has( "Use" ), "and nothing else" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "the predeclared constant nullptr" )
 
 scope
@@ -534,6 +573,8 @@ scope
     AssertTrue( Has( "Handle" ), "and an alias" )
     AssertTrue( Has( "long" ) andalso Has( "string" ) andalso Has( "ustring" ), "and the built-in type words" )
     AssertTrue( Has( "int32" ), "and tiko's typedefs" )
+    AssertTrue( Has( "slice" ) andalso Has( "uslice" ) andalso Has( "wslice" ), "and its string-slice types" )
+    AssertEqInt( KindOf( "wslice" ), CMP_STRUCT, "offered as types, not keywords" )
     AssertTrue( Has( "total" ) = false, "but not a local" )
     AssertTrue( Has( "Work" ) = false, "nor a procedure" )
     AssertTrue( Has( "if" ) = false andalso Has( "print" ) = false, "nor a statement keyword" )

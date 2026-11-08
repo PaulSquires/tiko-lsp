@@ -1,6 +1,6 @@
 #include "tree_sitter/parser.h"
 
-// Two things the grammar cannot express.
+// Three things the grammar cannot express.
 //
 // END OF FILE ENDS A LINE.
 //
@@ -24,11 +24,19 @@
 // the line: `interface IAnimal`, `inherits Animal` -- not `inherits as long`,
 // a field, nor `interface = 3`. Anything else is left to the lexer, which
 // reads the word as an identifier.
+//
+// `as view` ENDS AT A WORD BOUNDARY.
+//
+// tiko's view-kind type, `type Lexer as view`, is a block where `type X as Y`
+// is an alias. As one lexer token `as view` would also match the front of
+// `type V as viewport`, and tree-sitter's regexes have no lookahead -- so the
+// boundary after `view` is checked here, only where the parser can take it.
 
 enum TokenType {
     EOF_LINE_END,
     INTERFACE_KW,
     INHERITS_KW,
+    AS_VIEW_KW,
 };
 
 void *tree_sitter_tiko_external_scanner_create(void) { return NULL; }
@@ -67,6 +75,25 @@ static bool name_follows(TSLexer *lexer) {
     return is_ident_char(lexer->lookahead);     // `asset` is a name, `as` is not
 }
 
+// `as`, blanks, `view`, and no name character after it.
+static bool scan_as_view(TSLexer *lexer) {
+    if (lower(lexer->lookahead) != 'a') return false;
+    lexer->advance(lexer, false);
+    if (lower(lexer->lookahead) != 's') return false;
+    lexer->advance(lexer, false);
+    if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') lexer->advance(lexer, false);
+    const char *view = "view";
+    for (int i = 0; i < 4; i++) {
+        if (lower(lexer->lookahead) != view[i]) return false;
+        lexer->advance(lexer, false);
+    }
+    if (is_ident_char(lexer->lookahead)) return false;     // `viewport` is a name
+    lexer->mark_end(lexer);
+    lexer->result_symbol = AS_VIEW_KW;
+    return true;
+}
+
 bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
                                             const bool *valid_symbols) {
     if (valid_symbols[EOF_LINE_END] && lexer->eof(lexer)) {
@@ -78,7 +105,16 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
     // would only make the recovery worse.
     bool want_interface = valid_symbols[INTERFACE_KW];
     bool want_inherits = valid_symbols[INHERITS_KW];
+    bool want_as_view = valid_symbols[AS_VIEW_KW];
     if (want_interface && want_inherits && valid_symbols[EOF_LINE_END]) return false;
+    if (want_as_view && (want_interface || want_inherits)) return false;
+
+    if (want_as_view) {
+        while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r') {
+            lexer->advance(lexer, true);
+        }
+        return scan_as_view(lexer);
+    }
     if (!want_interface && !want_inherits) return false;
 
     while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r') {

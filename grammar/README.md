@@ -43,7 +43,7 @@ word `keyword` rule then collides with `identifier` at every turn.
 
 ## The external scanner
 
-`src/scanner.c` contributes three tokens. The first is zero-width: **end of file ends a
+`src/scanner.c` contributes four tokens. The first is zero-width: **end of file ends a
 line**. An editor buffer spends most of its life without a trailing newline —
 the caret is on the last line, still typing it — and a grammar that insists on
 one reports the last statement as broken exactly while it is being written.
@@ -53,6 +53,11 @@ is reserved, and as keyword tokens they would lex as keywords wherever a name is
 valid too (`print interface`). The scanner emits one only where the parser can
 take it and a name — not `as`, not `=` — follows: `interface IAnimal`,
 `inherits Animal`.
+
+The fourth is **`as view`**, tiko's view-kind type: `type Lexer as view` opens a
+block where `type X as Y` is an alias. It is one token so the parser need not
+choose before it sees `view`, and it comes from the scanner because a regular
+expression has no lookahead: `type V as viewport` must stay an alias.
 
 ## Building and testing
 

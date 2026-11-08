@@ -1998,6 +1998,23 @@
           }
         },
         {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_as_view_kw"
+              },
+              "named": true,
+              "value": "view_kind"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
           "type": "REPEAT",
           "content": {
             "type": "SYMBOL",
@@ -7568,6 +7585,10 @@
     {
       "type": "SYMBOL",
       "name": "_inherits_kw"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_as_view_kw"
     }
   ],
   "inline": [],

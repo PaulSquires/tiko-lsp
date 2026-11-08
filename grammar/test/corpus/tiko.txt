@@ -291,3 +291,98 @@ print interface
   (number)
   (identifier)
   (identifier))
+
+================================================================================
+string slices: a view-kind type, s[lo to hi], the slice type names
+================================================================================
+
+type Lexer as view
+    src as const slice
+    pos as integer
+    declare function NextWord( ) as const uslice
+end type
+
+type Handle As View_t
+type Port as viewport ptr
+
+function Lexer.NextWord( ) as const uslice
+    return this.src[st to this.pos - 1]
+end function
+
+dim as uslice v = u[7 to 11]
+print s[0 to 4]
+for each c in s[2 to len( s ) - 1]
+next
+var b = slice( pz, 7 )
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    (identifier)
+    (view_kind)
+    (identifier)
+    (type_annotation
+      (identifier)
+      (identifier))
+    (identifier)
+    (type_annotation
+      (identifier))
+    (declare_statement
+      (qualified_name
+        (identifier))
+      (parameter_list)
+      (identifier)))
+  (type_alias
+    (identifier)
+    (identifier))
+  (type_alias
+    (identifier)
+    (identifier)
+    (identifier))
+  (procedure_definition
+    (qualified_name
+      (identifier)
+      (identifier))
+    (parameter_list)
+    (identifier)
+    (identifier)
+    (identifier)
+    (member_access
+      (identifier))
+    (identifier)
+    (identifier)
+    (identifier)
+    (member_access
+      (identifier))
+    (operator)
+    (number))
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (identifier)
+  (number)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (number)
+  (for_statement
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)
+    (number)
+    (identifier)
+    (identifier)
+    (identifier)
+    (operator)
+    (number))
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number))

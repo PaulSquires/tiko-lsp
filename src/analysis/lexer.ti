@@ -148,3 +148,11 @@ declare function BuiltinConstantDecl( byref word_ as string ) as string
 
 '' The names, lower-cased.
 declare function AllBuiltinConstants( ) as containers.Array( of string )
+
+'' tiko-lang's string-slice types -- slice, uslice, wslice. NOT keywords: they
+'' lex as identifiers. Returns the code unit the slice views ("ubyte" for
+'' slice), or "" when the word is not one of them.
+declare function BuiltinSliceUnit( byref word_ as string ) as string
+
+'' The three names, lower-cased.
+declare function AllBuiltinSliceTypes( ) as containers.Array( of string )

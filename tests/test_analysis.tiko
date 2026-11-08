@@ -352,6 +352,27 @@ AssertClean( "#macro Twice( x )" & LF & "x" & LF & "x" & LF & "#endmacro", "#mac
 AssertClean( "#pragma once", "an ordinary directive is ignored" )
 
 AssertOneCode( "type Customer" & LF & "Name_ as string", DIAGCODE_UNCLOSED_BLOCK, "a type with no end type" )
+
+'' tiko's string slices (tiko-lang ec6351fda): a VIEW-KIND type is a block, though
+'' its line has an AS; the slicing `s[lo to hi]` is TO inside square brackets.
+AssertClean( "type Lexer as view" & LF & "    src as const slice" & LF & "    pos as integer" & LF & _
+             "    declare function NextWord( ) as const slice" & LF & "end type", _
+             "`type X as view` opens a block, closed by end type" )
+AssertClean( "type Lexer AS VIEW" & LF & "    pos as integer" & LF & "End Type", "in any case" )
+AssertOneCode( "type Lexer as view" & LF & "    pos as integer", DIAGCODE_UNCLOSED_BLOCK, _
+               "a view type with no end type is unclosed" )
+AssertOneCode( "type Handle as long" & LF & "end type", DIAGCODE_UNEXPECTED_END, _
+               "while `type X as long` is still an alias, and opens nothing" )
+AssertOneCode( "type Handle as view ptr" & LF & "end type", DIAGCODE_UNEXPECTED_END, _
+               "and only a bare `as view` opens: anything after it is an alias" )
+AssertClean( "dim as string s = " & DQ & "hello world" & DQ & LF & "print s[0 to 4]" & LF & _
+             "dim as uslice v = u[7 to 11]" & LF & "print v[1 to len( v ) - 1]" & LF & _
+             "for each c in s[2 to 5]" & LF & "next" & LF & "return this.src[st to this.pos - 1]", _
+             "slicing `s[lo to hi]` raises nothing" )
+AssertClean( "sub TakesU( byval v as const uslice )" & LF & "end sub" & LF & _
+             "function F( ) as const wslice" & LF & "    return wslice( p, 4 )" & LF & "end function" & LF & _
+             "var a = slice( pz )" & LF & "dim slice as long = 3", _
+             "the slice type names, and slice used as a name" )
 AssertOneCode( "#if defined(X)" & LF & "print 1", DIAGCODE_UNCLOSED_BLOCK, "an #if with no #endif" )
 AssertOneCode( "#endif", DIAGCODE_UNEXPECTED_END, "an #endif with no #if" )
 AssertOneCode( "#else", DIAGCODE_ORPHAN_CLAUSE, "an #else outside an #if" )

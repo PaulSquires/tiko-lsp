@@ -5173,6 +5173,10 @@
           "named": true
         },
         {
+          "type": "view_kind",
+          "named": true
+        },
+        {
           "type": "while_statement",
           "named": true
         },
@@ -6202,6 +6206,10 @@
   {
     "type": "until",
     "named": false
+  },
+  {
+    "type": "view_kind",
+    "named": true
   },
   {
     "type": "virtual",
