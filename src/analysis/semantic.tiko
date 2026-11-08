@@ -162,8 +162,12 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                         '' Only here, after the file's own names: a file that
                         '' declares int32 itself has replaced tiko's. Never after
                         '' a dot, where `rec.int32` is a member of something.
+                        '' The string-slice types, slice, uslice and wslice, are
+                        '' the same kind of prelude name.
                         dim as boolean builtinType = _
                             len( BuiltinTypedefTarget( TokenText( text_, tok ) ) ) > 0
+                        if( builtinType = false ) then _
+                            builtinType = len( BuiltinSliceUnit( TokenText( text_, tok ) ) ) > 0
                         if( builtinType ) then builtinType = ( IsMemberAccess( text_, tokens, i ) = false )
                         '' ...and its predeclared constant, nullptr: coloured as a
                         '' file-level CONST is, readonly and static.

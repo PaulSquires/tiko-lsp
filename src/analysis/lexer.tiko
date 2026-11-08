@@ -222,6 +222,33 @@ function AllBuiltinConstants( ) as containers.Array( of string )
     return out_
 end function
 
+'' ############################################################################
+''  tiko-lang's STRING-SLICE types -- slice, uslice, wslice
+''
+''  A view of a string's code units: `dim v as const slice = s[0 to 4]`. The
+''  prelude declares them as typedefs of reserved `__tko_` types (tiko-lang
+''  ec6351fda, docs/tiko-slices RFC-0001 §1), so they are not keywords for the
+''  same reason int32 is not: a program's own `slice` replaces tiko's, and the
+''  lexer leaves the words identifiers.
+'' ############################################################################
+
+function BuiltinSliceUnit( byref word_ as string ) as string
+    select case lcase(word_)
+        case "slice"  : return "ubyte"
+        case "uslice" : return "ushort"
+        case "wslice" : return "wchar_t"
+    end select
+    return ""
+end function
+
+function AllBuiltinSliceTypes( ) as containers.Array( of string )
+    dim out_ as containers.Array( of string )
+    out_.Push( "slice" )
+    out_.Push( "uslice" )
+    out_.Push( "wslice" )
+    return out_
+end function
+
 '' The preprocessor directives that open or close a block; every other
 '' directive is KW_PP_OTHER and the parser ignores the rest of its line.
 private function PpKeywordOf( byref word_ as string ) as FbKeyword

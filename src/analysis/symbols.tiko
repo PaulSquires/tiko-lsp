@@ -240,6 +240,14 @@ function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as Tok
     if( IsMemberAccess( text_, tokens, tokIdx ) ) then return ""
 
     dim as string word_ = TokenText( text_, tok )
+
+    '' A string-slice type: a view of a string's code units.
+    dim as string unit_ = BuiltinSliceUnit( word_ )
+    if( len(unit_) > 0 ) then
+        return "```tiko" & chr(10) & "type " & lcase(word_) & chr(10) & "```" & _
+               chr(10) & chr(10) & "*built-in type: a string slice, a view of " & unit_ & " code units*"
+    end if
+
     dim as string target = BuiltinTypedefTarget( word_ )
     if( len(target) = 0 ) then return ""
 

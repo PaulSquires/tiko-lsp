@@ -13,6 +13,11 @@ const TYPE_KEYWORDS = "any boolean byte const double function integer long longi
                       "short single string sub ubyte uinteger ulong ulongint ushort " & _
                       "ustring wstring zstring"
 
+'' The detail a string-slice type is offered with: what it is a view of.
+private function SliceDetail( byref name_ as string ) as string
+    return "string slice of " & BuiltinSliceUnit( name_ ) & " code units"
+end function
+
 '' ############################################################################
 ''  Context
 '' ############################################################################
@@ -560,6 +565,12 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
                      "", CMPGROUP_KEYWORD )
         next
 
+        '' tiko's string-slice types, which are prelude names like the typedefs.
+        dim sls as containers.Array( of string ) = AllBuiltinSliceTypes( )
+        for i as long = 0 to sls.Count( ) - 1
+            AddItem( items, sls[i], CMP_STRUCT, SliceDetail( sls[i] ), "", CMPGROUP_KEYWORD )
+        next
+
         dim tws as containers.Array( of string ) = strings.Split( TYPE_KEYWORDS, " " )
         for i as long = 0 to tws.Count( ) - 1
             if( IsKeyword( tws[i] ) = false ) then continue for
@@ -602,6 +613,13 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
         AddItem( items, typedefs[i], CMP_STRUCT, _
                  "type " & typedefs[i] & " as " & BuiltinTypedefTarget( typedefs[i] ), _
                  "", CMPGROUP_KEYWORD )
+    next
+
+    ''    ...and its string-slice types, slice, uslice and wslice -- a
+    ''    declaration names them, and `slice( p, n )` makes one from a pointer.
+    dim slices as containers.Array( of string ) = AllBuiltinSliceTypes( )
+    for i as long = 0 to slices.Count( ) - 1
+        AddItem( items, slices[i], CMP_STRUCT, SliceDetail( slices[i] ), "", CMPGROUP_KEYWORD )
     next
 
     ''    ...and its predeclared constant, nullptr, on the same terms.

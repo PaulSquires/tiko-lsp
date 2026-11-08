@@ -166,6 +166,27 @@ scope
 end scope
 
 scope
+    '' tiko's VIEW-KIND type: `type X as view` is a block with fields, not an alias.
+    Analyse( "type Lexer as view" & LF & _
+             "    src as const slice" & LF & _
+             "    pos as integer" & LF & _
+             "    declare function NextWord( ) as const slice" & LF & _
+             "end type" & LF & _
+             "type Handle as long" )
+
+    dim as long t = Expect( "Lexer", SYM_STRUCT, "a view type is a symbol" )
+    AssertEqStr( S_(t).Detail_, "type", "with a block type's detail, not an alias's" )
+    AssertTrue ( S_(t).RangeEnd > instr( g_Src, "end type" ) - 1, "whose range runs to its end type" )
+    dim as long f = Expect( "src", SYM_FIELD, "its field is a symbol" )
+    AssertEqInt( S_(f).Parent, t, "parented to the view type" )
+    AssertEqStr( S_(f).Detail_, "as const slice", "with the slice type as the detail" )
+    dim as long m = Expect( "NextWord", SYM_METHOD, "its declare is a method" )
+    AssertEqInt( S_(m).Parent, t, "parented to the view type too" )
+    dim as long h = Expect( "Handle", SYM_STRUCT, "and an alias after it is still an alias" )
+    AssertEqStr( S_(h).Detail_, "as long", "whose detail is its target" )
+end scope
+
+scope
     Analyse( "enum Colour" & LF & "    Red" & LF & "    Green = 5" & LF & "end enum" )
 
     dim as long e = Expect( "Colour", SYM_ENUM, "an enum is a symbol" )
@@ -518,6 +539,27 @@ scope
     '' The handler asks Resolve first, which is what lets a file's own name win.
     AssertTrue( g_Syms.Resolve( "float64", ByteAt( "print" ) ) >= 0, _
                 "a file's own float64 resolves, so it is hovered as the file's" )
+end scope
+
+scope
+    '' tiko-lang's string-slice types, by the same rules.
+    Analyse( "dim as const slice v" & LF & _
+             "sub F( byval u as USLICE )" & LF & "end sub" & LF & _
+             "dim as wslice w" & LF & _
+             "print rec.slice" )
+
+    dim as string h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "slice", 1 ) )
+    AssertContains( h, "```tiko" & LF & "type slice" & LF, "a slice type hovers as a code block" )
+    AssertContains( h, "string slice", "saying what it is" )
+    AssertContains( h, "ubyte code units", "and what it views" )
+
+    h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "USLICE", 1 ) )
+    AssertContains( h, "type uslice", "in any case" )
+    AssertContains( h, "ushort", "uslice views UTF-16 units" )
+    AssertContains( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "wslice", 1 ) ), "wchar_t", _
+                    "and wslice wchar_t" )
+    AssertEqStr( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "rec.slice", 5 ) ), "", _
+                 "never after a dot: rec.slice is a member" )
 end scope
 
 scope

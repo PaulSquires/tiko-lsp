@@ -1737,6 +1737,20 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                             exit for
                         end if
                     next
+
+                    '' ...except tiko's VIEW-KIND type, `type Lexer as view` and
+                    '' nothing else on the line: a block with an ordinary field
+                    '' body, closed by `end type`. `view` is a reserved word, so
+                    '' no alias can name it as its target.
+                    if( isBlock = false andalso stmt.Count( ) - first_ = 4 ) then
+                        dim as Token asTok = tokens[ stmt[first_ + 2] ]
+                        dim as Token viewTok = tokens[ stmt[first_ + 3] ]
+                        if( asTok.Kind = TK_KEYWORD andalso asTok.Kw = KW_AS andalso _
+                            viewTok.Kind = TK_KEYWORD andalso _
+                            lcase( TokenText( text_, viewTok ) ) = "view" ) then
+                            isBlock = true
+                        end if
+                    end if
                 end if
 
                 if( isBlock ) then

@@ -249,6 +249,18 @@ private sub TestFixedWidthTypes( )
              "int32 = 5" & LF )                        '' line 1
 
     AssertEqInt( TypeAt( 1, 0 ), SEMTYPE_VARIABLE, "a file's own int32 is its variable" )
+
+    '' tiko-lang's string-slice types are the same kind of prelude name.
+    ''         0         1         2         3
+    ''         0123456789012345678901234567890123
+    Analyse( "dim as const slice v" & LF & _           '' line 0
+             "dim as USLICE u = uslice( p, 4 )" & LF & _ '' line 1
+             "print rec.wslice" & LF )                 '' line 2
+
+    AssertEqInt( TypeAt( 0, 13 ), SEMTYPE_TYPE, "slice is a type though the file never declares it" )
+    AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_TYPE, "uslice in any case" )
+    AssertEqInt( TypeAt( 1, 18 ), SEMTYPE_TYPE, "and as the constructor uslice( p, n )" )
+    AssertEqInt( TypeAt( 2, 10 ), -1, "but not a member after a dot" )
 end sub
 
 '' ############################################################################
