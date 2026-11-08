@@ -2,8 +2,8 @@
 # ============================================================================
 #  Track A, A.4: test a packaged .vsix in a CLEAN VS Code profile.
 #
-#      bash release/vscode/test.sh [dist/tiko-win32-x64.vsix]      (Git Bash, Windows)
-#      bash release/vscode/test.sh dist/tiko-linux-x64.vsix         (Linux, with a display)
+#      bash release/vscode/test.sh [dist/tiko-lang-win32-x64.vsix]      (Git Bash, Windows)
+#      bash release/vscode/test.sh dist/tiko-lang-linux-x64.vsix         (Linux, with a display)
 #
 #  1. a fresh user-data dir and extensions dir under
 #     editors/vscode/test-results/<target>/ -- no settings, no other extensions;
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-VSIX=${1:-"$ROOT/dist/tiko-win32-x64.vsix"}
+VSIX=${1:-"$ROOT/dist/tiko-lang-win32-x64.vsix"}
 [ -f "$VSIX" ] || { echo "no such .vsix: $VSIX" >&2; exit 1; }
 TARGET=$(basename "$VSIX" .vsix)
 

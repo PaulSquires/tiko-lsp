@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const vscode = require('vscode');
 
-const EXTENSION_ID = 'PaulSquires.tiko';
+const EXTENSION_ID = 'PaulSquires.tiko-lang';
 const EXE = process.platform === 'win32' ? 'tiko-lsp.exe' : 'tiko-lsp';
 // The first answer waits for the server to start and index the folder.
 const READY_MS = 60000;

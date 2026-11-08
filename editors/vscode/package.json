@@ -1,5 +1,5 @@
 {
-  "name": "tiko",
+  "name": "tiko-lang",
   "displayName": "Tiko",
   "description": "Language support for the tiko programming language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included. Tiko is a FreeBASIC-compatible language.",
   "version": "0.1.3",
@@ -346,6 +346,6 @@
     "@vscode/vsce": "3.2.1"
   },
   "scripts": {
-    "package": "vsce package --out tiko.vsix"
+    "package": "vsce package --out tiko-lang.vsix"
   }
 }

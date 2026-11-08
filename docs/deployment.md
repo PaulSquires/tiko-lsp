@@ -172,6 +172,10 @@ click Install, open a `.tiko` file, and have a working server on Windows and Lin
 
 - **A-D1. Extension ID `PaulSquires.tiko`.** Rename `name` from `tiko-lsp`. The ID is
   **permanent** once published. Display name `Tiko`.
+  **Amended 2026-11-08:** the ID is now `PaulSquires.tiko-lang` (`name` `tiko-lang`). The author
+  deleted the `PaulSquires.tiko` listing and republishes under the new ID, which is just as
+  permanent. The display name, the `tiko.*` settings and commands, the `tiko` language id
+  and the `$tiko` problem matcher are unchanged.
 - **A-D2. Legacy extensions are opt-in.** `.bas`, `.bi` and `.inc` are not claimed by
   default, so installing Tiko doesn't take those files from FreeBASIC, VB or PHP/asm
   extensions. The README shows the `files.associations` line that turns them on.
@@ -255,8 +259,8 @@ For each target, empty `editors/vscode/server/` and fill it **from the release a
 `dist/`: the binary, `LICENSE` and `THIRD-PARTY-NOTICES.txt`. Then:
 
 ```bash
-npx @vscode/vsce package --target win32-x64 -o dist/tiko-win32-x64.vsix
-npx @vscode/vsce package --target linux-x64 -o dist/tiko-linux-x64.vsix
+npx @vscode/vsce package --target win32-x64 -o dist/tiko-lang-win32-x64.vsix
+npx @vscode/vsce package --target linux-x64 -o dist/tiko-lang-linux-x64.vsix
 ```
 
 Gates:
@@ -268,12 +272,12 @@ Gates:
 
 **Done; measured 2026-10-17:**
 
-- `tiko-win32-x64.vsix`: 214 files, 724 KB.
-- `tiko-linux-x64.vsix`: 214 files, 745 KB.
+- `tiko-lang-win32-x64.vsix`: 214 files, 724 KB.
+- `tiko-lang-linux-x64.vsix`: 214 files, 745 KB.
 
 ### A.4 Local verification (before any upload)
 
-**Automated:** `bash release/vscode/test.sh dist/tiko-<target>.vsix`.
+**Automated:** `bash release/vscode/test.sh dist/tiko-lang-<target>.vsix`.
 
 1. It installs the VSIX into a fresh `--user-data-dir` and `--extensions-dir` (under
    `editors/vscode/test-results/`, gitignored).
@@ -308,12 +312,12 @@ Rows the harness can't check, for the interactive pass:
 ### A.5 Publish: VS Code Marketplace
 
 ```bash
-npx @vscode/vsce publish --packagePath dist/tiko-win32-x64.vsix dist/tiko-linux-x64.vsix
+npx @vscode/vsce publish --packagePath dist/tiko-lang-win32-x64.vsix dist/tiko-lang-linux-x64.vsix
 ```
 
 - After upload the Marketplace runs a virus scan, and the listing appears once it passes
   (usually minutes). Then check
-  `https://marketplace.visualstudio.com/items?itemName=PaulSquires.tiko`: both platforms
+  `https://marketplace.visualstudio.com/items?itemName=PaulSquires.tiko-lang`: both platforms
   should be under Version history.
 - **Never `vsce unpublish`.** It is irreversible and reserves the name for good.
 - If Defender or the scan flags the exe: submit it to Microsoft's WDSI portal. Code
@@ -323,8 +327,8 @@ npx @vscode/vsce publish --packagePath dist/tiko-win32-x64.vsix dist/tiko-linux-
 ### A.6 Publish: Open VSX
 
 ```bash
-npx ovsx publish dist/tiko-win32-x64.vsix -p $OVSX_TOKEN
-npx ovsx publish dist/tiko-linux-x64.vsix -p $OVSX_TOKEN
+npx ovsx publish dist/tiko-lang-win32-x64.vsix -p $OVSX_TOKEN
+npx ovsx publish dist/tiko-lang-linux-x64.vsix -p $OVSX_TOKEN
 ```
 
 Each VSIX's manifest carries its target. Check `https://open-vsx.org/extension/PaulSquires/tiko`.
@@ -341,7 +345,7 @@ clean profile:
 
 All of these must be true:
 
-1. `PaulSquires.tiko` is live on the Marketplace and on Open VSX for win32-x64 and
+1. `PaulSquires.tiko-lang` is live on the Marketplace and on Open VSX for win32-x64 and
    linux-x64.
 2. The A.7 store matrix is all green.
 3. **The update path is proven.** Release `0.1.1` with the A.9 runbook. A clean profile
@@ -365,7 +369,7 @@ From Git Bash on Windows 11:
 | 4 | `sh release/smoke-linux.sh` on Fedora 44 (and `wsl -d Ubuntu -- sh release/smoke-linux.sh`) | `smoke ok` |
 | 4b | Mac: sync the tree, `bash release/build-macos.sh` there, `sh release/smoke-linux.sh` there, `scp` the tarball into `dist/` | gates + `smoke ok` |
 | 5 | `bash release/vscode/package.sh` | one binary per VSIX, versions in lockstep |
-| 6 | `bash release/vscode/test.sh dist/tiko-win32-x64.vsix`, and the linux-x64 one on a Linux desktop | all checks PASS |
+| 6 | `bash release/vscode/test.sh dist/tiko-lang-win32-x64.vsix`, and the linux-x64 one on a Linux desktop | all checks PASS |
 | 7 | `git tag vX.Y.Z && git push origin main vX.Y.Z` | |
 | 8 | A.5, then A.6 | both listings show X.Y.Z for both platforms |
 

@@ -128,7 +128,7 @@ From `editors/vscode` in the tiko-lsp repository:
 ```bash
 npm install
 npm run package
-code --install-extension tiko.vsix
+code --install-extension tiko-lang.vsix
 ```
 
 That development package includes no server. It finds one through
