@@ -218,7 +218,7 @@
         },
         {
           "name": "storage.type.tiko",
-          "match": "(?i)(?<![\\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|ustring|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|int16|int32|int64|short|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\\w$%&!#])"
+          "match": "(?i)(?<![\\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|ustring|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|uslice|wslice|int16|int32|int64|short|slice|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\\w$%&!#])"
         },
         {
           "name": "keyword.other.tiko",

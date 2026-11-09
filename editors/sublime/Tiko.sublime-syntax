@@ -120,7 +120,7 @@ contexts:
       scope: keyword.control.tiko
     - match: '(?i)(?<![\w.])(protected|abstract|explicit|extends|private|virtual|public|shared|static|byref|byval|const)(?![\w$%&!#])'
       scope: storage.modifier.tiko
-    - match: '(?i)(?<![\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|ustring|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|int16|int32|int64|short|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\w$%&!#])'
+    - match: '(?i)(?<![\w.])(uinteger|ulongint|boolean|float32|float64|integer|longint|pointer|ustring|wstring|zstring|double|single|string|uint16|uint32|uint64|ushort|uslice|wslice|int16|int32|int64|short|slice|ubyte|uint8|ulong|byte|int8|long|any|ptr)(?![\w$%&!#])'
       scope: storage.type.tiko
     - match: '(?i)(?<![\w.])(constructor|destructor|implements|interface|namespace|function|inherits|operator|property|declare|extern|class|field|scope|union|enum|once|type|with|asm|sub|as|is|of)(?![\w$%&!#])'
       scope: keyword.other.tiko
