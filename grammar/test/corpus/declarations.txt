@@ -190,6 +190,10 @@ partial type Form
     y as long
 end type
 
+partial class Pet
+    z as long
+end class
+
 partial = 6
 
 --------------------------------------------------------------------------------
@@ -197,11 +201,19 @@ partial = 6
 (source_file
   (type_definition
     (modifier)
+    (modifier)
     name: (identifier)
     (identifier)
     (type_annotation
       (identifier)))
   (type_definition
+    (modifier)
+    name: (identifier)
+    (identifier)
+    (type_annotation
+      (identifier)))
+  (class_definition
+    (modifier)
     name: (identifier)
     (identifier)
     (type_annotation

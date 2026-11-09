@@ -1129,6 +1129,15 @@
           },
           "named": false,
           "value": "const"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_partial_kw"
+          },
+          "named": false,
+          "value": "partial"
         }
       ]
     },
@@ -1972,23 +1981,6 @@
             "type": "SYMBOL",
             "name": "modifier"
           }
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "ALIAS",
-              "content": {
-                "type": "SYMBOL",
-                "name": "_partial_kw"
-              },
-              "named": false,
-              "value": "partial"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
         },
         {
           "type": "ALIAS",

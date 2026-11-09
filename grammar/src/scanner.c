@@ -76,14 +76,14 @@ static bool name_follows(TSLexer *lexer) {
     return is_ident_char(lexer->lookahead);     // `asset` is a name, `as` is not
 }
 
-// After `partial`: blanks, then `type` with no name character after it. Only that makes it the
-// keyword; `partial` is an ordinary name anywhere else.
+// After `partial`: blanks, then `type` or `class` with no name character after it. Only that
+// makes it the keyword; `partial` is an ordinary name anywhere else.
 static bool type_follows(TSLexer *lexer) {
     if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
     while (lexer->lookahead == ' ' || lexer->lookahead == '\t') lexer->advance(lexer, false);
-    const char *type = "type";
-    for (int i = 0; i < 4; i++) {
-        if (lower(lexer->lookahead) != type[i]) return false;
+    const char *word = lower(lexer->lookahead) == 'c' ? "class" : "type";
+    for (int i = 0; word[i]; i++) {
+        if (lower(lexer->lookahead) != word[i]) return false;
         lexer->advance(lexer, false);
     }
     return !is_ident_char(lexer->lookahead);

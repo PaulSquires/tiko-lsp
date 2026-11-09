@@ -337,6 +337,10 @@ module.exports = grammar({
     modifier: $ => choice(
       kw('private'), kw('public'), kw('protected'), kw('static'),
       kw('virtual'), kw('abstract'), kw('shared'), kw('const'),
+      // `partial` is contextual, like `interface`: src/scanner.c says why, and only makes the
+      // token before `type` or `class`. A modifier because an optional token INSIDE
+      // class_definition blows up tree-sitter's analysis of `highlights.scm`.
+      alias($._partial_kw, 'partial'),
     ),
 
     procedure_definition: $ => seq(
@@ -423,8 +427,6 @@ module.exports = grammar({
 
     type_definition: $ => seq(
       repeat($.modifier),
-      // `partial` is contextual, like `interface`: src/scanner.c says why.
-      optional(alias($._partial_kw, 'partial')),
       kw('type'),
       field('name', $.identifier),
       // tiko's VIEW-KIND type, `type Lexer as view` and nothing else on the
