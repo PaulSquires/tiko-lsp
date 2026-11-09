@@ -14,8 +14,8 @@ syn keyword tikoControl wend while
 syn keyword tikoModifier abstract byref byval const explicit extends private protected public shared
 syn keyword tikoModifier static virtual
 syn keyword tikoDeclare as asm class constructor declare destructor enum extern field function
-syn keyword tikoDeclare implements inherits interface is namespace of once operator property scope
-syn keyword tikoDeclare sub type union with
+syn keyword tikoDeclare implements inherits interface is namespace of once operator partial property
+syn keyword tikoDeclare scope sub type union with
 syn keyword tikoType any boolean byte double float32 float64 int16 int32 int64 int8
 syn keyword tikoType integer long longint pointer ptr short single slice string ubyte
 syn keyword tikoType uint16 uint32 uint64 uint8 uinteger ulong ulongint ushort uslice ustring

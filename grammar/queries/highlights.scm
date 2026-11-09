@@ -39,7 +39,7 @@
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
   "channel" "link"
-  "class" "interface" "inherits" "implements"
+  "class" "interface" "inherits" "implements" "partial"
 ] @keyword
 
 [

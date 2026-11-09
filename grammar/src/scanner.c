@@ -37,6 +37,7 @@ enum TokenType {
     INTERFACE_KW,
     INHERITS_KW,
     AS_VIEW_KW,
+    PARTIAL_KW,
 };
 
 void *tree_sitter_tiko_external_scanner_create(void) { return NULL; }
@@ -75,6 +76,19 @@ static bool name_follows(TSLexer *lexer) {
     return is_ident_char(lexer->lookahead);     // `asset` is a name, `as` is not
 }
 
+// After `partial`: blanks, then `type` with no name character after it. Only that makes it the
+// keyword; `partial` is an ordinary name anywhere else.
+static bool type_follows(TSLexer *lexer) {
+    if (lexer->lookahead != ' ' && lexer->lookahead != '\t') return false;
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') lexer->advance(lexer, false);
+    const char *type = "type";
+    for (int i = 0; i < 4; i++) {
+        if (lower(lexer->lookahead) != type[i]) return false;
+        lexer->advance(lexer, false);
+    }
+    return !is_ident_char(lexer->lookahead);
+}
+
 // `as`, blanks, `view`, and no name character after it.
 static bool scan_as_view(TSLexer *lexer) {
     if (lower(lexer->lookahead) != 'a') return false;
@@ -106,6 +120,7 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
     bool want_interface = valid_symbols[INTERFACE_KW];
     bool want_inherits = valid_symbols[INHERITS_KW];
     bool want_as_view = valid_symbols[AS_VIEW_KW];
+    bool want_partial = valid_symbols[PARTIAL_KW];
     if (want_interface && want_inherits && valid_symbols[EOF_LINE_END]) return false;
     if (want_as_view && (want_interface || want_inherits)) return false;
 
@@ -115,7 +130,7 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
         }
         return scan_as_view(lexer);
     }
-    if (!want_interface && !want_inherits) return false;
+    if (!want_interface && !want_inherits && !want_partial) return false;
 
     while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r') {
         lexer->advance(lexer, true);
@@ -135,6 +150,11 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
         found = INTERFACE_KW;
     } else if (want_inherits && n == 8 && same(word, "inherits", 8)) {
         found = INHERITS_KW;
+    } else if (want_partial && n == 7 && same(word, "partial", 7)) {
+        lexer->mark_end(lexer);
+        if (!type_follows(lexer)) return false;
+        lexer->result_symbol = PARTIAL_KW;
+        return true;
     } else {
         return false;
     }

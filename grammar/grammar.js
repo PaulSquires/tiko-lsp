@@ -136,7 +136,7 @@ module.exports = grammar({
   ],
 
   // `interface` and `inherits` are contextual: src/scanner.c says why.
-  externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw],
+  externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw, $._partial_kw],
 
   word: $ => $._word,
 
@@ -423,6 +423,8 @@ module.exports = grammar({
 
     type_definition: $ => seq(
       repeat($.modifier),
+      // `partial` is contextual, like `interface`: src/scanner.c says why.
+      optional(alias($._partial_kw, 'partial')),
       kw('type'),
       field('name', $.identifier),
       // tiko's VIEW-KIND type, `type Lexer as view` and nothing else on the

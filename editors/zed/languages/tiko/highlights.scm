@@ -30,7 +30,7 @@
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
   "channel" "link"
-  "class" "interface" "inherits" "implements"
+  "class" "interface" "inherits" "implements" "partial"
   "private" "public" "protected" "static" "shared"
   "const" "virtual" "abstract" "byref" "byval"
 ] @keyword

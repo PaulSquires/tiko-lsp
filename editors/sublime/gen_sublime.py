@@ -33,7 +33,7 @@ structural = ('sub function property constructor destructor operator declare typ
               'namespace extern scope with asm if then else elseif endif select case is for to '
               'step next while wend do loop until exit continue end as of extends field explicit '
               'once private public protected static shared const virtual abstract byref byval '
-              'return goto gosub class interface inherits implements').split()
+              'return goto gosub class interface inherits implements partial').split()
 control = set('if then else elseif endif select case for to step next while wend do loop until '
               'exit continue end return goto gosub'.split())
 modifiers = set('private public protected static shared const virtual abstract byref byval '

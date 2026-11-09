@@ -177,3 +177,34 @@ end type
       (identifier)
       (identifier)
       (identifier))))
+
+================================================================================
+partial type, and partial as an ordinary name
+================================================================================
+
+public partial type Form
+    x as long
+end type
+
+partial type Form
+    y as long
+end type
+
+partial = 6
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    (modifier)
+    name: (identifier)
+    (identifier)
+    (type_annotation
+      (identifier)))
+  (type_definition
+    name: (identifier)
+    (identifier)
+    (type_annotation
+      (identifier)))
+  (identifier)
+  (number))

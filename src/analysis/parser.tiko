@@ -1441,6 +1441,16 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
             if( macroKind <> KW_NONE ) then PushBlock( st, macroKind, "", head )
         end if
 
+        '' `partial type Form`: a contextual word, so the statement is the TYPE after it.
+        if( head.Kind = TK_IDENT andalso first_ + 1 < stmt.Count( ) ) then
+            dim as Token afterHead = tokens[ stmt[first_ + 1] ]
+            if( afterHead.Kind = TK_KEYWORD andalso afterHead.Kw = KW_TYPE andalso _
+                lcase( TokenText( text_, head ) ) = "partial" ) then
+                first_ += 1
+                head = afterHead
+            end if
+        end if
+
         '' -- keyword-headed statements -------------------------------------------
         ''
         '' A statement headed by anything else falls THROUGH to the lambda scan

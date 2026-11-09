@@ -249,6 +249,9 @@ end scope
 TestGroup( "parser: procedures" )
 
 AssertClean( "sub Test( )" & LF & "    print 1" & LF & "end sub", "a balanced sub" )
+AssertClean( "partial type Form" & LF & "    x as long" & LF & "end type", "partial type opens a TYPE block" )
+AssertClean( "public partial type Form" & LF & "    x as long" & LF & "end type", "public partial type opens a TYPE block" )
+AssertClean( "dim as long partial = 5" & LF & "partial = 6", "partial stays an ordinary name" )
 AssertClean( "function Add( byval a as long ) as long" & LF & "    return a" & LF & "end function", _
              "a balanced function" )
 AssertClean( "private sub Hidden( )" & LF & "end sub", "PRIVATE qualifies the sub, it does not hide it" )

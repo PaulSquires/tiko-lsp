@@ -1974,6 +1974,23 @@
           }
         },
         {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_partial_kw"
+              },
+              "named": false,
+              "value": "partial"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
           "type": "ALIAS",
           "content": {
             "type": "TOKEN",
@@ -7589,6 +7606,10 @@
     {
       "type": "SYMBOL",
       "name": "_as_view_kw"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_partial_kw"
     }
   ],
   "inline": [],

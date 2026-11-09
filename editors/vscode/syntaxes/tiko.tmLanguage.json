@@ -222,7 +222,7 @@
         },
         {
           "name": "keyword.other.tiko",
-          "match": "(?i)(?<![\\w.])(constructor|destructor|implements|interface|namespace|function|inherits|operator|property|declare|extern|class|field|scope|union|enum|once|type|with|asm|sub|as|is|of)(?![\\w$%&!#])"
+          "match": "(?i)(?<![\\w.])(constructor|destructor|implements|interface|namespace|function|inherits|operator|property|declare|partial|extern|class|field|scope|union|enum|once|type|with|asm|sub|as|is|of)(?![\\w$%&!#])"
         },
         {
           "name": "support.function.builtin.tiko",
