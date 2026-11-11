@@ -26,6 +26,11 @@
 ''  A join is a happens-before edge, so the last two need no lock: by the time
 ''  the loop looks at them the worker has finished writing and stopped.
 '' ----------------------------------------------------------------------------
+'' THE INDEX THREADS ASK FOR THEIR STACK. threadcreate's default is the C library's
+'' minimum on Linux and macOS -- 16 KiB on glibc -- where Windows gives 1 MiB, and the
+'' indexer's parse outgrew it: on Linux the server segfaulted in the background build.
+const IDX_THREAD_STACK = 1024 * 1024
+
 dim shared as any ptr        g_idxThread
 dim shared as any ptr        g_idxMutex
 dim shared as boolean        g_idxCancel
@@ -229,7 +234,7 @@ sub StartIndexBuild( byref roots as PathArray )
     SetCancel( false )
     g_idxRefresh = false
     g_idxDone    = false
-    g_idxThread  = threadcreate( @IndexBuildWorker, 0 )
+    g_idxThread  = threadcreate( @IndexBuildWorker, 0, IDX_THREAD_STACK )
 
     if( g_idxThread = 0 ) then
         '' No thread available. Rather than leave the workspace unindexed, the
@@ -262,7 +267,7 @@ sub StartIndexRefresh( byref paths as PathArray, byref roots as PathArray )
     SetCancel( false )
     g_idxRefresh = true
     g_idxDone    = false
-    g_idxThread  = threadcreate( @IndexRefreshWorker, 0 )
+    g_idxThread  = threadcreate( @IndexRefreshWorker, 0, IDX_THREAD_STACK )
 
     if( g_idxThread = 0 ) then
         LogWarn( "could not start the index thread -- refreshing on the message loop" )
