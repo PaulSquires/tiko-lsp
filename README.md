@@ -12,6 +12,9 @@ One server works in every editor that speaks the Language Server Protocol (LSP).
 - **VS Code users:** install the **Tiko** extension and you are done. The extension
   carries its own copy of the server. See [Quick start](#quick-start-vs-code).
 - **Other editors:** see [Other editors](#other-editors).
+- **Writing tiko with an AI coding agent?** Give it the
+  [tiko AI Cheatsheet](https://tiko-lang.net/ai-cheatsheet.md): the language and standard
+  library on one page, ready to drop into a project as `AGENTS.md`.
 
 tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 
