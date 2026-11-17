@@ -22,8 +22,8 @@ SITES = [
     ("src/lsp/protocol.ti", r'^const LSP_SERVER_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"'),
     # Track A: the VS Code extension is versioned in lockstep with the server it bundles.
     ("editors/vscode/package.json", r'^  "version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
-    ("editors/vscode/package-lock.json", r'\A\{\s*"name": "tiko",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
-    ("editors/vscode/package-lock.json", r'"": \{\s*"name": "tiko",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
+    ("editors/vscode/package-lock.json", r'\A\{\s*"name": "tiko-lang",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
+    ("editors/vscode/package-lock.json", r'"": \{\s*"name": "tiko-lang",\s*"version": "([0-9]+\.[0-9]+\.[0-9]+)"'),
 ]
 
 
