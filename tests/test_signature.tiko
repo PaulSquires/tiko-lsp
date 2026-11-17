@@ -256,6 +256,58 @@ private sub TestArgSites( )
 end sub
 
 '' ############################################################################
+''  A header's own name is not a callee
+'' ############################################################################
+
+'' The token index of the first occurrence of `word_` followed by '(', or -1.
+private function NameTokBefore( byref word_ as string ) as long
+    for i as long = 0 to g_Tokens.Count( ) - 2
+        if( g_Tokens[i + 1].Kind = TK_LPAREN andalso _
+            lcase( TokenText( g_Src, g_Tokens[i] ) ) = lcase( word_ ) ) then return i
+    next
+    return -1
+end function
+
+private sub TestHeaderNames( )
+    TestGroup( "IsProcedureHeaderName" )
+
+    Analyse( "type Task" & LF & _
+             "    declare function IsDueOn( byval y as long ) as boolean" & LF & _
+             "end type" & LF & _
+             "function Task.IsDueOn( byval y as long ) as boolean" & LF & _
+             "    return y = 0" & LF & _
+             "end function" & LF )
+    dim as long body = -1
+    for i as long = 0 to g_Tokens.Count( ) - 2
+        if( g_Tokens[i + 1].Kind = TK_LPAREN andalso TokenText( g_Src, g_Tokens[i] ) = "IsDueOn" ) then body = i
+    next
+    AssertTrue( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "IsDueOn" ) ), _
+                "`declare function IsDueOn(` declares, it does not call" )
+    AssertTrue( IsProcedureHeaderName( g_Src, g_Tokens, body ), _
+                "nor does the out-of-line `function Task.IsDueOn(`" )
+
+    Analyse( "sub Outer.Inner.Go_( byval n as long )" & LF & "end sub" & LF )
+    AssertTrue( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "Go_" ) ), _
+                "two qualifiers deep" )
+
+    Analyse( "private sub Move_( byval x as long )" & LF & "end sub" & LF )
+    AssertTrue( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "Move_" ) ), _
+                "a plain `sub Move_(` behind a modifier" )
+
+    Analyse( "sub Go_( )" & LF & _
+             "    Plan.Add( 1 )" & LF & _
+             "    Move_( 2 )" & LF & _
+             "    dim as long n = Count( 3 )" & LF & _
+             "end sub" & LF )
+    AssertFalse( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "Add" ) ), _
+                 "a method call `Plan.Add(` is a call" )
+    AssertFalse( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "Move_" ) ), _
+                 "so is a statement call" )
+    AssertFalse( IsProcedureHeaderName( g_Src, g_Tokens, NameTokBefore( "Count" ) ), _
+                 "and one inside an expression" )
+end sub
+
+'' ############################################################################
 ''  Which declaration is being called
 '' ############################################################################
 private sub TestFindCallable( )
@@ -343,6 +395,7 @@ print "tiko-lsp -- signature, call context and argument site tests"
 TestParseSignature( )
 TestCallContext( )
 TestArgSites( )
+TestHeaderNames( )
 TestFindCallable( )
 TestIntrinsics( )
 

@@ -408,6 +408,32 @@ sub FindArgSites( byref text_ as string, byref tokens as TokenArray, _
     next
 end sub
 
+function IsProcedureHeaderName( byref text_ as string, byref tokens as TokenArray, _
+                                byval nameTok as long ) as boolean
+    if( nameTok < 1 orelse nameTok >= tokens.Count( ) ) then return false
+
+    '' Back over `Outer.Inner.` to the first segment of the qualified name. A
+    '' qualifier may be spelled like a keyword, as a member can.
+    dim as long i = nameTok
+    while( IsMemberAccess( text_, tokens, i ) )
+        if( i < 2 ) then return false
+        select case tokens[i - 2].Kind
+            case TK_IDENT, TK_KEYWORD
+            case else
+                return false
+        end select
+        i -= 2
+    wend
+
+    if( i < 1 ) then return false
+    if( tokens[i - 1].Kind <> TK_KEYWORD ) then return false
+    select case lcase( TokenText( text_, tokens[i - 1] ) )
+        case "sub", "function", "property", "constructor", "destructor", "operator"
+            return true
+    end select
+    return false
+end function
+
 '' ----------------------------------------------------------------------------
 ''  Which declaration is being called
 '' ----------------------------------------------------------------------------
