@@ -3,7 +3,7 @@
 Language support for **tiko** -- the FreeBASIC-compatible language of tiko-lang
 -- served by [tiko-lsp](../../README.md), through Sublime's
 [LSP](https://packagecontrol.io/packages/LSP) package. The Sublime twin of the
-[Zed](../zed) and [VS Code](../vscode) extensions: a syntax called Tiko, the
+[Zed](../zed) and [VS Code](../vscode) extensions: a syntax called tiko, the
 path to a binary, and the toolchain settings the server needs. Everything else
 -- diagnostics, completion, hover, go to definition, references, rename,
 signature help, semantic tokens, inlay hints, formatting and quick fixes --

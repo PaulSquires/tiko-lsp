@@ -17,7 +17,7 @@ and no setting to change.
 
 1. Install **tiko-lang** from the Extensions view (search for `tiko`).
 2. Open a folder containing tiko sources, then open a `.tiko` file.
-3. To see the server's own messages, run **Tiko: Show Language Server Output**.
+3. To see the server's own messages, run **tiko: Show Language Server Output**.
 
 ### Win32, runtime and `std` names
 
@@ -32,7 +32,7 @@ folder, in Downloads (also one level down, where Windows' *Extract All* puts it)
 
 If it finds none, the extension says so once per window and offers **Locate
 Toolchain…**. Choose your `tiko-lang` folder; the extension saves it and restarts the
-server. You can run **Tiko: Locate Toolchain…** from the Command Palette at any time,
+server. You can run **tiko: Locate Toolchain…** from the Command Palette at any time,
 or set the folder yourself:
 
 ```jsonc
@@ -41,14 +41,14 @@ or set the folder yourself:
 }
 ```
 
-**Tiko: Show Language Server Output** shows the toolchain the server used.
+**tiko: Show Language Server Output** shows the toolchain the server used.
 
 ### Build and run
 
 - **Run:** the **▶** button at the top right of a tiko editor, `Ctrl+F5` (`Cmd+F5` on a
-  Mac), **Run ▸ Run Without Debugging**, or **Tiko: Run**.
-- **Build:** `Ctrl+Shift+B`, then **tiko: build …**, or **Tiko: Build**.
-- **Check** (every error, nothing written): **Tiko: Check (no build)**.
+  Mac), **Run ▸ Run Without Debugging**, or **tiko: Run**.
+- **Build:** `Ctrl+Shift+B`, then **tiko: build …**, or **tiko: Build**.
+- **Check** (every error, nothing written): **tiko: Check (no build)**.
 
 When a `tiko.toml` is at or above the file, the project is built (`tiko build`,
 `tiko run`). Otherwise the file itself is built, and the program is written next to it.
@@ -57,7 +57,7 @@ the ones only the compiler finds, go to the **Problems** view.
 
 `tiko run` runs one target. When the `tiko.toml` has more than one exe target, the one
 whose `main` or `sources` hold the open file runs; if that does not decide it, you are
-asked once per project, and **Tiko: Select Run Target...** changes the answer.
+asked once per project, and **tiko: Select Run Target...** changes the answer.
 
 `tiko.build.arguments` adds compiler options (`-g`, `-exx`), and `tiko.run.arguments`
 passes arguments to the program. Tasks of type `tiko` in `.vscode/tasks.json` take
@@ -84,17 +84,17 @@ treat them as tiko, add:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `tiko.toolchainPath` | `""` | The `tiko-lang` folder you unpacked. Leave it empty to have it found automatically. **Tiko: Locate Toolchain…** sets it. |
+| `tiko.toolchainPath` | `""` | The `tiko-lang` folder you unpacked. Leave it empty to have it found automatically. **tiko: Locate Toolchain…** sets it. |
 | `tiko.includePaths` | `[]` | Override: the toolchain's `inc` folders, for an unusual layout. |
 | `tiko.packagePaths` | `[]` | Where `#import` packages are found, if not in the `pkg` folder beside an include path. |
 | `tiko.compilerPath` | `""` | A `tiko` compiler the server may ask about each folder's `tiko.toml` (`tiko metadata`), so imports resolve exactly as the compiler resolves them. Never run for diagnostics. Empty: the compiler in the toolchain folder, else a `tiko` on the `PATH`. |
 | `tiko.build.arguments` | `[]` | Compiler options for Build and Run, such as `-g` or `-exx`. |
-| `tiko.run.arguments` | `[]` | Arguments **Tiko: Run** passes to the program. |
+| `tiko.run.arguments` | `[]` | Arguments **tiko: Run** passes to the program. |
 | `tiko.server.path` | `""` | Use a different `tiko-lsp` executable instead of the included one. |
 | `tiko.server.arguments` | `["--stdio"]` | Server arguments. Add `"--log-level", "debug", "--log-file", "C:/temp/tiko-lsp.log"` to see what the server is doing. |
-| `tiko.trace.server` | `"off"` | Log the LSP traffic in the **Tiko Language Server** output channel. |
+| `tiko.trace.server` | `"off"` | Log the LSP traffic in the **tiko Language Server** output channel. |
 
-**Tiko: Locate Toolchain…** chooses the toolchain folder. **Tiko: Restart Language
+**tiko: Locate Toolchain…** chooses the toolchain folder. **tiko: Restart Language
 Server** restarts the server by hand.
 
 ## Which server runs

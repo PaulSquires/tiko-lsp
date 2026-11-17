@@ -1,4 +1,4 @@
-name = "Tiko"
+name = "tiko"
 grammar = "tiko"
 path_suffixes = ["tiko", "tko", "ti", "bas", "bi", "inc"]
 line_comments = ["' ", "'' "]

@@ -33,7 +33,7 @@ if [ "$SERVER_VERSION" != "$EXT_VERSION" ]; then
     echo "GATE: extension $EXT_VERSION != server $SERVER_VERSION -- run release/bump.py" >&2
     exit 1
 fi
-echo "== Tiko for VS Code $EXT_VERSION"
+echo "== tiko for VS Code $EXT_VERSION"
 
 [ -d node_modules ] || npm ci
 

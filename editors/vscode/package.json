@@ -51,7 +51,6 @@
       {
         "id": "tiko",
         "aliases": [
-          "Tiko",
           "tiko"
         ],
         "extensions": [
@@ -73,43 +72,43 @@
       {
         "command": "tiko.restartServer",
         "title": "Restart Language Server",
-        "category": "Tiko"
+        "category": "tiko"
       },
       {
         "command": "tiko.showOutput",
         "title": "Show Language Server Output",
-        "category": "Tiko"
+        "category": "tiko"
       },
       {
         "command": "tiko.locateToolchain",
         "title": "Locate Toolchain...",
-        "category": "Tiko"
+        "category": "tiko"
       },
       {
         "command": "tiko.build",
         "title": "Build",
-        "category": "Tiko",
+        "category": "tiko",
         "icon": "$(tools)"
       },
       {
         "command": "tiko.run",
         "title": "Run",
-        "category": "Tiko",
+        "category": "tiko",
         "icon": "$(play)"
       },
       {
         "command": "tiko.check",
         "title": "Check (no build)",
-        "category": "Tiko"
+        "category": "tiko"
       },
       {
         "command": "tiko.selectRunTarget",
         "title": "Select Run Target...",
-        "category": "Tiko"
+        "category": "tiko"
       }
     ],
     "configuration": {
-      "title": "Tiko",
+      "title": "tiko",
       "properties": {
         "tiko.server.path": {
           "type": "string",
@@ -131,7 +130,7 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "The folder you unpacked tiko into -- the one named `tiko-lang`, e.g. `C:/tiko-lang` (Linux/macOS: `/home/you/tiko-lang`). Its headers, packages and compiler are then used, so `std/` and `windows.bi` names complete. Empty: a `tiko` on the `PATH`, then a `tiko-lang` folder in your home or Downloads folder, is found automatically. **Tiko: Locate Toolchain...** sets this for you. Sent as `initializationOptions.toolchainPath`."
+          "markdownDescription": "The folder you unpacked tiko into -- the one named `tiko-lang`, e.g. `C:/tiko-lang` (Linux/macOS: `/home/you/tiko-lang`). Its headers, packages and compiler are then used, so `std/` and `windows.bi` names complete. Empty: a `tiko` on the `PATH`, then a `tiko-lang` folder in your home or Downloads folder, is found automatically. **tiko: Locate Toolchain...** sets this for you. Sent as `initializationOptions.toolchainPath`."
         },
         "tiko.includePaths": {
           "type": "array",
@@ -160,7 +159,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Extra compiler options for **Tiko: Build** and **Tiko: Run**, such as `-g` (debug information) or `-exx` (runtime checks). A project's `tiko.toml` profiles still apply."
+          "markdownDescription": "Extra compiler options for **tiko: Build** and **tiko: Run**, such as `-g` (debug information) or `-exx` (runtime checks). A project's `tiko.toml` profiles still apply."
         },
         "tiko.run.arguments": {
           "type": "array",
@@ -168,7 +167,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Command-line arguments passed to the program by **Tiko: Run** (after `--`)."
+          "markdownDescription": "Command-line arguments passed to the program by **tiko: Run** (after `--`)."
         },
         "tiko.trace.server": {
           "type": "string",
@@ -178,7 +177,7 @@
             "verbose"
           ],
           "default": "off",
-          "description": "Traces the communication between VS Code and tiko-lsp in the 'Tiko Language Server' output channel."
+          "description": "Traces the communication between VS Code and tiko-lsp in the 'tiko Language Server' output channel."
         }
       }
     },
@@ -225,7 +224,7 @@
     "debuggers": [
       {
         "type": "tiko",
-        "label": "Tiko",
+        "label": "tiko",
         "languages": [
           "tiko"
         ],
@@ -238,7 +237,7 @@
               },
               "target": {
                 "type": "string",
-                "description": "The tiko.toml target to run, when it has more than one exe target. Empty: the one holding the active file, else the one chosen with Tiko: Select Run Target..."
+                "description": "The tiko.toml target to run, when it has more than one exe target. Empty: the one holding the active file, else the one chosen with tiko: Select Run Target..."
               },
               "args": {
                 "type": "array",
@@ -266,7 +265,7 @@
         ],
         "configurationSnippets": [
           {
-            "label": "Tiko: Run",
+            "label": "tiko: Run",
             "description": "Build and run with tiko run.",
             "body": {
               "type": "tiko",

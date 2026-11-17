@@ -1,5 +1,5 @@
 id = "tiko-lsp"
-name = "Tiko"
+name = "tiko"
 version = "0.1.0"
 schema_version = 1
 description = "Language support for tiko, served by tiko-lsp."
@@ -16,4 +16,4 @@ rev = "e9e94e005b0f7c95a3e4371856051e656ccb8d02"
 
 [language_servers.tiko-lsp]
 name = "tiko-lsp"
-languages = ["Tiko"]
+languages = ["tiko"]

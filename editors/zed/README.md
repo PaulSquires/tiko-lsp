@@ -1,7 +1,7 @@
 # tiko-lsp for Zed
 
 A Zed extension that gives `.tiko`, `.tko` and `.ti` files (and the legacy `.bas`, `.bi` and `.inc`)
-a language — **Tiko** — and starts `tiko-lsp` for them.
+a language — **tiko** — and starts `tiko-lsp` for them.
 
 The extension itself does almost nothing, and that is the point: Zed speaks LSP,
 tiko-lsp speaks LSP, and all that was missing between them was a language name
@@ -105,7 +105,7 @@ top-level README. Never run for diagnostics.
 ## What works
 
 Verified by running Zed **1.16.1** against this extension with a real
-`tiko-lsp.exe`: the extension loads, `widgets.bas` is recognised as Tiko, the
+`tiko-lsp.exe`: the extension loads, `widgets.bas` is recognised as tiko, the
 server starts, `initialize` names the client as Zed, `didOpen` arrives, the file
 is analysed, the workspace scan starts in the background, and Zed's
 `textDocument/codeAction` requests are answered.

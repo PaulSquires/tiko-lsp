@@ -170,7 +170,7 @@ async function start(context) {
         // (workspace/didChangeWatchedFiles), so none are configured here.
     };
 
-    client = new LanguageClient('tiko', 'Tiko Language Server', serverOptions, clientOptions);
+    client = new LanguageClient('tiko', 'tiko Language Server', serverOptions, clientOptions);
     output.appendLine(`starting ${found.path} ${args.join(' ')}  (${found.source})`);
     try {
         await client.start();
@@ -191,7 +191,7 @@ async function start(context) {
         if (tc.packageDir) output.appendLine(`  packages  ${tc.packageDir}`);
         if (tc.compiler) output.appendLine(`  compiler  ${tc.compiler}`);
     } else {
-        output.appendLine('toolchain: none found -- std/ and windows.bi names are unknown. Run "Tiko: Locate Toolchain...".');
+        output.appendLine('toolchain: none found -- std/ and windows.bi names are unknown. Run "tiko: Locate Toolchain...".');
         promptForToolchain(context, toolchainPath);
     }
 }
@@ -272,7 +272,7 @@ async function promptForToolchain(context, configuredPath) {
 
     const message = configuredPath
         ? `tiko.toolchainPath does not name a tiko toolchain: ${configuredPath}`
-        : 'Tiko could not find the tiko toolchain, so names from std/ and windows.bi ' +
+        : 'tiko could not find the tiko toolchain, so names from std/ and windows.bi ' +
           'will not complete. Point it at the folder you unpacked tiko into.';
     const choice = await vscode.window.showInformationMessage(
         message, 'Locate Toolchain...', 'Download tiko', "Don't Ask Again");
@@ -441,7 +441,7 @@ function makeTask(definition, subject, compiler) {
 
 function missingCompiler() {
     vscode.window.showErrorMessage(
-        'Tiko cannot build: no tiko compiler was found. Locate the toolchain, or set "tiko.compilerPath".',
+        'tiko cannot build: no tiko compiler was found. Locate the toolchain, or set "tiko.compilerPath".',
         'Locate Toolchain...', 'Download tiko'
     ).then((choice) => {
         if (choice === 'Locate Toolchain...') vscode.commands.executeCommand('tiko.locateToolchain');
@@ -499,7 +499,7 @@ async function pickRunTarget(manifest, targets) {
     const choice = await vscode.window.showQuickPick(
         targets.map((t) => ({ label: t.name, description: t.main ? path.relative(dir, t.main) : '' })),
         { title: `Run which target of ${path.relative(path.dirname(dir), manifest)}?`,
-          placeHolder: 'Remembered for this tiko.toml; change it with "Tiko: Select Run Target..."' });
+          placeHolder: 'Remembered for this tiko.toml; change it with "tiko: Select Run Target..."' });
     if (!choice) return undefined;
     await extContext.workspaceState.update(RUN_TARGET_KEY + manifest, choice.label);
     return choice.label;
@@ -535,12 +535,12 @@ async function selectRunTarget() {
     }
     const subject = buildSubject(undefined);
     if (!subject || !subject.manifest) {
-        vscode.window.showInformationMessage('Tiko: there is no tiko.toml at or above the active file, so there is no target to choose.');
+        vscode.window.showInformationMessage('tiko: there is no tiko.toml at or above the active file, so there is no target to choose.');
         return;
     }
     const targets = await exeTargets(compiler, subject.manifest);
     if (!targets || targets.length === 0) {
-        vscode.window.showErrorMessage(`Tiko: no exe target could be read from ${subject.manifest}.`);
+        vscode.window.showErrorMessage(`tiko: no exe target could be read from ${subject.manifest}.`);
         return;
     }
     await pickRunTarget(subject.manifest, targets);
@@ -590,7 +590,7 @@ async function runTiko(command, more) {
     const definition = Object.assign({ type: TASK_TYPE, command }, more || {});
     const subject = buildSubject(definition.file);
     if (!subject) {
-        vscode.window.showErrorMessage('Tiko: open a .tiko file, or a folder with a tiko.toml, to build it.');
+        vscode.window.showErrorMessage('tiko: open a .tiko file, or a folder with a tiko.toml, to build it.');
         return;
     }
     if (command === 'run' && !definition.target) {
@@ -643,7 +643,7 @@ const debugProvider = {
         if (!config.noDebug && !saidNoDebugger) {
             saidNoDebugger = true;
             vscode.window.showInformationMessage(
-                'Tiko cannot debug in VS Code yet: the program runs without a debugger.');
+                'tiko cannot debug in VS Code yet: the program runs without a debugger.');
         }
         const more = {};
         if (config.file) more.file = folder && !path.isAbsolute(config.file)
@@ -674,7 +674,7 @@ async function restart(context) {
 
 async function activate(context) {
     extContext = context;
-    output = vscode.window.createOutputChannel('Tiko Language Server');
+    output = vscode.window.createOutputChannel('tiko Language Server');
     context.subscriptions.push(output);
 
     context.subscriptions.push(
@@ -702,7 +702,7 @@ async function activate(context) {
                 return;
             }
             vscode.window
-                .showInformationMessage('Tiko settings changed. Restart the language server?', 'Restart')
+                .showInformationMessage('tiko settings changed. Restart the language server?', 'Restart')
                 .then((choice) => {
                     if (choice === 'Restart') restart(context);
                 });
