@@ -1,8 +1,8 @@
-# Tiko for VS Code
+# tiko for VS Code
 
-Language support for **tiko**, the FreeBASIC-compatible language: diagnostics,
-completion, hover, go to definition, find references, rename, signature help,
-semantic colouring, inlay hints, formatting and quick fixes.
+Language support for **tiko**, a compiled, statically typed programming language:
+diagnostics, completion, hover, go to definition, find references, rename, signature
+help, semantic colouring, inlay hints, formatting and quick fixes.
 
 All of it comes from [tiko-lsp](https://github.com/PaulSquires/tiko-lsp), a
 language server written in tiko. **The server is included**: install the
@@ -15,7 +15,7 @@ and no setting to change.
 
 ## Getting started
 
-1. Install **Tiko** from the Extensions view (search for `tiko`).
+1. Install **tiko-lang** from the Extensions view (search for `tiko`).
 2. Open a folder containing tiko sources, then open a `.tiko` file.
 3. To see the server's own messages, run **Tiko: Show Language Server Output**.
 

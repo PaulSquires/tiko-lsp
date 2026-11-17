@@ -1,7 +1,7 @@
 {
   "name": "tiko-lang",
   "displayName": "tiko-lang",
-  "description": "Language support for the tiko programming language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included. Tiko is a FreeBASIC-compatible language.",
+  "description": "Language support for tiko, a compiled, statically typed programming language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included.",
   "version": "0.1.5",
   "publisher": "PaulSquires",
   "homepage": "https://tiko-lang.net/",
