@@ -106,7 +106,10 @@ private function OnInlayHint( byref srv as Server, _
             dim as string lowerName = lcase( TokenText( body, nameTok ) )
 
             dim as long symIndex = -1
+            '' The symbol check misses an out-of-line body, `function Task.IsDueOn(`:
+            '' its symbol's name starts at `Task`, not at the token before '('.
             if( IsDeclarationSite( doc, nameTok.Start_ ) ) then continue for
+            if( IsProcedureHeaderName( body, doc->Tokens( ), sites[i].NameTok ) ) then continue for
             if( IsMemberAccess( body, doc->Tokens( ), sites[i].NameTok ) ) then
                 symIndex = doc->Symbols( ).ResolveMember( lowerName )
                 if( symIndex >= 0 ) then

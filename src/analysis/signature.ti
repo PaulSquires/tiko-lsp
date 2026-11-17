@@ -111,6 +111,15 @@ declare sub FindArgSites( byref text_ as string, byref tokens as TokenArray, _
                           byval startOffset as long, byval endOffset as long, _
                           byref sites as ArgSiteArray )
 
+'' True when tokens[nameTok] is the NAME a procedure header declares, not a
+'' callee: `sub Move(`, `declare function Area(`, and the out-of-line
+'' `function Task.IsDueOn(` and `sub Outer.Inner.Go(`, whose name follows a
+'' dot exactly as a method call's does. The walk goes back over the qualifiers
+'' to the token before the first one, which a header makes `sub`, `function`,
+'' `property`, `constructor`, `destructor` or `operator`.
+declare function IsProcedureHeaderName( byref text_ as string, byref tokens as TokenArray, _
+                                        byval nameTok as long ) as boolean
+
 '' The index of the best procedure declaration for `lowerName` in `symbols`,
 '' visible from `fromOffset`, or -1. `alternatives` comes back with how many
 '' declarations of that name were found -- the overload count a client shows.
