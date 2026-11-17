@@ -2,6 +2,24 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## 0.1.5
+
+- **The version follows tiko's.** The extension, the server and the tiko toolchain now
+  share one version number: this is the server shipped with tiko 0.1.5 (there is no 0.1.4
+  of the extension).
+- **The extension is `PaulSquires.tiko-lang`**, shown as **tiko-lang**. Commands are under
+  **tiko:** in the Command Palette (**tiko: Run**, **tiko: Build**, **tiko: Locate
+  Toolchain...**), and the output channel is **tiko Language Server**.
+- **Newer tiko syntax understood:** `partial type` and `partial class` (with `partial` as a
+  modifier); string slices -- `type X as view` blocks and the `slice`, `uslice` and `wslice`
+  types, which highlight as types; interfaces and classes; a property's `set` / `end set`.
+- Completion offers the types after a generic's `( of ` and after each comma in its list.
+- No parameter-name inlay hints on an out-of-line method's own header
+  (`function Task.IsDueOn( ...`).
+- The server reads `TIKO_PKG` and `TIKO_INCLUDE`, as tiko does.
+- On Linux and macOS the server no longer crashes while it indexes the workspace in the
+  background (its index threads now ask for a 1 MiB stack, as Windows gives by default).
+
 ## 0.1.3
 
 - **The toolchain is found for you.** The server looks for the `tiko-lang` folder in your
