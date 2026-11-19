@@ -177,6 +177,10 @@ w('    - match: ' + q(r'(?i)' + WORD_START + r'(end)\s+(get|set)' + WORD_END))
 w('      captures:')
 w('        1: keyword.control.tiko')
 w('        2: keyword.other.tiko')
+# tiko-lang's array slice, span( of T ): a type only before its `( of` list, so a variable
+# called span stays a name (docs/tiko-slices RFC-0003).
+w('    - match: ' + q(r'(?i)' + WORD_START + r'span(?=\s*\(\s*of' + WORD_END + ')'))
+w('      scope: storage.type.tiko')
 for scope, words in (('keyword.control.tiko', kw_control), ('storage.modifier.tiko', kw_modifier),
                      ('storage.type.tiko', types), ('keyword.other.tiko', kw_decl),
                      ('support.function.builtin.tiko', other)):

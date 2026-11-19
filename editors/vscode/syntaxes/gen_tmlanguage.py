@@ -132,6 +132,9 @@ g = {
                               "2": {"name": "keyword.other.tiko"}}},
                 {"name": "keyword.control.tiko", "match": r'(?i)(?<![\w.])(' + kw_control + r')(?![\w$%&!#])'},
                 {"name": "storage.modifier.tiko", "match": r'(?i)(?<![\w.])(' + kw_modifier + r')(?![\w$%&!#])'},
+                # tiko-lang's array slice, span( of T ): a type only before its `( of` list, so a
+                # variable called span stays a name (docs/tiko-slices RFC-0003).
+                {"name": "storage.type.tiko", "match": r'(?i)(?<![\w.])span(?=\s*\(\s*of(?![\w$%&!#]))'},
                 {"name": "storage.type.tiko", "match": r'(?i)(?<![\w.])(' + types + r')(?![\w$%&!#])'},
                 {"name": "keyword.other.tiko", "match": r'(?i)(?<![\w.])(' + kw_decl + r')(?![\w$%&!#])'},
                 {"name": "support.function.builtin.tiko", "match": r'(?i)(?<![\w.])(' + other + r')(?![\w$%&!#])'},

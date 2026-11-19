@@ -331,6 +331,23 @@ scope
     AssertEqInt( KindOf( "uslice" ), CMP_STRUCT, "as a type, as a UDT is" )
     AssertEqStr( DetailOf( "slice" ), "string slice of ubyte code units", "saying what it views" )
     AssertEqInt( GroupOf( "wslice" ), CMPGROUP_KEYWORD, "ranked with the language" )
+    AssertTrue ( Has( "span" ), "and span, the array slice" )
+    AssertEqInt( KindOf( "span" ), CMP_STRUCT, "as a type" )
+    AssertEqStr( DetailOf( "span" ), "array slice: span( of T ), made by a( lo to hi )", "saying what it is" )
+end scope
+
+scope
+    '' An ARRAY SLICE's element: `v( i ).` offers the element type's members, as an
+    '' array element does -- and not every member in the file, the fallback.
+    Analyse( "type Customer" & LF & "    Name_ as string" & LF & "end type" & LF & _
+             "type Order" & LF & "    Total as double" & LF & "end type" & LF & _
+             "sub Work( )" & LF & _
+             "    dim as span( of Customer ) v" & LF & _
+             "    v( 0 )." & LF & "end sub" )
+
+    CompleteAfter( "    v( 0 )." )
+    AssertTrue ( Has( "Name_" ), "span( of Customer ): v( i ). offers Customer's fields" )
+    AssertTrue ( Has( "Total" ) = false, "and not Order's" )
 end scope
 
 scope
@@ -676,6 +693,7 @@ scope
     AssertTrue( Has( "int32" ), "and tiko's typedefs" )
     AssertTrue( Has( "slice" ) andalso Has( "uslice" ) andalso Has( "wslice" ), "and its string-slice types" )
     AssertEqInt( KindOf( "wslice" ), CMP_STRUCT, "offered as types, not keywords" )
+    AssertTrue( Has( "span" ), "and its array slice, span" )
     AssertTrue( Has( "total" ) = false, "but not a local" )
     AssertTrue( Has( "Work" ) = false, "nor a procedure" )
     AssertTrue( Has( "if" ) = false andalso Has( "print" ) = false, "nor a statement keyword" )

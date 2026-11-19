@@ -116,6 +116,8 @@ contexts:
       captures:
         1: keyword.control.tiko
         2: keyword.other.tiko
+    - match: '(?i)(?<![\w.])span(?=\s*\(\s*of(?![\w$%&!#]))'
+      scope: storage.type.tiko
     - match: '(?i)(?<![\w.])(continue|elseif|return|select|endif|gosub|until|while|case|else|exit|goto|loop|next|step|then|wend|end|for|do|if|to)(?![\w$%&!#])'
       scope: keyword.control.tiko
     - match: '(?i)(?<![\w.])(protected|abstract|explicit|extends|private|virtual|public|shared|static|byref|byval|const)(?![\w$%&!#])'

@@ -13,6 +13,9 @@ const TYPE_KEYWORDS = "any boolean byte const double function integer long longi
                       "short single string sub ubyte uinteger ulong ulongint ushort " & _
                       "ustring wstring zstring"
 
+'' The detail span, the array-slice type, is offered with (RFC-0003).
+const SPAN_DETAIL = "array slice: span( of T ), made by a( lo to hi )"
+
 '' The detail a string-slice type is offered with: what it is a view of.
 private function SliceDetail( byref name_ as string ) as string
     return "string slice of " & BuiltinSliceUnit( name_ ) & " code units"
@@ -289,6 +292,17 @@ private function TypeNameAfterAs_( byref detail as string ) as string
         if( part = false ) then exit for
         word_ &= chr( c )
     next
+
+    '' AN ARRAY SLICE, span( of Customer ), is reached through `v( i ).`, and the
+    '' element is the type with the members -- as an array's element type is,
+    '' since a chain reads `v( i )` and `v` alike (RFC-0003).
+    if( lcase( word_ ) = "span" ) then
+        dim as string after = ltrim( mid( rest, len(word_) + 1 ) )
+        if( left( after, 1 ) = "(" ) then
+            after = ltrim( mid( after, 2 ) )
+            if( lcase( left( after, 3 ) ) = "of " ) then return TypeNameAfterAs_( "as " & mid( after, 4 ) )
+        end if
+    end if
 
     dim as long dotAt = instrrev( word_, "." )
     if( dotAt > 0 ) then word_ = mid( word_, dotAt + 1 )
@@ -671,6 +685,7 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
         for i as long = 0 to sls.Count( ) - 1
             AddItem( items, sls[i], CMP_STRUCT, SliceDetail( sls[i] ), "", CMPGROUP_KEYWORD )
         next
+        AddItem( items, "span", CMP_STRUCT, SPAN_DETAIL, "", CMPGROUP_KEYWORD )   '' span( of T )
 
         dim tws as containers.Array( of string ) = strings.Split( TYPE_KEYWORDS, " " )
         for i as long = 0 to tws.Count( ) - 1
@@ -722,6 +737,7 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
     for i as long = 0 to slices.Count( ) - 1
         AddItem( items, slices[i], CMP_STRUCT, SliceDetail( slices[i] ), "", CMPGROUP_KEYWORD )
     next
+    AddItem( items, "span", CMP_STRUCT, SPAN_DETAIL, "", CMPGROUP_KEYWORD )   '' span( of T ), the array slice
 
     ''    ...and its predeclared constant, nullptr, on the same terms.
     dim consts as containers.Array( of string ) = AllBuiltinConstants( )

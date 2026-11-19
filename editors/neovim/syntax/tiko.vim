@@ -42,6 +42,7 @@ syn keyword tikoBuiltin wstr
 syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"
 syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|'\)"
 syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"
+syn match   tikoType "\<span\ze\s*(\s*of\>"
 
 " Comments: an apostrophe, REM as a whole word, and the nesting block form.
 syn keyword tikoTodo contained TODO FIXME XXX NOTE

@@ -123,6 +123,16 @@
 ((identifier) @type
   (#match? @type
    "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64|slice|uslice|wslice)$"))
+
+; tiko-lang's array slice, span( of T ): a type only where its `( of` list follows
+; it -- in a declaration the list is a generic_parameters node, in an expression
+; (`span( of long )( p, n )`) the word `of` is the next name. A variable called
+; span stays a name, which is why the word is not in the list above.
+(_ (identifier) @type . (generic_parameters)
+  (#match? @type "^(?i)span$"))
+(_ (identifier) @type . (identifier) @_of
+  (#match? @type "^(?i)span$")
+  (#match? @_of "^(?i)of$"))
 ; tiko-lang's predeclared constant, `const nullptr as any ptr = 0`: a
 ; constant, as an enum member is. Not a keyword, so matched here like the
 ; type names above.

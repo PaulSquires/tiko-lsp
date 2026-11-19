@@ -156,3 +156,14 @@ declare function BuiltinSliceUnit( byref word_ as string ) as string
 
 '' The three names, lower-cased.
 declare function AllBuiltinSliceTypes( ) as containers.Array( of string )
+
+'' tiko-lang's ARRAY-SLICE type, span( of T ) (docs/tiko-slices RFC-0003): true when
+'' token `i` is the word span and `( of` follows it. Contextual, as slice is: span
+'' alone stays a name, and a file's own span type replaces tiko's.
+declare function IsSpanTypeAt( byref text_ as string, byref tokens as TokenArray, _
+                               byval i as long ) as boolean
+
+'' The element type written in span( of T ) at token `i` -- "int32", "Customer ptr"
+'' -- or "" when IsSpanTypeAt is false or the list is not closed.
+declare function SpanElementText( byref text_ as string, byref tokens as TokenArray, _
+                                  byval i as long ) as string

@@ -241,6 +241,15 @@ function BuiltinTypedefHoverMarkdown( byref text_ as string, byref tokens as Tok
 
     dim as string word_ = TokenText( text_, tok )
 
+    '' The array-slice type, span( of T ): a view of a run of T elements.
+    if( IsSpanTypeAt( text_, tokens, tokIdx ) ) then
+        dim as string el = SpanElementText( text_, tokens, tokIdx )
+        if( len(el) = 0 ) then el = "T"
+        return "```tiko" & chr(10) & "type span( of " & el & " )" & chr(10) & "```" & _
+               chr(10) & chr(10) & "*built-in type: an array slice, a view of a run of " & el & _
+               " elements, made by `a( lo to hi )` and counted from 0*"
+    end if
+
     '' A string-slice type: a view of a string's code units.
     dim as string unit_ = BuiltinSliceUnit( word_ )
     if( len(unit_) > 0 ) then

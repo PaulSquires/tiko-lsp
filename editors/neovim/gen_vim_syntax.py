@@ -73,6 +73,9 @@ w('syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"')
 # Neither word is reserved -- `set` names containers.Set -- so only there.
 w('syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|\'\)"')
 w('syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"')
+# tiko-lang's array slice, span( of T ): a type only before its `( of` list, so a variable
+# called span stays a name (docs/tiko-slices RFC-0003).
+w('syn match   tikoType "\<span\ze\s*(\s*of\>"')
 w('')
 w('" Comments: an apostrophe, REM as a whole word, and the nesting block form.')
 w('syn keyword tikoTodo contained TODO FIXME XXX NOTE')

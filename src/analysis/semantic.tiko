@@ -168,6 +168,8 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                             len( BuiltinTypedefTarget( TokenText( text_, tok ) ) ) > 0
                         if( builtinType = false ) then _
                             builtinType = len( BuiltinSliceUnit( TokenText( text_, tok ) ) ) > 0
+                        '' ...and span, the array slice, where `( of` follows it.
+                        if( builtinType = false ) then builtinType = IsSpanTypeAt( text_, tokens, i )
                         if( builtinType ) then builtinType = ( IsMemberAccess( text_, tokens, i ) = false )
                         '' ...and its predeclared constant, nullptr: coloured as a
                         '' file-level CONST is, readonly and static.

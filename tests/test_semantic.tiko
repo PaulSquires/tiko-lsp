@@ -261,6 +261,17 @@ private sub TestFixedWidthTypes( )
     AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_TYPE, "uslice in any case" )
     AssertEqInt( TypeAt( 1, 18 ), SEMTYPE_TYPE, "and as the constructor uslice( p, n )" )
     AssertEqInt( TypeAt( 2, 10 ), -1, "but not a member after a dot" )
+
+    '' span( of T ), the array slice: a type where `( of` follows it, and only there.
+    ''         0         1         2         3
+    ''         0123456789012345678901234567890123
+    Analyse( "dim as span( of int32 ) v = a( 1 to 3 )" & LF & _ '' line 0
+             "dim as SPAN( OF long ) w" & LF & _               '' line 1
+             "print span + 1" & LF )                           '' line 2
+
+    AssertEqInt( TypeAt( 0, 7 ), SEMTYPE_TYPE, "span( of T ) is a type though the file never declares it" )
+    AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_TYPE, "in any case" )
+    AssertTrue( TypeAt( 2, 6 ) <> SEMTYPE_TYPE, "but span alone is a name, not a type" )
 end sub
 
 '' ############################################################################

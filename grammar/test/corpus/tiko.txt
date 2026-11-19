@@ -386,3 +386,51 @@ var b = slice( pz, 7 )
   (identifier)
   (identifier)
   (number))
+
+================================================================================
+array slices: a( lo to hi ), span( of T ), and span as a plain name
+================================================================================
+
+dim as int32 a( 1 to 6 )
+dim as span( of int32 ) v = a( 2 to 4 )
+print v( 0 ), len( v )
+var w = span( of long )( p, 3 )
+dim as long span = 1
+
+---
+
+(source_file
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier)
+    (number)
+    (identifier)
+    (number))
+  (identifier)
+  (type_annotation
+    (identifier)
+    (generic_parameters
+      (identifier))
+    (identifier))
+  (identifier)
+  (number)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (identifier)
+  (number)
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (number))

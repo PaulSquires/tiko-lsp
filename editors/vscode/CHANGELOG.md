@@ -2,6 +2,13 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## Unreleased
+
+- **Array slices** (tiko after 0.1.5): `span( of T )` highlights as a type -- only before
+  its `( of`, so a variable called `span` stays a name -- is offered by completion with the
+  slice types, and hovers with its element. `v( i ).` completes the element type's members,
+  as an array element does.
+
 ## 0.1.5
 
 - **The version follows tiko's.** The extension, the server and the tiko toolchain now

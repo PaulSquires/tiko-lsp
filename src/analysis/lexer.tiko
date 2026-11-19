@@ -249,6 +249,44 @@ function AllBuiltinSliceTypes( ) as containers.Array( of string )
     return out_
 end function
 
+'' ############################################################################
+''  tiko-lang's ARRAY-SLICE type -- span( of T )
+''
+''  A view of a run of an array's elements: `dim v as span( of int32 ) =
+''  a( 2 to 4 )` (tiko-lang ed6da87bf, docs/tiko-slices RFC-0003). One type per
+''  element type, made by the compiler, so `span` is only a type when `( of`
+''  follows it -- a variable called span stays a variable.
+'' ############################################################################
+
+function IsSpanTypeAt( byref text_ as string, byref tokens as TokenArray, _
+                       byval i as long ) as boolean
+    if( i < 0 orelse i + 2 >= tokens.Count( ) ) then return false
+    if( tokens[i].Kind <> TK_IDENT ) then return false
+    if( lcase( TokenText( text_, tokens[i] ) ) <> "span" ) then return false
+    if( tokens[i + 1].Kind <> TK_LPAREN ) then return false
+    if( tokens[i + 2].Kind <> TK_IDENT andalso tokens[i + 2].Kind <> TK_KEYWORD ) then return false
+    return lcase( TokenText( text_, tokens[i + 2] ) ) = "of"
+end function
+
+function SpanElementText( byref text_ as string, byref tokens as TokenArray, _
+                          byval i as long ) as string
+    if( IsSpanTypeAt( text_, tokens, i ) = false ) then return ""
+    dim as long depth = 1
+    dim as string out_
+    for j as long = i + 3 to tokens.Count( ) - 1
+        dim as TokenKind k = tokens[j].Kind
+        if( k = TK_EOL ) then return ""
+        if( k = TK_LPAREN ) then depth += 1
+        if( k = TK_RPAREN ) then
+            depth -= 1
+            if( depth = 0 ) then return out_
+        end if
+        if( len(out_) > 0 ) then out_ &= " "
+        out_ &= TokenText( text_, tokens[j] )
+    next
+    return ""
+end function
+
 '' The preprocessor directives that open or close a block; every other
 '' directive is KW_PP_OTHER and the parser ignores the rest of its line.
 private function PpKeywordOf( byref word_ as string ) as FbKeyword

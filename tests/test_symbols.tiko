@@ -563,6 +563,22 @@ scope
 end scope
 
 scope
+    '' tiko-lang's array slice, span( of T ): hovered with its element.
+    Analyse( "dim as span( of Customer ptr ) v" & LF & _
+             "sub F( byval w as SPAN( of int32 ) )" & LF & "end sub" & LF & _
+             "print span" )
+
+    dim as string h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "span", 1 ) )
+    AssertContains( h, "```tiko" & LF & "type span( of Customer ptr )" & LF, "span hovers with the element it was given" )
+    AssertContains( h, "array slice", "saying what it is" )
+    AssertContains( h, "counted from 0", "and how it counts" )
+    AssertContains( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "SPAN", 1 ) ), "span( of int32 )", _
+                    "in any case" )
+    AssertEqStr( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "print span", 7 ) ), "", _
+                 "span alone, with no ( of, is not the type" )
+end scope
+
+scope
     '' tiko-lang's predeclared nullptr: asked only when a name did not resolve.
     Analyse( "dim as long ptr p = nullptr" & LF & _
              "if p = NULLPTR then p = 0" & LF & _
