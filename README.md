@@ -467,8 +467,12 @@ log file and the file you had open.
   completion offers both `MessageBoxA` and `MessageBoxW`.
 - **`#define` macros are not indexed.** Object-like macros, such as raylib's colour
   constants, do not complete.
-- **No type inference.** After `GetCustomer().` completion offers every known member,
-  not only the members of the type that `GetCustomer` returns.
+- **A `var` takes no type from its initializer.** After `.` or `->`, completion offers the
+  members of the declared type. It follows fields, calls, methods, array elements and
+  pointers: `c.ord.`, `GetCustomer().`, `c.Last().`, `arr(0).` and `p->` all narrow.
+  After `var v = GetCustomer()`, though, `v.` offers every known member.
+- **No type errors as you type.** The underlines are structural. Run **Tiko: Check**
+  (`tiko check`) to see type errors in the Problems panel.
 - **References and rename match by name.** They follow the include graph, but two
   unrelated symbols with the same name in files that can see each other are treated as
   one. Rename refuses the cases where that would be unsafe.
