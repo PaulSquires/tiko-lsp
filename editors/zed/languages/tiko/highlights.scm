@@ -122,7 +122,7 @@
 ; The built-in TYPE names, coloured as types rather than as plain keywords.
 ((identifier) @type
   (#match? @type
-   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|float32|float64|slice|uslice|wslice)$"))
+   "^(?i)(any|boolean|byte|double|integer|long|longint|short|single|string|ustring|ubyte|uinteger|ulong|ulongint|ushort|wstring|zstring|ptr|pointer|int8|uint8|int16|uint16|int32|uint32|int64|uint64|int128|uint128|float32|float64|slice|uslice|wslice)$"))
 
 ; tiko-lang's array slice, span( of T ): a type only where its `( of` list follows
 ; it -- in a declaration the list is a generic_parameters node, in an expression

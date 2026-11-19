@@ -521,6 +521,8 @@ scope
     Analyse( "dim as int32 n" & LF & _
              "dim as FLOAT32 f" & LF & _
              "dim as long float64" & LF & _
+             "dim as int128 big" & LF & _
+             "dim as UINT128 ubig" & LF & _
              "print rec.uint16" )
 
     dim as string h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "int32", 1 ) )
@@ -530,6 +532,13 @@ scope
 
     h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "FLOAT32", 1 ) )
     AssertContains( h, "type float32 as single", "in any case" )
+
+    h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "int128", 1 ) )
+    AssertContains( h, "type int128 as __tko_int128", "int128 hovers as the prelude declares it" )
+    AssertContains( h, "16 bytes", "sixteen bytes wide" )
+    h = BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "UINT128", 1 ) )
+    AssertContains( h, "type uint128 as __tko_uint128", "and uint128, in any case" )
+    AssertContains( h, "16 bytes", "the same width" )
 
     AssertEqStr( BuiltinTypedefHoverMarkdown( g_Src, g_Tokens, ByteAt( "uint16", 1 ) ), "", _
                  "never after a dot: rec.uint16 is a member" )

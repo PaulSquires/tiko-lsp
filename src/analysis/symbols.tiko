@@ -226,6 +226,7 @@ private function BuiltinTypedefBytes( byref target as string ) as long
         case "single"              : return 4
         case "longint", "ulongint" : return 8
         case "double"              : return 8
+        case "__tko_int128", "__tko_uint128" : return 16
     end select
     return 0
 end function

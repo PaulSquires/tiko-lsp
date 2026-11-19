@@ -16,10 +16,10 @@ syn keyword tikoModifier static virtual
 syn keyword tikoDeclare as asm class constructor declare destructor enum extern field function
 syn keyword tikoDeclare implements inherits interface is namespace of once operator partial property
 syn keyword tikoDeclare scope sub type union with
-syn keyword tikoType any boolean byte double float32 float64 int16 int32 int64 int8
-syn keyword tikoType integer long longint pointer ptr short single slice string ubyte
-syn keyword tikoType uint16 uint32 uint64 uint8 uinteger ulong ulongint ushort uslice ustring
-syn keyword tikoType wslice wstring zstring
+syn keyword tikoType any boolean byte double float32 float64 int128 int16 int32 int64
+syn keyword tikoType int8 integer long longint pointer ptr short single slice string
+syn keyword tikoType ubyte uint128 uint16 uint32 uint64 uint8 uinteger ulong ulongint ushort
+syn keyword tikoType uslice ustring wslice wstring zstring
 syn keyword tikoOperatorWord and andalso eqv imp mod not or orelse shl shr
 syn keyword tikoOperatorWord xor
 syn keyword tikoBuiltin __fastcall __thiscall abs access acos alias append asc asin atan2

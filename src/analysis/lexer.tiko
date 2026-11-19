@@ -159,7 +159,7 @@ end function
 '' ############################################################################
 ''  The fixed-width type names
 ''
-''  tiko-lang declares ten typedefs for every program, in its prelude:
+''  tiko-lang declares twelve typedefs for every program, in its prelude:
 ''  `type int32 as long` and its siblings. They are NOT in the table above,
 ''  and must not be: a program's own declaration of one of the names replaces
 ''  tiko's -- a variable called int32, win/basetsd.bi's `type INT32 as long`
@@ -177,6 +177,8 @@ function BuiltinTypedefTarget( byref word_ as string ) as string
         case "uint32"  : return "ulong"
         case "int64"   : return "longint"
         case "uint64"  : return "ulongint"
+        case "int128"  : return "__tko_int128"
+        case "uint128" : return "__tko_uint128"
         case "float32" : return "single"
         case "float64" : return "double"
     end select
@@ -193,6 +195,8 @@ function AllBuiltinTypedefs( ) as containers.Array( of string )
     out_.Push( "uint32" )
     out_.Push( "int64" )
     out_.Push( "uint64" )
+    out_.Push( "int128" )
+    out_.Push( "uint128" )
     out_.Push( "float32" )
     out_.Push( "float64" )
     return out_

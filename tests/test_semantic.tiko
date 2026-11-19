@@ -245,6 +245,16 @@ private sub TestFixedWidthTypes( )
     AssertEqInt( TypeAt( 2, 6 ), -1, "and a name that is not one still gets nothing" )
     AssertEqInt( TypeAt( 3, 10 ), -1, "nor does a member after a dot" )
 
+    ''         0         1
+    ''         0123456789012345678
+    Analyse( "dim as int128 a" & LF & _                '' line 0
+             "dim as UINT128 b" & LF & _               '' line 1
+             "print rec.uint128" & LF )                '' line 2
+
+    AssertEqInt( TypeAt( 0, 7 ), SEMTYPE_TYPE, "int128 is a type too" )
+    AssertEqInt( TypeAt( 1, 7 ), SEMTYPE_TYPE, "and uint128, in any case" )
+    AssertEqInt( TypeAt( 2, 10 ), -1, "but not as a member after a dot" )
+
     Analyse( "dim shared as long int32" & LF & _       '' line 0
              "int32 = 5" & LF )                        '' line 1
 
