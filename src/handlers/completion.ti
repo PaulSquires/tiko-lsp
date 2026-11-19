@@ -17,6 +17,14 @@ declare sub VisibleWithImports( byref srv as Server, byval here as long, _
 declare function FinalTypeName( byref srv as Server, byref visible as containers.Array( of long ), _
                                 byref typeName as string ) as string
 
+'' The type NAME a `var` takes from its initializer -- symbol `symIndex` of
+'' `doc` -- walked as member completion walks `GetCustomer( ).`, through the
+'' files `doc` can see. As the chain names it (an alias stays an alias), not
+'' always in its declared case; "" when it cannot be told. `ptrs` is how many
+'' pointers go with it: `var n = new Customer` is a Customer and 1.
+declare function VarInitTypeName( byref srv as Server, byval doc as TextDocumentPtr, _
+                                  byval symIndex as long, byref ptrs as long ) as string
+
 '' THE MEMBER A CHAIN REACHES: `lowerName` after the dot token `dotIdx`, where
 '' what stands left of the dot -- `lg`, `lg.Warn( ).Str( k, v )`, `f( )` -- is
 '' resolved to a type a link at a time, as member completion does. `count` is

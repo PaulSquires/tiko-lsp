@@ -137,6 +137,14 @@ declare function ReturnTypeName( byref sym as SymbolInfo ) as string
 '' anything else's declared type. What a member chain is walked by.
 declare function MemberTypeName( byref sym as SymbolInfo ) as string
 
+'' How many `ptr`s (or `pointer`s) that same type carries: `as Customer ptr` is
+'' 1, `as long` 0. What MemberTypeName drops, and a hover must not.
+declare function MemberPointerDepth( byref sym as SymbolInfo ) as long
+
+'' The pointer a `var`'s initializer adds in front of its chain: 1 for `new T`
+'' and `@x`, else 0.
+declare function InitializerPointerDepth( byref sym as SymbolInfo ) as long
+
 '' A `var`'s initializer as the member chain it is -- `var c = GetCustomer( )`
 '' gives base getcustomer and no links -- so that `c.` is resolved as
 '' `GetCustomer( ).` would be. BaseOffset is the variable's own, where the

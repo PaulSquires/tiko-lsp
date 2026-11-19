@@ -565,6 +565,14 @@ scope
     if( ic >= 0 ) then AssertEqStr( g_Syms.Items[ic].Init_, "", "a typed variable keeps none" )
     if( ib >= 0 ) then AssertEqStr( g_Syms.Items[ib].Init_, "c.ord", "the second declarator keeps its own" )
 
+    '' The pointers a hover adds after the type's name.
+    dim as long inn = g_Syms.Resolve( "n", inUse )
+    dim as long ip  = g_Syms.Resolve( "p", inUse )
+    if( inn >= 0 ) then AssertEqInt( InitializerPointerDepth( g_Syms.Items[inn] ), 1, "new T adds a pointer" )
+    if( ip >= 0 )  then AssertEqInt( InitializerPointerDepth( g_Syms.Items[ip] ), 1, "@x adds a pointer" )
+    if( iv >= 0 )  then AssertEqInt( InitializerPointerDepth( g_Syms.Items[iv] ), 0, "a call adds none" )
+
+
     CompleteAfter( "    v." )
     AssertTrue ( Has( "nm" ) andalso Has( "Last" ), "a function call: its return type's members" )
     AssertFalse( Has( "total" ), "and no other type's" )
@@ -594,6 +602,26 @@ scope
     AssertTrue ( Has( "nm" ) andalso Has( "total" ), "an expression is not read as its last operand" )
     CompleteAfter( "    k." )
     AssertTrue ( Has( "nm" ) andalso Has( "total" ), "a literal names no type" )
+end scope
+
+scope
+    Analyse( "type T" & LF & "    a as T ptr" & LF & "    b as long" & LF & "    c as T pointer ptr" & LF & _
+             "    f as function( byval x as T ptr ) as long" & LF & _
+             "    declare function Find( ) as T ptr" & LF & "    declare function Get_( ) byref as T" & LF & _
+             "end type" )
+    dim as long n_( 0 to 5 ) = { 1, 0, 2, 0, 1, 0 }
+    dim as string nm_( 0 to 5 ) = { "a", "b", "c", "f", "find", "get_" }
+    for i as long = 0 to 5
+        dim as long found = -1
+        for j as long = 0 to g_Syms.Count( ) - 1
+            if( g_Syms.Items[j].LowerName = nm_(i) ) then found = j
+        next
+        if( found >= 0 ) then
+            AssertEqInt( MemberPointerDepth( g_Syms.Items[found] ), n_(i), "pointer depth of " & nm_(i) )
+        else
+            AssertTrue( false, nm_(i) & " is a symbol" )
+        end if
+    next
 end scope
 
 scope

@@ -46,7 +46,7 @@ tiko is FreeBASIC-compatible, so the server also reads FreeBASIC-style code.
 | --- | --- |
 | **Diagnostics** | Underlines structural mistakes as you type, such as an `if` with no `end if` or an unclosed string. |
 | **Completion** | Suggests variables, procedures, types, fields after `.`, and module exports after `strings.`. |
-| **Hover** | Shows the declaration and signature of the name under the mouse. |
+| **Hover** | Shows the declaration and signature of the name under the mouse. For a `var`, the type its initializer gives it: `var c = FindCustomer( 3 )` shows `c as Customer ptr`. |
 | **Go to definition** | `F12` jumps to where a name is declared. It works across files, into `#include`d headers and into `#import`ed modules. |
 | **Find references** | `Shift+F12` lists every use of a name in the workspace. |
 | **Rename** | `F2` renames a name everywhere it is used. A rename it cannot do safely is refused, with the reason. |

@@ -194,6 +194,58 @@ private function ModuleMemberHover_( byref srv as Server, byval doc as TextDocum
     return md
 end function
 
+'' A type NAME in the case its declaration spells it: a chain can hand back
+'' `customer` (from `new Customer`), and a hover should say Customer. Looked for
+'' in this file, then in what it can see; the name as given when neither has it.
+private function DisplayTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
+                                   byref typeName as string ) as string
+    dim as string want = lcase( typeName )
+    for i as long = 0 to doc->Symbols( ).Count( ) - 1
+        dim as SymbolInfo s = doc->Symbols( ).Items[i]
+        if( s.LowerName = want andalso IsTypeSymbol( s ) ) then return s.Name_
+    next
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here >= 0 ) then
+        dim visible as containers.Array( of long )
+        VisibleWithImports( srv, here, visible )
+        for v as long = 0 to visible.Count( ) - 1
+            for t as long = 0 to srv.Index->FileSymbolCount( visible[v] ) - 1
+                dim as SymbolInfo s = srv.Index->SymbolAt( visible[v], t )
+                if( s.LowerName = want andalso IsTypeSymbol( s ) ) then return s.Name_
+            next
+        next
+    end if
+    return typeName
+end function
+
+'' THE HOVER OF A `var`: it has no `as <type>`, so its declaration line would be
+'' its bare name. When its initializer names a type -- `var c = GetCustomer( )`
+'' -- the line reads `c as Customer`, as a `dim` would, and a note says where the
+'' type came from. Any other symbol, or a `var` whose type cannot be told, is
+'' shown as it is.
+private function VarHover_( byref srv as Server, byval doc as TextDocumentPtr, _
+                            byval symIndex as long ) as string
+    dim as SymbolInfo sym = doc->Symbols( ).Items[symIndex]
+    if( sym.Kind_ <> SYM_VARIABLE orelse len(sym.Detail_) > 0 orelse len(sym.Init_) = 0 ) then
+        return SymbolHoverMarkdown( sym )
+    end if
+
+    '' Through the index, which has the type wherever it is declared and the
+    '' pointers each link carries. Hover never waits for a scan: before the
+    '' index is there, the `var` shows as it is.
+    if( IndexBuildPending( ) andalso IndexBuildReady( ) = false ) then return SymbolHoverMarkdown( sym )
+    EnsureWorkspaceIndex( srv )
+    dim as long ptrs = 0
+    dim as string typeName = VarInitTypeName( srv, doc, symIndex, ptrs )
+    if( len(typeName) = 0 ) then return SymbolHoverMarkdown( sym )
+
+    sym.Detail_ = "as " & DisplayTypeName_( srv, doc, typeName )
+    for i as long = 1 to ptrs
+        sym.Detail_ &= " ptr"
+    next
+    return SymbolHoverMarkdown( sym ) & chr(10) & chr(10) & "Type taken from its initializer."
+end function
+
 private function OnHover( byref srv as Server, _
                           byref req as RpcMessage, _
                           byref rb as JsonBuilder, _
@@ -238,7 +290,7 @@ private function OnHover( byref srv as Server, _
     if( len(markdown) > 0 ) then
         '' A module's member, answered above.
     elseif( symIndex >= 0 ) then
-        markdown = SymbolHoverMarkdown( doc->Symbols( ).Items[symIndex] )
+        markdown = VarHover_( srv, doc, symIndex )
     else
         markdown = IndexHover_( srv, doc, offset )
         if( len(markdown) = 0 ) then

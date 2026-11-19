@@ -350,11 +350,13 @@ end function
 ''
 '' A `var` in this file has no declared type and takes its initializer's,
 '' walked the same way; `depth` bounds that, so `var a = b` / `var b = a`
-'' cannot loop.
-private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
-                                 byref ctx as CompletionContext, _
-                                 byref visible as containers.Array( of long ), _
-                                 byval depth as long = 0 ) as string
+'' cannot loop. `ptrs` is how many pointers the type the walk ends on carries
+'' -- `as Customer ptr` is 1 -- which the NAME leaves out and a hover needs.
+private function ChainType_( byref srv as Server, byval doc as TextDocumentPtr, _
+                             byref ctx as CompletionContext, _
+                             byref visible as containers.Array( of long ), _
+                             byval depth as long, byref ptrs as long ) as string
+    ptrs = 0
     if( len(ctx.BaseName) = 0 ) then return ""
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return ""
@@ -375,6 +377,7 @@ private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentP
         if( srv.Index->ModuleMemberAt( here, ctx.BaseName, ctx.Chain[0], target, xh ) = 0 ) then return ""
         if( target.FileIndex < 0 ) then return ""
         typeName = MemberTypeName( srv.Index->SymbolAt( target.FileIndex, target.SymIndex ) )
+        ptrs = MemberPointerDepth( srv.Index->SymbolAt( target.FileIndex, target.SymIndex ) )
         first_ = 1
 
     else
@@ -384,10 +387,13 @@ private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentP
                 typeName = ctx.BaseName
             else
                 typeName = MemberTypeName( doc->Symbols( ).Items[b] )
+                ptrs = MemberPointerDepth( doc->Symbols( ).Items[b] )
                 if( len(typeName) = 0 andalso depth < 4 ) then
                     dim as CompletionContext ic
                     if( InitializerChain( doc->Symbols( ).Items[b], ic ) ) then
-                        typeName = ChainTypeName_( srv, doc, ic, visible, depth + 1 )
+                        dim as long inner = 0
+                        typeName = ChainType_( srv, doc, ic, visible, depth + 1, inner )
+                        ptrs = inner + InitializerPointerDepth( doc->Symbols( ).Items[b] )
                     end if
                 end if
             end if
@@ -400,6 +406,7 @@ private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentP
                     typeName = ctx.BaseName
                 case else
                     typeName = MemberTypeName( bs )
+                    ptrs = MemberPointerDepth( bs )
             end select
         end if
     end if
@@ -410,7 +417,31 @@ private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentP
         dim as long n
         if( IndexMemberOf_( srv, visible, typeName, ctx.Chain[k], true, m, n ) = false ) then return ""
         typeName = MemberTypeName( m )
+        ptrs = MemberPointerDepth( m )
     next
+    return typeName
+end function
+
+private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
+                                 byref ctx as CompletionContext, _
+                                 byref visible as containers.Array( of long ) ) as string
+    dim as long ptrs = 0
+    return ChainType_( srv, doc, ctx, visible, 0, ptrs )
+end function
+
+function VarInitTypeName( byref srv as Server, byval doc as TextDocumentPtr, _
+                          byval symIndex as long, byref ptrs as long ) as string
+    ptrs = 0
+    if( symIndex < 0 orelse symIndex >= doc->Symbols( ).Count( ) ) then return ""
+    dim as CompletionContext ic
+    if( InitializerChain( doc->Symbols( ).Items[symIndex], ic ) = false ) then return ""
+    dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
+    if( here < 0 ) then return ""
+    dim visible as containers.Array( of long )
+    VisibleWithImports( srv, here, visible )
+    dim as long inner = 0
+    dim as string typeName = ChainType_( srv, doc, ic, visible, 1, inner )
+    if( len(typeName) > 0 ) then ptrs = inner + InitializerPointerDepth( doc->Symbols( ).Items[symIndex] )
     return typeName
 end function
 

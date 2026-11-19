@@ -301,7 +301,9 @@ function DeclaredTypeName( byref sym as SymbolInfo ) as string
     return TypeNameAfterAs_( sym.Detail_ )
 end function
 
-function ReturnTypeName( byref sym as SymbolInfo ) as string
+'' What follows a procedure's parameter list -- `as Customer ptr` -- or "" for
+'' anything that is not a function, method or property.
+private function ReturnTypeText_( byref sym as SymbolInfo ) as string
     select case sym.Kind_
         case SYM_FUNCTION, SYM_METHOD, SYM_PROPERTY
         case else
@@ -331,7 +333,11 @@ function ReturnTypeName( byref sym as SymbolInfo ) as string
 
     dim as string rest = trim( iif( closeAt >= 0, mid( d, closeAt + 2 ), d ) )
     if( lcase( left( rest, 6 ) ) = "byref " ) then rest = trim( mid( rest, 7 ) )
-    return TypeNameAfterAs_( rest )
+    return rest
+end function
+
+function ReturnTypeName( byref sym as SymbolInfo ) as string
+    return TypeNameAfterAs_( ReturnTypeText_( sym ) )
 end function
 
 function MemberTypeName( byref sym as SymbolInfo ) as string
@@ -340,6 +346,47 @@ function MemberTypeName( byref sym as SymbolInfo ) as string
             return ReturnTypeName( sym )
     end select
     return DeclaredTypeName( sym )
+end function
+
+function MemberPointerDepth( byref sym as SymbolInfo ) as long
+    dim as string t
+    select case sym.Kind_
+        case SYM_FUNCTION, SYM_METHOD, SYM_PROPERTY
+            t = ReturnTypeText_( sym )
+        case else
+            t = sym.Detail_
+    end select
+    if( lcase( left( t, 3 ) ) <> "as " ) then return 0
+
+    '' Whole words only, and none inside parentheses: `as function( ) as T ptr`
+    '' is a procedure pointer, and `( of Foo ptr )` a generic's argument.
+    dim as long n = 0
+    dim as long depth = 0
+    dim as string word_
+    for i as long = 3 to len(t)
+        dim as ubyte c = iif( i < len(t), t[i], 32 )
+        dim as boolean part = ( c >= asc("a") andalso c <= asc("z") ) orelse _
+                              ( c >= asc("A") andalso c <= asc("Z") ) orelse _
+                              ( c >= asc("0") andalso c <= asc("9") ) orelse c = asc("_")
+        if( part ) then
+            word_ &= chr( c )
+        else
+            if( depth = 0 ) then
+                dim as string w = lcase( word_ )
+                if( w = "ptr" orelse w = "pointer" ) then n += 1
+            end if
+            word_ = ""
+            if( c = asc("(") ) then depth += 1
+            if( c = asc(")") andalso depth > 0 ) then depth -= 1
+        end if
+    next
+    return n
+end function
+
+function InitializerPointerDepth( byref sym as SymbolInfo ) as long
+    dim as string t = lcase( ltrim( sym.Init_ ) )
+    if( left( t, 4 ) = "new " orelse left( t, 1 ) = "@" ) then return 1
+    return 0
 end function
 
 '' The name of the symbol a member expression is reaching into, resolved to a
