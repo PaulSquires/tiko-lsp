@@ -808,6 +808,21 @@ private function AddSymbol( byref st as ParseState, byref name_ as string, _
     return st.Symbols_->Add( sym )
 end function
 
+'' A variable declared with no type -- `var c = GetCustomer( )` -- keeps its
+'' initializer, statement tokens `initFrom` to `initTo`, as Init_: it is all
+'' there is to say what `c` is. Anything with a declared type, a constant, or
+'' a declarator with no `=` keeps none.
+private sub SetVarInit_( byref st as ParseState, byval symIndex as long, _
+                         byval kind as SymbolKind, byref detail as string, _
+                         byref text_ as string, byref tokens as TokenArray, _
+                         byref stmt as containers.Array( of long ), _
+                         byval initFrom as long, byval initTo as long )
+    if( st.Symbols_ = 0 orelse symIndex < 0 ) then exit sub
+    if( kind <> SYM_VARIABLE orelse len(detail) > 0 ) then exit sub
+    if( initFrom < 0 orelse initTo < initFrom orelse initTo >= stmt.Count( ) ) then exit sub
+    st.Symbols_->Items[symIndex].Init_ = SpanText( text_, tokens, stmt[initFrom], stmt[initTo] )
+end sub
+
 '' The index of the first token of a dotted name, and its extent, starting at
 '' `from_`. Returns false when there is no name there.
 private function NameTokens( byref text_ as string, byref tokens as TokenArray, _
@@ -1046,6 +1061,9 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
     dim as long pendingName = -1
     dim as long typeFrom = -1
     dim as long typeTo = -1
+    '' Where a declarator's depth-0 `=` initializer starts; -1 for none. Kept
+    '' for a variable with no type -- a `var` -- whose type it is (Init_).
+    dim as long initFrom = -1
 
     while( k < stmt.Count( ) )
         dim as Token t = tokens[ stmt[k] ]
@@ -1087,6 +1105,10 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
                     next
                 end if
 
+            case TK_OP
+                if( depth = 0 andalso pendingName >= 0 andalso initFrom < 0 andalso _
+                    TokenText( text_, t ) = "=" ) then initFrom = k + 1
+
             case TK_COMMA
                 if( depth = 0 ) then
                     if( pendingName >= 0 ) then
@@ -1095,11 +1117,13 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
                         if( typeFrom >= 0 andalso typeTo >= typeFrom ) then
                             detail = "as " & SpanText( text_, tokens, stmt[typeFrom], stmt[typeTo] )
                         end if
-                        AddSymbol( st, TokenText( text_, n ), kind, detail, _
-                                   n.Start_, n.Length_, stmtStart, stmtEnd, isLocal )
+                        dim as long added = AddSymbol( st, TokenText( text_, n ), kind, detail, _
+                                                       n.Start_, n.Length_, stmtStart, stmtEnd, isLocal )
+                        SetVarInit_( st, added, kind, detail, text_, tokens, stmt, initFrom, k - 1 )
                     end if
                     pendingName = -1
                     expectName = true
+                    initFrom = -1
                 end if
         end select
 
@@ -1125,8 +1149,9 @@ private sub AddDeclarations( byref st as ParseState, byref text_ as string, _
             next
         end if
 
-        AddSymbol( st, TokenText( text_, n ), kind, detail, _
-                   n.Start_, n.Length_, stmtStart, stmtEnd, isLocal )
+        dim as long added = AddSymbol( st, TokenText( text_, n ), kind, detail, _
+                                       n.Start_, n.Length_, stmtStart, stmtEnd, isLocal )
+        SetVarInit_( st, added, kind, detail, text_, tokens, stmt, initFrom, stmt.Count( ) - 1 )
     end if
 end sub
 

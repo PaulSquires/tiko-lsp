@@ -355,8 +355,10 @@ end function
 '' That last one is the whole of phase 5's type knowledge: the type NAME is
 '' read out of the declaration and looked up. A CHAIN -- `GetCustomer( ).`,
 '' `lg.Warn( ).Str( "k", v ).` -- is walked a link at a time, each member's
-'' declared or return type naming the next container. It is not inference:
-'' `(a + b).` and a generic's `E` are not resolved, and fall back to the
+'' declared or return type naming the next container. A `var`, which has no
+'' declared type, takes its initializer's: `var c = GetCustomer( )` makes `c.`
+'' the chain `GetCustomer( ).` (InitializerChain). It is not inference beyond
+'' that: `(a + b).` and a generic's `E` are not resolved, and fall back to the
 '' file-wide member list.
 '' The container a TYPE NAME stands for in this file, following aliases --
 '' `type CustAlias as Customer` -- as many hops as there are, bounded so a
@@ -421,7 +423,51 @@ private function MemberChild_( byref syms as SymbolTable, byval parent as long, 
     return fallback
 end function
 
-private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as CompletionContext ) as long
+function InitializerChain( byref sym as SymbolInfo, byref ctx as CompletionContext ) as boolean
+    if( len(sym.Init_) = 0 ) then return false
+
+    '' Read as if a dot followed it: `GetCustomer( ) .` is the chain that
+    '' completion already knows how to walk. The space keeps a number from
+    '' lexing as `3.`.
+    dim as string src = sym.Init_ & " ."
+    dim tokens as TokenArray
+    dim diags as DiagnosticArray
+    LexSource( src, tokens, diags )
+
+    dim as long dotIdx = -1
+    dim as long first_ = -1
+    for i as long = 0 to tokens.Count( ) - 1
+        select case tokens[i].Kind
+            case TK_EOL, TK_EOF, TK_COMMENT
+            case else
+                if( first_ < 0 ) then first_ = i
+                dotIdx = i
+        end select
+    next
+    if( first_ < 0 orelse dotIdx <= first_ ) then return false
+    if( IsDot( src, tokens[dotIdx] ) = false ) then return false
+
+    dim as CompletionContext c
+    if( ReadMemberChain( src, tokens, dotIdx, c ) = false ) then return false
+
+    '' The chain has to BE the initializer, not its tail: `a + b` must not
+    '' read as `b`. Only `new` (`new Customer( )`) or `@` (`@c`) may stand
+    '' before it, and both leave the members of the type they name.
+    dim as string lead = lcase( TokenText( src, tokens[first_] ) )
+    if( lead = "new" orelse lead = "@" ) then first_ += 1
+    if( first_ >= dotIdx orelse tokens[first_].Start_ <> c.BaseOffset ) then return false
+
+    ctx = c
+    ctx.Kind_ = CMPCTX_MEMBER
+    '' The names in the initializer are looked up where the variable is declared.
+    ctx.BaseOffset = sym.NameStart
+    return true
+end function
+
+'' `depth` bounds the `var` initializers followed -- `var a = b` / `var b = a`
+'' must not loop.
+private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as CompletionContext, _
+                                    byval depth as long = 0 ) as long
     if( len(ctx.BaseName) = 0 ) then return -1
 
     dim as long c = -1
@@ -445,7 +491,15 @@ private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as Comp
             dim as long v = syms.Resolve( ctx.BaseName, ctx.BaseOffset )
             if( v >= 0 ) then
                 dim as string typeName = lcase( MemberTypeName( syms.Items[v] ) )
-                if( len(typeName) > 0 ) then c = ContainerNamed_( syms, typeName )
+                if( len(typeName) > 0 ) then
+                    c = ContainerNamed_( syms, typeName )
+                elseif( depth < 4 ) then
+                    '' A `var` has no declared type; its initializer's is its own.
+                    dim as CompletionContext ic
+                    if( InitializerChain( syms.Items[v], ic ) ) then
+                        c = ResolveMemberBase( syms, ic, depth + 1 )
+                    end if
+                end if
             end if
         end if
     end if

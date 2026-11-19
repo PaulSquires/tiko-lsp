@@ -137,6 +137,13 @@ declare function ReturnTypeName( byref sym as SymbolInfo ) as string
 '' anything else's declared type. What a member chain is walked by.
 declare function MemberTypeName( byref sym as SymbolInfo ) as string
 
+'' A `var`'s initializer as the member chain it is -- `var c = GetCustomer( )`
+'' gives base getcustomer and no links -- so that `c.` is resolved as
+'' `GetCustomer( ).` would be. BaseOffset is the variable's own, where the
+'' initializer's names are looked up. False when the initializer is not a
+'' plain chain (after an optional `new` or `@`): `a + b`, a literal, a cast.
+declare function InitializerChain( byref sym as SymbolInfo, byref ctx as CompletionContext ) as boolean
+
 '' Inside a method, the container it belongs to (inline or `sub T.M`); -1.
 declare function EnclosingTypeIndex( byref syms as SymbolTable, byval offset as long ) as long
 

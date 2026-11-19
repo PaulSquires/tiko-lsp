@@ -82,6 +82,12 @@ type SymbolInfo
     '' begin `#module "name"`) that is what an importer may name through the import's
     '' alias; in classic code it means nothing, as in FreeBASIC.
     IsPublic      as boolean
+
+    '' A `var`'s initializer, its tokens re-spaced as SpanText joins them --
+    '' `GetCustomer ()` for `var c = GetCustomer( )` -- since a `var` has no
+    '' `as <type>` to read its type from. Completion resolves it as a member chain (InitializerChain).
+    '' Empty for everything that has a declared type.
+    Init_         as string
 end type
 
 type SymbolArray as containers.Array( of SymbolInfo )

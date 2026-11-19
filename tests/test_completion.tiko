@@ -532,6 +532,79 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "member completion: a var takes its initializer's type" )
+
+scope
+    '' A `var` has no `as <type>`; what it was initialized with says what it is.
+    Analyse( "type Order" & LF & "    id as long" & LF & "    total as double" & LF & "end type" & LF & _
+             "type Customer" & LF & "    nm as string" & LF & "    ord as Order" & LF & _
+             "    declare function Last( ) as Order" & LF & "end type" & LF & _
+             "function GetCustomer( ) as Customer" & LF & "end function" & LF & _
+             "sub Use( )" & LF & _
+             "    dim as Customer c" & LF & _
+             "    var v = GetCustomer( )" & LF & _
+             "    var w = c.Last( )" & LF & _
+             "    var n = new Customer" & LF & _
+             "    var p = @c" & LF & _
+             "    var q = v" & LF & _
+             "    var a = 1, b = c.ord" & LF & _
+             "    var s = c.nm & GetCustomer( ).nm" & LF & _
+             "    var k = 42" & LF & _
+             "    v." & LF & "    w." & LF & "    n->" & LF & "    p->" & LF & "    q." & LF & _
+             "    b." & LF & "    s." & LF & "    k." & LF & _
+             "end sub" )
+
+    '' The parser keeps the initializer, and only for an untyped variable.
+    '' Looked up from inside Use( ), where the locals are in scope.
+    dim as long inUse = instr( g_Src, "    k." )
+    dim as long iv = g_Syms.Resolve( "v", inUse )
+    dim as long ic = g_Syms.Resolve( "c", inUse )
+    dim as long ib = g_Syms.Resolve( "b", inUse )
+    AssertTrue( iv >= 0 andalso ic >= 0 andalso ib >= 0, "v, c and b are symbols" )
+    if( iv >= 0 ) then AssertEqStr( g_Syms.Items[iv].Init_, "GetCustomer ()", "its Init_ is the initializer, as SpanText spaces it" )
+    if( ic >= 0 ) then AssertEqStr( g_Syms.Items[ic].Init_, "", "a typed variable keeps none" )
+    if( ib >= 0 ) then AssertEqStr( g_Syms.Items[ib].Init_, "c.ord", "the second declarator keeps its own" )
+
+    CompleteAfter( "    v." )
+    AssertTrue ( Has( "nm" ) andalso Has( "Last" ), "a function call: its return type's members" )
+    AssertFalse( Has( "total" ), "and no other type's" )
+
+    CompleteAfter( "    w." )
+    AssertTrue ( Has( "total" ), "a method call: its return type's members" )
+    AssertFalse( Has( "nm" ), "not the receiver's" )
+
+    CompleteAfter( "    n->" )
+    AssertTrue ( Has( "nm" ), "new T: T's members, through ->" )
+    AssertFalse( Has( "total" ), "only T's" )
+
+    CompleteAfter( "    p->" )
+    AssertTrue ( Has( "nm" ), "@x: x's type's members" )
+    AssertFalse( Has( "total" ), "only its" )
+
+    CompleteAfter( "    q." )
+    AssertTrue ( Has( "Last" ), "a var of a var: followed through" )
+    AssertFalse( Has( "id" ), "to the first one's type" )
+
+    CompleteAfter( "    b." )
+    AssertTrue ( Has( "id" ) andalso Has( "total" ), "a field: its declared type's members" )
+    AssertFalse( Has( "nm" ), "not its owner's" )
+
+    '' Not a plain chain: no type is claimed, and the file-wide guess stands.
+    CompleteAfter( "    s." )
+    AssertTrue ( Has( "nm" ) andalso Has( "total" ), "an expression is not read as its last operand" )
+    CompleteAfter( "    k." )
+    AssertTrue ( Has( "nm" ) andalso Has( "total" ), "a literal names no type" )
+end scope
+
+scope
+    '' Two vars made of each other must not loop.
+    Analyse( "type T" & LF & "    f as long" & LF & "end type" & LF & _
+             "sub Use( )" & LF & "    var a = b" & LF & "    var b = a" & LF & "    a." & LF & "end sub" )
+    CompleteAfter( "    a." )
+    AssertTrue( Has( "f" ), "a cycle of vars ends, and falls back" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 
 scope

@@ -347,9 +347,14 @@ end function
 '' named directly, `this`), else among what it includes, else it is an
 '' import's alias and its first link is the module's member. Every later link
 '' is the previous type's member, by its declared or return type.
+''
+'' A `var` in this file has no declared type and takes its initializer's,
+'' walked the same way; `depth` bounds that, so `var a = b` / `var b = a`
+'' cannot loop.
 private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentPtr, _
                                  byref ctx as CompletionContext, _
-                                 byref visible as containers.Array( of long ) ) as string
+                                 byref visible as containers.Array( of long ), _
+                                 byval depth as long = 0 ) as string
     if( len(ctx.BaseName) = 0 ) then return ""
     dim as long here = srv.Index->IndexOfUri( doc->Uri( ) )
     if( here < 0 ) then return ""
@@ -379,6 +384,12 @@ private function ChainTypeName_( byref srv as Server, byval doc as TextDocumentP
                 typeName = ctx.BaseName
             else
                 typeName = MemberTypeName( doc->Symbols( ).Items[b] )
+                if( len(typeName) = 0 andalso depth < 4 ) then
+                    dim as CompletionContext ic
+                    if( InitializerChain( doc->Symbols( ).Items[b], ic ) ) then
+                        typeName = ChainTypeName_( srv, doc, ic, visible, depth + 1 )
+                    end if
+                end if
             end if
         else
             dim as IndexHit hit
