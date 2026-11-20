@@ -2,9 +2,14 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
-## Unreleased
+## 0.1.6
 
-- **Array slices** (tiko after 0.1.5): `span( of T )` highlights as a type -- only before
+- **Linux on arm64**: a `linux-arm64` extension and server, for tiko's new aarch64 Linux
+  toolchain (Ubuntu 22.04 and later).
+- **`int128` and `uint128`** complete, colour and hover as built-in types (16 bytes).
+- **A `var` takes its initializer's type**: after `var v = GetCustomer( )`, `v.` completes
+  `Customer`'s members, and hovering `v` shows the type, also through `new` and `@`.
+- **Array slices**: `span( of T )` highlights as a type -- only before
   its `( of`, so a variable called `span` stays a name -- is offered by completion with the
   slice types, and hovers with its element. `v( i ).` completes the element type's members,
   as an array element does.
