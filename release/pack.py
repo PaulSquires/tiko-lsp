@@ -62,7 +62,7 @@ def text_bytes(text, crlf):
 
 
 def main(argv):
-    if len(argv) != 4 or argv[1] not in ("windows", "linux", "macos"):
+    if len(argv) != 4 or argv[1] not in ("windows", "linux", "linux-arm64", "macos"):
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
     plat, binary, toolchain = argv[1], Path(argv[2]), argv[3]
@@ -85,7 +85,8 @@ def main(argv):
             for name, data, _ in members:
                 z.writestr(zipfile.ZipInfo(name, time.localtime(now)[:6]), data, zipfile.ZIP_DEFLATED)
     else:
-        out = DIST / ("tiko-lsp-linux-x86_64.tar.gz" if plat == "linux" else "tiko-lsp-macos-arm64.tar.gz")
+        out = DIST / {"linux": "tiko-lsp-linux-x86_64.tar.gz", "linux-arm64": "tiko-lsp-linux-arm64.tar.gz",
+                      "macos": "tiko-lsp-macos-arm64.tar.gz"}[plat]
         with tarfile.open(out, "w:gz") as t:
             for name, data, mode in members:
                 info = tarfile.TarInfo(name)

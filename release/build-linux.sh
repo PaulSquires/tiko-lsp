@@ -1,6 +1,8 @@
 #!/bin/bash
 # ============================================================================
 #  Release build, Linux x64: dist/tiko-lsp-linux-x86_64.tar.gz
+#  On aarch64 Linux:          dist/tiko-lsp-linux-arm64.tar.gz (tiko-lang
+#  docs/tiko-linux-arm64 L5: the Lima VM tk22, Ubuntu 22.04 arm64, glibc 2.35)
 #
 #  Run from Git Bash on Windows, through WSL:
 #
@@ -25,9 +27,14 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/tiko-linux/bin/tiko"}
+# THE HOST'S ARCHITECTURE decides the archive, the toolchain and the dynamic loader allowed.
+case "$(uname -m)" in
+    aarch64) PLAT=linux-arm64;  TCDIR=tiko-linux-arm64; LOADER=ld-linux-aarch64.so.1 ;;
+    *)       PLAT=linux-x86_64; TCDIR=tiko-linux;       LOADER=ld-linux-x86-64.so.2 ;;
+esac
+TIKO=${TIKO_LSP_TIKO:-"$ROOT/../tiko-lang/toolchains/$TCDIR/bin/tiko"}
 GLIBC_MAX=${TIKO_LSP_GLIBC_MAX:-2.35}
-ALLOWED_NEEDED="ld-linux-x86-64.so.2 libc.so.6 libdl.so.2 libm.so.6 libpthread.so.0 libtinfo.so.6"
+ALLOWED_NEEDED="$LOADER libc.so.6 libdl.so.2 libm.so.6 libpthread.so.0 libtinfo.so.6"
 
 W=$HOME/tklsp-release
 LOG=$HOME/tklsp-release-suite.log
@@ -39,7 +46,7 @@ for tool in python3 strip objdump tar; do
 done
 [ -x "$TIKO" ] || { echo "tiko not found: $TIKO -- set TIKO_LSP_TIKO" >&2; exit 1; }
 
-echo "== tiko-lsp $VERSION -- Linux x64 release build on $(. /etc/os-release; echo "$PRETTY_NAME"), $(ldd --version | head -1)"
+echo "== tiko-lsp $VERSION -- $PLAT release build on $(. /etc/os-release; echo "$PRETTY_NAME"), $(ldd --version | head -1)"
 
 echo "== [1/5] copy to $W"
 rm -rf "$W"
@@ -92,6 +99,6 @@ echo "== [4/5] smoke"
 python3 "$ROOT/release/smoke.py" "$W/stage/tiko-lsp" "$VERSION"
 
 echo "== [5/5] pack"
-python3 "$ROOT/release/pack.py" linux "$W/stage/tiko-lsp" "$(dirname "$(dirname "$TIKO")")"
+python3 "$ROOT/release/pack.py" "$( [ "$PLAT" = linux-arm64 ] && echo linux-arm64 || echo linux )" "$W/stage/tiko-lsp" "$(dirname "$(dirname "$TIKO")")"
 
-echo "== done: dist/tiko-lsp-linux-x86_64.tar.gz ($VERSION, GLIBC_$NEWEST)"
+echo "== done: dist/tiko-lsp-$PLAT.tar.gz ($VERSION, GLIBC_$NEWEST)"

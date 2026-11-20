@@ -76,6 +76,7 @@ export TIKO_TEST_EXTENSIONS_DIR=$(native "$WORK/extensions")
 if [ -z "${TIKO_TEST_TOOLCHAIN:-}" ]; then
     if [ $WIN -eq 1 ]; then TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-windows"
     elif [ "$(uname -s)" = Darwin ]; then TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-macos"
+    elif [ "$(uname -m)" = aarch64 ]; then TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-linux-arm64"
     else TC_DEFAULT="$ROOT/../tiko-lang/toolchains/tiko-linux"; fi
     [ -d "$TC_DEFAULT/inc" ] && TIKO_TEST_TOOLCHAIN=$(native "$(cd "$TC_DEFAULT" && pwd)")
 fi
