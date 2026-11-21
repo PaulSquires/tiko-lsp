@@ -27,6 +27,8 @@
 (with_block            "with"      @open "end with"      @close)
 (asm_block             "asm"       @open "end asm"       @close)
 (select_statement      "select"    @open "end select"    @close)
+(match_statement       "match"     @open "end match"     @close)
+(match_expression      "match"     @open "end match"     @close)
 
 ; ZED WILL NOT TAKE A FIELD OR A KEYWORD INSIDE `enum_definition`.
 ; `(enum_definition name: ...)` and `(enum_definition "enum" ...)` are both

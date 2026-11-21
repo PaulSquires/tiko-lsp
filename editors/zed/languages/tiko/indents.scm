@@ -22,6 +22,9 @@
   (else_clause)
   (select_statement)
   (case_clause)
+  (match_statement)
+  (match_expression)
+  (match_arm)
   (for_statement)
   (while_statement)
   (do_statement)
@@ -34,7 +37,7 @@
   "end destructor" "end operator"
   "end type" "end union" "end enum" "end namespace" "end extern"
   "end scope" "end with" "end select" "end asm" "end if" "end while"
-  "end class" "end interface"
+  "end class" "end interface" "end match"
   "endif" "wend" "loop" "next"
   "else" "elseif" "case"
   "#endmacro"
