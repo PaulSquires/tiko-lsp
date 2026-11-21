@@ -755,6 +755,10 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
                  "", CMPGROUP_KEYWORD )
     next
 
+    ''    ...and `match`, tiko-lang's pattern match: no reserved word, so not in the
+    ''    keyword table, but a statement and a value all the same.
+    AddItem( items, "match", CMP_KEYWORD, "keyword", "", CMPGROUP_KEYWORD )
+
     '' 4. the language. Last, because a reserved word is almost never what the
     ''    user is reaching for, and there are 247 of them.
     dim words as containers.Array( of string ) = AllKeywords( )

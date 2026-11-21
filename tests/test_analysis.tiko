@@ -310,6 +310,33 @@ AssertClean( "do" & LF & "SELECT Channel   ' wait" & LF & "case receive from ctx
              "end select" & LF & "loop", "select channel is case-insensitive and takes a comment" )
 AssertClean( "dim as long channel" & LF & "select case channel" & LF & "case 1" & LF & "end select", _
              "a variable called channel still selects" )
+'' tiko-lang's match (RFC-0001-match): a statement with `case` arms, a value with
+'' `pattern => value` arms, both closed by `end match`. `match` is no reserved word.
+AssertClean( "match l" & LF & "case Red : print 1" & LF & "case Amber, Green" & LF & "print 2" & LF & _
+             "case else" & LF & "end match", "a match statement" )
+AssertClean( "sub S( byval p as Point )" & LF & "    match p" & LF & _
+             "        case Point( 0, 0 ) : print 0" & LF & "        case Point( x, y ) if x = y : print x" & LF & _
+             "        case Point( x, y )" & LF & "            select case x" & LF & "                case 1" & LF & _
+             "            end select" & LF & "    end match" & LF & "end sub", _
+             "a match statement in a sub, with guards and a select inside an arm" )
+AssertClean( "match s" & LF & "case c as Circle : print c->r" & LF & "case starts ""load "" rest : print rest" & LF & _
+             "case is < 0, 1 to 9" & LF & "case ( true, any )" & LF & "case else" & LF & "end match", _
+             "type, starts, is, range and tuple patterns" )
+AssertClean( "dim as string s = match code" & LF & "    200 => ""OK""" & LF & "    301, 302 => ""Redirect""" & LF & _
+             "    Point( x, y ) if x = y => ""d""" & LF & "    else => ""Unknown""" & LF & "end match", _
+             "a match used as a value, its else arm included" )
+AssertClean( "print ""x""; Foo( match n" & LF & "    1 => ""a""" & LF & "    else => ""b""" & LF & "end match )", _
+             "a match as an argument: the call closes after end match" )
+AssertClean( "x = match n" & LF & "    1 => match m" & LF & "        2 => ""c""" & LF & "        else => ""d""" & LF & _
+             "    end match" & LF & "    else => ""e""" & LF & "end match & ""!""", _
+             "a match nested in an arm's value, and end match continuing the statement" )
+AssertClean( "dim as long match = 3" & LF & "match = match + 1" & LF & "print match" & LF & "end match", _
+             "match as a variable, and end match as END with its value" )
+AssertClean( "select case y" & LF & "case 1" & LF & "match 10" & LF & "case 2" & LF & "match 20" & LF & "end select", _
+             "match 10 inside a SELECT arm is a call: the end select comes first" )
+AssertClean( "r = match( 21 )" & LF & "print r", "match( 21 ) is a call" )
+AssertOneCode( "sub S( )" & LF & "    match n" & LF & "        case 1" & LF & "end sub", DIAGCODE_MISMATCHED_END, _
+               "a match with no end match" )
 AssertClean( "while x" & LF & "wend", "while/wend" )
 AssertClean( "do" & LF & "loop until x", "do/loop" )
 AssertClean( "do while x" & LF & "loop", "do while/loop" )

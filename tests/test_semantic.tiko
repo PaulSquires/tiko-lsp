@@ -329,6 +329,27 @@ private sub TestPropertySections( )
     AssertTrue( TypeAt( 9, 4 ) <> SEMTYPE_KEYWORD, "nor x = set" )
 end sub
 
+private sub TestMatch( )
+    TestGroup( "tiko-lang's match, a contextual keyword" )
+
+    Analyse( "dim as long match = 3" & LF & _              '' line 0
+             "match l" & LF & _                            '' line 1
+             "    case starts ""x"" r : print r" & LF & _  '' line 2
+             "end match" & LF & _                          '' line 3
+             "s = match code" & LF & _                     '' line 4
+             "    1 => 2" & LF & _                         '' line 5
+             "end match" & LF & _                          '' line 6
+             "match = match + 1" & LF )                    '' line 7
+
+    AssertEqInt( TypeAt( 1, 0 ), SEMTYPE_KEYWORD, "match opening a statement match is a keyword" )
+    AssertEqInt( TypeAt( 2, 9 ), SEMTYPE_KEYWORD, "starts after case is a keyword" )
+    AssertEqInt( TypeAt( 3, 4 ), SEMTYPE_KEYWORD, "and after end" )
+    AssertEqInt( TypeAt( 4, 4 ), SEMTYPE_KEYWORD, "match used as a value is a keyword" )
+    AssertTrue( TypeAt( 0, 12 ) <> SEMTYPE_KEYWORD, "a variable called match is not" )
+    AssertTrue( TypeAt( 7, 0 ) <> SEMTYPE_KEYWORD, "nor match = ..." )
+    AssertTrue( TypeAt( 7, 8 ) <> SEMTYPE_KEYWORD, "nor ... = match + 1" )
+end sub
+
 '' ############################################################################
 ''  Main
 '' ############################################################################
@@ -342,5 +363,6 @@ TestUtf16( )
 TestFixedWidthTypes( )
 TestBuiltinConstants( )
 TestPropertySections( )
+TestMatch( )
 
 end TestSummary( "semantic tokens" )
