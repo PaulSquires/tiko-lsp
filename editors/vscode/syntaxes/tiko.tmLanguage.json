@@ -190,6 +190,52 @@
           }
         },
         {
+          "match": "(?i)^\\s*(match)(?=\\s+(?![-+*/\\\\^&]?=|as(?![\\w$%&!#])|[',):])\\S)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            }
+          }
+        },
+        {
+          "match": "(?i)(?:(?<=[=(,])|(?<=(?<![\\w.])return)|(?<=(?<![\\w.])print)|(?<=(?<![\\w.])then))\\s*(match)(?=\\s+(?![-+*/\\\\^&]?=|as(?![\\w$%&!#])|[',):])\\S)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            }
+          }
+        },
+        {
+          "match": "(?i)(?<![\\w.])(end)\\s+(match)(?![\\w$%&!#])",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            },
+            "2": {
+              "name": "keyword.control.tiko"
+            }
+          }
+        },
+        {
+          "match": "(?i)(?<![\\w.])(case)\\s+(starts)(?=\\s+[^\\s=,:'<>])",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            },
+            "2": {
+              "name": "keyword.control.tiko"
+            }
+          }
+        },
+        {
+          "match": "(?i)^\\s*(starts)(?=\\s+[^\\s=,:'<>].*=>)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.tiko"
+            }
+          }
+        },
+        {
           "match": "(?i)^\\s*(get|set)\\s*(?=$|')",
           "captures": {
             "1": {

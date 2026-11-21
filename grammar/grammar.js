@@ -136,7 +136,9 @@ module.exports = grammar({
   ],
 
   // `interface` and `inherits` are contextual: src/scanner.c says why.
-  externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw, $._partial_kw],
+  // `match` too, as two tokens -- the statement form and the value form.
+  externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw, $._partial_kw,
+                   $._match_kw, $._match_value_kw],
 
   word: $ => $._word,
 
@@ -673,6 +675,7 @@ module.exports = grammar({
       $.if_statement,
       $.if_single_line,
       $.select_statement,
+      $.match_statement,
       $.for_statement,
       $.while_statement,
       $.do_statement,
@@ -772,9 +775,66 @@ module.exports = grammar({
     case_clause: $ => prec.right(seq(
       kw('case'),
       // `case else` is not a value, and `else` is structural everywhere else.
-      choice(kw('else'), seq(optional(kw('is')), field('value', $._atoms))),
+      choice(kw('else'), seq(
+        optional(kw('is')),
+        field('value', $._atoms),
+        // A MATCH arm may carry a GUARD: `case Point( x, y ) if x = y`. Only a match
+        // writes one; a select's arm never meets an `if` before its line ends.
+        optional(seq(kw('if'), field('guard', $._atoms))),
+      )),
       repeat($._body_item),
     )),
+
+    // `match` (tiko-lang RFC-0001-match), the STATEMENT form: a subject, then
+    // `case` arms -- the select's own -- each with a body of any length.
+    //
+    //     match l
+    //         case Red : print "stop"
+    //         case Point( x, y ) if x = y
+    //             print "diagonal"
+    //     end match
+    //
+    // `match` is contextual, not reserved: the external scanner makes the
+    // keyword only where the next line starts with `case` and an `end match`
+    // follows (src/scanner.c), so every name use of the word parses as before.
+    // `end match` is one token like every closer, so inside a match it wins
+    // over `end <value>` by longest match; outside one it is END with `match`
+    // as the exit code, as fbc reads it.
+    match_statement: $ => seq(
+      alias($._match_kw, 'match'),
+      field('subject', $._atoms),
+      $._line_end,
+      repeat(choice($._terminator, $.preproc)),
+      repeat($.case_clause),
+      endkw('match'),
+    ),
+
+    // The VALUE form, an atom like a lambda: the subject runs to the end of
+    // the line, each following line is an arm, and the closer may carry on the
+    // statement -- `end match & "!"`, `end match )`.
+    //
+    //     dim s = match code
+    //         200, 204   => "OK"
+    //         is >= 500  => "Server error"
+    //         else       => "Unknown"
+    //     end match
+    match_expression: $ => seq(
+      alias($._match_value_kw, 'match'),
+      field('subject', $._atoms),
+      '\n',
+      repeat(choice('\n', $.match_arm)),
+      endkw('match'),
+    ),
+
+    // `pattern [if guard] => value`. `=>` is its own token here, above the
+    // operator of the same spelling, so a pattern's atoms stop at it.
+    match_arm: $ => seq(
+      choice(kw('else'), seq(optional(kw('is')), field('pattern', $._atoms))),
+      optional(seq(kw('if'), field('guard', $._atoms))),
+      alias(token(prec(1, '=>')), '=>'),
+      field('value', $._atoms),
+      '\n',
+    ),
 
     // `next` may name the variable it closes -- `next i` -- and the line after
     // it may equally start with a name. The closer takes the longer reading,
@@ -945,6 +1005,9 @@ module.exports = grammar({
       // block everywhere else; here it is the constructor, and what follows the
       // word is the only thing that tells them apart.
       $.type_literal,
+
+      // `dim s = match code` ... `end match` -- a match used as a value.
+      $.match_expression,
     ),
 
     // Higher precedence than a bare `.` atom followed by whatever comes next:
@@ -1024,7 +1087,9 @@ module.exports = grammar({
     // Inside a pair of parentheses a comma is just punctuation again.
     // A LAMBDA IS AN ARGUMENT as often as it is a value: `CountIf( xs( ), function(
     // byval n as int32 ) as boolean` ... `end function )`, and `sub[ byref t ]( )`.
-    _nested_atom: $ => choice($._value_atom, ',', $._lambda_arg, $.procedure_type),
+    // A MATCH is an argument too: `Foo( match x` ... `end match )`.
+    _nested_atom: $ => choice($._value_atom, ',', $._lambda_arg, $.procedure_type,
+                              $.match_expression),
 
     // ...and the SAME HEADER WITHOUT A BODY is a procedure's SHAPE: `byval cb as sub
     // cdecl( byval as long ) ptr`, `procptr( Over, sub( byval as double ) )`. Only

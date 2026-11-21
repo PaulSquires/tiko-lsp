@@ -1,0 +1,352 @@
+================================================================================
+match statement: case arms, bodies, guards, starts, type patterns, case else
+================================================================================
+
+match l
+    case Red
+        print "stop"
+    case Amber : print "slow"
+    case Point( x, y ) if x = y
+        print x
+    case starts "load " rest : print rest
+    case any as Rect : print "rect"
+    case is >= 500
+    case else : print "other"
+end match
+--------------------------------------------------------------------------------
+
+(source_file
+  (match_statement
+    (identifier)
+    (case_clause
+      (identifier)
+      (identifier)
+      (string))
+    (case_clause
+      (identifier)
+      (identifier)
+      (string))
+    (case_clause
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier))
+    (case_clause
+      (identifier)
+      (string)
+      (identifier)
+      (identifier)
+      (identifier))
+    (case_clause
+      (identifier)
+      (type_annotation
+        (identifier))
+      (identifier)
+      (string))
+    (case_clause
+      (operator)
+      (number))
+    (case_clause
+      (identifier)
+      (string))))
+
+================================================================================
+match statement nested in a case body, and inside a select arm
+================================================================================
+
+sub F( byval p as Pair )
+    match p.a
+        case 1
+            match p.b
+                case 2 : print "1,2"
+                case else
+            end match
+        case else
+            select case p.b
+                case 1
+                    match p.a
+                        case 0 : print 0
+                    end match
+            end select
+    end match
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)))
+    (match_statement
+      (identifier)
+      (member_access
+        (identifier))
+      (case_clause
+        (number)
+        (match_statement
+          (identifier)
+          (member_access
+            (identifier))
+          (case_clause
+            (number)
+            (identifier)
+            (string))
+          (case_clause)))
+      (case_clause
+        (select_statement
+          (identifier)
+          (member_access
+            (identifier))
+          (case_clause
+            (number)
+            (match_statement
+              (identifier)
+              (member_access
+                (identifier))
+              (case_clause
+                (number)
+                (identifier)
+                (number)))))))))
+
+================================================================================
+match expression: dim, return, print, every pattern shape, else
+================================================================================
+
+dim as ustring s = match code
+    200        => "OK"
+    301, 302   => "Redirect"
+    400 to 499 => "Client error"
+    is >= 500  => "Server error"
+    else       => "Unknown"
+end match
+function Area( byval s as Shape ptr ) as double
+    return match s
+        c as Circle => 3 * c->r * c->r
+        ( true, any ) => 1
+        Point( x, y ) if x = y => x
+        else => 0
+    end match
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (match_expression
+    (identifier)
+    (match_arm
+      (number)
+      (string))
+    (match_arm
+      (number)
+      (number)
+      (string))
+    (match_arm
+      (number)
+      (identifier)
+      (number)
+      (string))
+    (match_arm
+      (operator)
+      (number)
+      (string))
+    (match_arm
+      (string)))
+  (procedure_definition
+    (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier)
+        (identifier)))
+    (identifier)
+    (identifier)
+    (match_expression
+      (identifier)
+      (match_arm
+        (identifier)
+        (type_annotation
+          (identifier))
+        (number)
+        (operator)
+        (identifier)
+        (member_access
+          (identifier))
+        (operator)
+        (identifier)
+        (member_access
+          (identifier)))
+      (match_arm
+        (identifier)
+        (identifier)
+        (number))
+      (match_arm
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier))
+      (match_arm
+        (number)))))
+
+================================================================================
+match expression: continued closers, nesting, two in a statement, an argument
+================================================================================
+
+print "two:"; match n
+    7 => "a"
+    else => "b"
+end match; match n + 1
+    8 => "c"
+    else => "d"
+end match
+print match pr
+    Pair( a, b ) if a > b => "down"
+    Pair( a, b ) => match b - a
+        1 => "step"
+        else => "jump"
+    end match
+end match & "!"
+Foo( match x
+    1 => "one"
+    else => "many"
+end match )
+if c then print match n
+    7 => "seven"
+    else => "other"
+end match
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (string)
+  (operator)
+  (match_expression
+    (identifier)
+    (match_arm
+      (number)
+      (string))
+    (match_arm
+      (string)))
+  (operator)
+  (match_expression
+    (identifier)
+    (operator)
+    (number)
+    (match_arm
+      (number)
+      (string))
+    (match_arm
+      (string)))
+  (identifier)
+  (match_expression
+    (identifier)
+    (match_arm
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier)
+      (operator)
+      (identifier)
+      (string))
+    (match_arm
+      (identifier)
+      (identifier)
+      (identifier)
+      (match_expression
+        (identifier)
+        (operator)
+        (identifier)
+        (match_arm
+          (number)
+          (string))
+        (match_arm
+          (string)))))
+  (operator)
+  (string)
+  (identifier)
+  (match_expression
+    (identifier)
+    (match_arm
+      (number)
+      (string))
+    (match_arm
+      (string)))
+  (if_single_line
+    (identifier)
+    (identifier)
+    (match_expression
+      (identifier)
+      (match_arm
+        (number)
+        (string))
+      (match_arm
+        (string)))))
+
+================================================================================
+match as a name: variable, sub, call, paren-less call in a select arm, END
+================================================================================
+
+dim as long match = 7
+match = match + 1
+sub match( byval x as long )
+end sub
+match( 21 )
+select case y
+    case 1
+        match 10
+    case 2
+        match 20
+end select
+match 5
+print "var"; match
+end match
+--------------------------------------------------------------------------------
+
+(source_file
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (number)
+  (identifier)
+  (identifier)
+  (operator)
+  (number)
+  (procedure_definition
+    (qualified_name
+      (identifier))
+    (parameter_list
+      (parameter
+        (identifier)
+        (identifier))))
+  (identifier)
+  (number)
+  (select_statement
+    (identifier)
+    (case_clause
+      (number)
+      (identifier)
+      (number))
+    (case_clause
+      (number)
+      (identifier)
+      (number)))
+  (identifier)
+  (number)
+  (identifier)
+  (string)
+  (operator)
+  (identifier)
+  (end_with_value
+    (identifier)))

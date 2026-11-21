@@ -25,7 +25,7 @@
   "declare"
   "type" "union" "enum" "namespace" "extern" "scope" "with" "asm"
   "if" "then" "else" "elseif" "endif"
-  "select" "case" "is"
+  "select" "case" "is" "match"
   "for" "next" "while" "wend" "do" "loop" "until"
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
@@ -40,8 +40,21 @@
   "end destructor" "end operator"
   "end type" "end union" "end enum" "end namespace" "end extern"
   "end scope" "end with" "end select" "end asm" "end if" "end while"
-  "end class" "end interface"
+  "end class" "end interface" "end match"
 ] @keyword
+
+; MATCH (tiko-lang RFC-0001-match). `match` and `end match` are tokens of their
+; own, made only where the word opens a match (src/scanner.c). `starts` is a
+; name to the grammar -- it is not reserved -- so it is coloured only inside an
+; arm: before a string in a `case` arm, anywhere in a `=>` arm. The `=>` arm
+; takes no anchor because one there costs ~3s of query analysis.
+"=>" @operator
+(case_clause
+  (identifier) @keyword . (string)
+  (#match? @keyword "^[sS][tT][aA][rR][tT][sS]$"))
+(match_arm
+  (identifier) @keyword
+  (#match? @keyword "^[sS][tT][aA][rR][tT][sS]$"))
 
 (end_statement) @keyword
 

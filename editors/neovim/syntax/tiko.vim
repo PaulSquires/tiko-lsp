@@ -40,6 +40,11 @@ syn keyword tikoBuiltin swap tab tan threadcall trim typeof ubound ucase unlock 
 syn keyword tikoBuiltin using va_first var varptr view wchr width window winput write
 syn keyword tikoBuiltin wstr
 syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"
+syn match   tikoControl "^\s*\zsmatch\ze\s\+\%([-+*/\\^&]\==\|as\>\|[',):]\)\@!\S"
+syn match   tikoControl "\%([=(,]\s*\|\<\%(return\|print\|then\)\s\+\)\@<=match\ze\s\+\%([-+*/\\^&]\==\|as\>\|[',):]\)\@!\S"
+syn match   tikoControl "\(\<end\s\+\)\@<=match\>"
+syn match   tikoControl "\(\<case\s\+\)\@<=starts\ze\s\+[^ \t=,:'<>]"
+syn match   tikoControl "^\s*\zsstarts\ze\s\+[^ \t=,:'<>].*=>"
 syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|'\)"
 syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"
 syn match   tikoType "\<span\ze\s*(\s*of\>"

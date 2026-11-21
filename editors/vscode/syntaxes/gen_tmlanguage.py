@@ -37,6 +37,16 @@ def alt(words):
     # longest first, so `andalso` is tried before `and`
     return '|'.join(sorted(set(words), key=lambda w: (-len(w), w)))
 
+# `match` (tiko-lang, RFC-0001-match) is contextual, not reserved: it opens a match only when
+# a subject follows it -- not `match = 3`, `match += 1`, `match( 21 )`, `match:`, `dim match as
+# long`, `dim as long match`. MATCH_SUBJ is "whitespace, then a subject": anything but an
+# assignment, `as`, a comment, a separator or the end of the line.
+MATCH_SUBJ = r"(?=\s+(?![-+*/\\^&]?=|as(?![\w$%&!#])|[',):])\S)"
+# Where a value-form match may start: after `=`, `(`, `,` or `return` / `print` / `then`.
+# One fixed-width lookbehind per word, so the pattern stays portable (Oniguruma and Python).
+MATCH_VALUE_AT = (r'(?:(?<=[=(,])|(?<=(?<![\w.])return)|(?<=(?<![\w.])print)'
+                  r'|(?<=(?<![\w.])then))\s*')
+
 kw_control = alt(w for w in structural if w in control)
 kw_modifier = alt(modifiers)
 kw_decl = alt(w for w in structural if w not in control and w not in modifiers)
@@ -122,6 +132,23 @@ g = {
                 {"match": r'(?i)(?<![\w.])(select)\s+(channel)(?![\w$%&!#])',
                  "captures": {"1": {"name": "keyword.control.tiko"},
                               "2": {"name": "keyword.control.tiko"}}},
+                # `match` (RFC-0001-match), contextual: only where it opens a match -- at a
+                # statement's start or where a value goes, with a subject after it -- and
+                # `end match` as one closer. MATCH_SUBJ above says what a subject is.
+                {"match": r'(?i)^\s*(match)' + MATCH_SUBJ,
+                 "captures": {"1": {"name": "keyword.control.tiko"}}},
+                {"match": r'(?i)' + MATCH_VALUE_AT + r'(match)' + MATCH_SUBJ,
+                 "captures": {"1": {"name": "keyword.control.tiko"}}},
+                {"match": r'(?i)(?<![\w.])(end)\s+(match)(?![\w$%&!#])',
+                 "captures": {"1": {"name": "keyword.control.tiko"},
+                              "2": {"name": "keyword.control.tiko"}}},
+                # `starts "pre" rest`, a match pattern: after `case`, or at the start of a
+                # value arm (a line with `=>` in it). Elsewhere `starts` is a name.
+                {"match": r"(?i)(?<![\w.])(case)\s+(starts)(?=\s+[^\s=,:'<>])",
+                 "captures": {"1": {"name": "keyword.control.tiko"},
+                              "2": {"name": "keyword.control.tiko"}}},
+                {"match": r"(?i)^\s*(starts)(?=\s+[^\s=,:'<>].*=>)",
+                 "captures": {"1": {"name": "keyword.control.tiko"}}},
                 # A property's sections, `get` / `set` alone on their line and `end get` /
                 # `end set`: neither word is reserved -- `set` names containers.Set -- so
                 # only there.

@@ -53,6 +53,16 @@ types = alt(builtin_types)
 WORD_END = r'(?![\w$%&!#])'
 WORD_START = r'(?<![\w.])'
 
+# `match` (tiko-lang, RFC-0001-match) is contextual, not reserved: it opens a match only when
+# a subject follows it -- not `match = 3`, `match += 1`, `match( 21 )`, `match:`, `dim match as
+# long`, `dim as long match`. MATCH_SUBJ is "whitespace, then a subject": anything but an
+# assignment, `as`, a comment, a separator or the end of the line. Same patterns as
+# ../vscode/syntaxes/gen_tmlanguage.py.
+MATCH_SUBJ = r"(?=\s+(?![-+*/\\^&]?=|as" + WORD_END + r"|[',):])\S)"
+# Where a value-form match may start: after `=`, `(`, `,` or `return` / `print` / `then`.
+MATCH_VALUE_AT = (r'(?:(?<=[=(,])|(?<=(?<![\w.])return)|(?<=(?<![\w.])print)'
+                  r'|(?<=(?<![\w.])then))\s*')
+
 
 def q(s):
     """A YAML single-quoted scalar."""
@@ -168,6 +178,27 @@ w('    - match: ' + q(r'(?i)' + WORD_START + r'(select)\s+(channel)' + WORD_END)
 w('      captures:')
 w('        1: keyword.control.tiko')
 w('        2: keyword.control.tiko')
+# `match` (RFC-0001-match), contextual: only where it opens a match -- at a statement's start
+# or where a value goes, with a subject after it -- and `end match` as one closer.
+w('    - match: ' + q(r'(?i)^\s*(match)' + MATCH_SUBJ))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('    - match: ' + q(r'(?i)' + MATCH_VALUE_AT + r'(match)' + MATCH_SUBJ))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('    - match: ' + q(r'(?i)' + WORD_START + r'(end)\s+(match)' + WORD_END))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('        2: keyword.control.tiko')
+# `starts "pre" rest`, a match pattern: after `case`, or at the start of a value arm (a line
+# with `=>` in it). Elsewhere `starts` is a name.
+w('    - match: ' + q(r"(?i)" + WORD_START + r"(case)\s+(starts)(?=\s+[^\s=,:'<>])"))
+w('      captures:')
+w('        1: keyword.control.tiko')
+w('        2: keyword.control.tiko')
+w('    - match: ' + q(r"(?i)^\s*(starts)(?=\s+[^\s=,:'<>].*=>)"))
+w('      captures:')
+w('        1: keyword.control.tiko')
 # A property's sections, `get` / `set` alone on their line and `end get` / `end set`: neither
 # word is reserved -- `set` names containers.Set -- so only there.
 w('    - match: ' + q(r"(?i)^\s*(get|set)\s*(?=$|')"))
