@@ -67,6 +67,10 @@ enum FbKeyword
     KW_WHILE
     KW_DO
     KW_FOR
+    '' tiko-lang's `match` (RFC-0001-match). CONTEXTUAL, so never in the keyword
+    '' table: the word lexes as an identifier and parser.tiko recognises it by
+    '' spelling, where a subject follows and the next line is an arm.
+    KW_MATCH
 
     '' block closers and clauses
     KW_END

@@ -49,6 +49,7 @@ private function BlockWord( byval kw as FbKeyword ) as string
         case KW_WHILE       : return "while"
         case KW_DO          : return "do"
         case KW_FOR         : return "for"
+        case KW_MATCH       : return "match"
         case KW_PP_IF       : return "#if"
         case KW_PP_MACRO    : return "#macro"
     end select
@@ -444,6 +445,116 @@ end function
 ''  `cast( function( ) as long, p )` fails that second test on the comma, which
 ''  is exactly the false positive it is there to prevent.
 '' ----------------------------------------------------------------------------
+'' ----------------------------------------------------------------------------
+''  match -- tiko-lang's pattern match (docs/tiko-comparison RFC-0001-match)
+''
+''  `match` is CONTEXTUAL there: a variable, a sub, a function, a label and
+''  `end match` as END with an exit code all keep their meaning. It is the
+''  keyword only where a subject follows it and the NEXT statement is an arm:
+''
+''      match l                    dim s = match code
+''          case Red : ...             200 => "OK"
+''          case else : ...            else => "other"
+''      end match                  end match
+''
+''  A statement match also needs its `end match` to come before an `end select`
+''  closing a SELECT opened outside it: `match 10` followed by `case 2` inside a
+''  SELECT arm is a paren-less call to a `sub match` (fbc accepts it, measured).
+'' ----------------------------------------------------------------------------
+
+private function IsWord_( byref text_ as string, byref t as Token, byref w as string ) as boolean
+    if( t.Kind <> TK_IDENT ) then return false
+    return lcase( TokenText( text_, t ) ) = w
+end function
+
+'' The first token of the next statement at or after `i` -- line ends,
+'' separators and comments skipped -- or -1 at the end.
+private function NextStmtAt_( byref tokens as TokenArray, byval i as long ) as long
+    while( i < tokens.Count( ) )
+        select case tokens[i].Kind
+            case TK_EOL, TK_COLON, TK_COMMENT : i += 1
+            case TK_EOF                       : return -1
+            case else                         : return i
+        end select
+    wend
+    return -1
+end function
+
+'' Does the statement that starts at `i` hold a top-level `=>`?
+private function StmtHasArrow_( byref text_ as string, byref tokens as TokenArray, byval i as long ) as boolean
+    dim as long depth = 0
+    while( i < tokens.Count( ) )
+        dim as Token t = tokens[i]
+        select case t.Kind
+            case TK_EOL, TK_EOF : return false
+            case TK_COLON
+                if( depth = 0 ) then return false
+            case TK_LPAREN, TK_LBRACKET : depth += 1
+            case TK_RPAREN, TK_RBRACKET : depth -= 1
+            case TK_OP
+                if( depth = 0 andalso TokenText( text_, t ) = "=>" ) then return true
+        end select
+        i += 1
+    wend
+    return false
+end function
+
+'' From the statement at `i` on: is the match closed before an `end select` that
+'' closes a SELECT opened outside it? The end of the input counts as yes -- an
+'' unclosed match is then reported as one.
+private function MatchCloses_( byref text_ as string, byref tokens as TokenArray, byval i as long ) as boolean
+    dim as long md = 0, sd = 0
+    dim as boolean atStart = true
+    while( i < tokens.Count( ) )
+        dim as Token t = tokens[i]
+        select case t.Kind
+            case TK_EOF : return true
+            case TK_EOL, TK_COLON : atStart = true : i += 1 : continue while
+            case TK_COMMENT : i += 1 : continue while
+        end select
+        if( atStart ) then
+            atStart = false
+            if( t.Kind = TK_KEYWORD andalso t.Kw = KW_SELECT ) then
+                sd += 1
+            elseif( t.Kind = TK_KEYWORD andalso t.Kw = KW_END andalso i + 1 < tokens.Count( ) ) then
+                dim as Token n = tokens[i + 1]
+                if( n.Kind = TK_KEYWORD andalso n.Kw = KW_SELECT ) then
+                    if( sd = 0 ) then return false
+                    sd -= 1
+                elseif( IsWord_( text_, n, "match" ) ) then
+                    if( md = 0 ) then return true
+                    md -= 1
+                end if
+            elseif( IsWord_( text_, t, "match" ) ) then
+                '' A nested statement match: its own 'end match' must not end this scan.
+                dim as long e = i
+                while( e < tokens.Count( ) andalso tokens[e].Kind <> TK_EOL andalso tokens[e].Kind <> TK_EOF )
+                    e += 1
+                wend
+                dim as long nx = NextStmtAt_( tokens, e )
+                if( nx >= 0 ) then
+                    if( tokens[nx].Kind = TK_KEYWORD andalso tokens[nx].Kw = KW_CASE ) then md += 1
+                end if
+            end if
+        end if
+        i += 1
+    wend
+    return true
+end function
+
+private function HasOpenFrame_( byref st as ParseState, byval kw as FbKeyword ) as boolean
+    for k as long = st.Stack_.Count( ) - 1 to 0 step -1
+        if( st.Stack_[k].Kind_ = kw ) then return true
+    next
+    return false
+end function
+
+private function TopKind_( byref st as ParseState ) as FbKeyword
+    if( st.Stack_.Count( ) = 0 ) then return KW_NONE
+    return st.Stack_[ st.Stack_.Count( ) - 1 ].Kind_
+end function
+
+
 private function IsLambdaHeader( byref text_ as string, byref tokens as TokenArray, _
                                  byref stmt as containers.Array( of long ), byval at_ as long ) as boolean
     if( at_ + 1 >= stmt.Count( ) ) then return false
@@ -1170,6 +1281,53 @@ end function
 '' ----------------------------------------------------------------------------
 ''  The statement walker
 '' ----------------------------------------------------------------------------
+'' The names an arm's pattern BINDS, as tiko-lang's rewrite reads them, made locals
+'' so hover, definition and completion find them: a bare name inside a tuple or
+'' UDT pattern -- `Point( x, y )`, `( a, any )` -- except true / false / nullptr;
+'' `x` in `x as Circle`; `rest` in `starts "load " rest`. `Red`, `Light.Red` and
+'' `Point` are values and types, and bind nothing. tokens[stmt[from_]] up to
+'' tokens[stmt[to_ - 1]] is the pattern, without its guard.
+private sub AddMatchBindings_( byref st as ParseState, byref text_ as string, _
+                               byref tokens as TokenArray, byref stmt as containers.Array( of long ), _
+                               byval from_ as long, byval to_ as long, _
+                               byval stmtStart as long, byval stmtEnd as long )
+    dim as long depth = 0
+    dim as long k = from_
+    while( k < to_ )
+        dim as Token t = tokens[ stmt[k] ]
+        select case t.Kind
+            case TK_LPAREN, TK_LBRACKET : depth += 1 : k += 1 : continue while
+            case TK_RPAREN, TK_RBRACKET : depth -= 1 : k += 1 : continue while
+            case TK_IDENT
+            case else : k += 1 : continue while
+        end select
+        dim as string w = lcase( TokenText( text_, t ) )
+        dim as long nameAt = -1
+        if( w = "starts" andalso k + 2 < to_ ) then
+            dim as Token lit = tokens[ stmt[k + 1] ]
+            if( (lit.Kind = TK_STRING orelse lit.Kind = TK_IDENT) andalso tokens[ stmt[k + 2] ].Kind = TK_IDENT ) then
+                nameAt = k + 2
+            end if
+        elseif( k + 1 < to_ andalso tokens[ stmt[k + 1] ].Kind = TK_KEYWORD andalso _
+                lcase( TokenText( text_, tokens[ stmt[k + 1] ] ) ) = "as" ) then
+            nameAt = k
+        elseif( depth >= 1 andalso k > from_ andalso k + 1 < to_ ) then
+            dim as TokenKind pk = tokens[ stmt[k - 1] ].Kind
+            dim as TokenKind nk = tokens[ stmt[k + 1] ].Kind
+            if( (pk = TK_LPAREN orelse pk = TK_COMMA) andalso (nk = TK_RPAREN orelse nk = TK_COMMA) ) then
+                if( (w <> "true") andalso (w <> "false") andalso (w <> "nullptr") ) then nameAt = k
+            end if
+        end if
+        if( nameAt >= 0 ) then
+            dim as Token n = tokens[ stmt[nameAt] ]
+            AddSymbol( st, TokenText( text_, n ), SYM_VARIABLE, "", _
+                       n.Start_, n.Length_, stmtStart, stmtEnd, InProcedure( st ) )
+            k = nameAt
+        end if
+        k += 1
+    wend
+end sub
+
 sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                  byref diags as DiagnosticArray, byval symbols as SymbolTable ptr, _
                  byval indents as IndentTrace ptr )
@@ -1476,6 +1634,36 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
             end if
         end if
 
+        '' `match l` with `case` arms on the following lines: tiko-lang's match
+        '' STATEMENT. Its arms are read as a SELECT's are (KW_CASE below), and
+        '' their pattern's bindings are locals.
+        dim as boolean openedMatch = false
+        if( head.Kind = TK_IDENT andalso first_ + 1 < stmt.Count( ) ) then
+            if( IsWord_( text_, head, "match" ) ) then
+                dim as Token subj = tokens[ stmt[first_ + 1] ]
+                dim as boolean nameUse = false
+                if( subj.Kind = TK_OP ) then
+                    select case TokenText( text_, subj )
+                        case "=", "=>", ".", "->", "+=", "-=", "*=", "/=", "\=", "^=", "&="
+                            nameUse = true
+                    end select
+                end if
+                if( nameUse = false ) then
+                    dim as long nx = NextStmtAt_( tokens, i )
+                    if( nx >= 0 ) then
+                        dim as boolean armNext = ( tokens[nx].Kind = TK_KEYWORD andalso tokens[nx].Kw = KW_CASE )
+                        if( armNext = false andalso tokens[nx].Kind = TK_KEYWORD andalso tokens[nx].Kw = KW_END ) then
+                            if( nx + 1 < tokens.Count( ) ) then armNext = IsWord_( text_, tokens[nx + 1], "match" )
+                        end if
+                        if( armNext andalso MatchCloses_( text_, tokens, nx ) ) then
+                            PushBlock( st, KW_MATCH, "", head )
+                            openedMatch = true
+                        end if
+                    end if
+                end if
+            end if
+        end if
+
         '' -- keyword-headed statements -------------------------------------------
         ''
         '' A statement headed by anything else falls THROUGH to the lambda scan
@@ -1575,7 +1763,14 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
             '' -- closers --------------------------------------------------------
             case KW_END
                 '' `end` alone, or `end 1`, is the END STATEMENT and closes
-                '' nothing. Only `end <block-keyword>` is a closer.
+                '' nothing. Only `end <block-keyword>` is a closer -- and `end
+                '' match`, but only where a match is open: elsewhere it is END with
+                '' a variable called match as the exit code, which fbc accepts.
+                if( hasNext andalso nextTok.Kind = TK_IDENT andalso HasOpenFrame_( st, KW_MATCH ) ) then
+                    if( IsWord_( text_, nextTok, "match" ) ) then
+                        CloseBlock( st, diags, KW_MATCH, head, "end match" )
+                    end if
+                end if
                 if( hasNext andalso nextKw <> KW_NONE ) then
                     select case nextKw
                         case KW_SUB, KW_FUNCTION, KW_PROPERTY, KW_CONSTRUCTOR, _
@@ -1608,6 +1803,10 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
 
             '' -- clauses that must be inside something ---------------------------
             case KW_ELSE
+                if( TopKind_( st ) = KW_MATCH andalso StmtHasArrow_( text_, tokens, stmt[first_] ) ) then
+                    '' `else => value`, the last arm of a match used as a value.
+                    exit select
+                end if
                 RequireInside( st, diags, KW_IF, head, "else" )
                 '' A clause opens nothing, so the stack is unchanged: ELSE goes
                 '' back out to its IF, and what follows returns to the body.
@@ -1616,7 +1815,19 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 RequireInside( st, diags, KW_IF, head, "elseif" )
                 Mark( st, head.Start_, IndentDepth( st ) - 1, IndentDepth( st ) )
             case KW_CASE
-                RequireInside( st, diags, KW_SELECT, head, "case" )
+                if( TopKind_( st ) = KW_MATCH ) then
+                    '' A match statement's arm: the pattern runs to its 'if' guard.
+                    dim as long patEnd = stmt.Count( )
+                    for k as long = first_ + 1 to stmt.Count( ) - 1
+                        dim as Token g = tokens[ stmt[k] ]
+                        if( g.Kind = TK_KEYWORD andalso g.Kw = KW_IF ) then patEnd = k : exit for
+                    next
+                    dim as Token lastT = tokens[ stmt[ stmt.Count( ) - 1 ] ]
+                    AddMatchBindings_( st, text_, tokens, stmt, first_ + 1, patEnd, _
+                                       head.Start_, lastT.Start_ + lastT.Length_ )
+                else
+                    RequireInside( st, diags, KW_SELECT, head, "case" )
+                end if
 
                 '' CASE is indented INSIDE its SELECT -- the house style of
                 '' every file in this repository -- and its arm one further.
@@ -1985,6 +2196,55 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 openedLambda = true
             end if
         next
+
+        '' -- a match used as a VALUE: `dim s = match code`, `return match x`,
+        '' `Foo( match x` -- the subject to the end of the line, and the next
+        '' statement an arm, `pattern => value`. Its parentheses, like a lambda's,
+        '' close after `end match`.
+        if( openedMatch = false ) then
+            for k as long = first_ + 1 to stmt.Count( ) - 2
+                dim as Token t = tokens[ stmt[k] ]
+                if( IsWord_( text_, t, "match" ) = false ) then continue for
+                dim as Token prev_ = tokens[ stmt[k - 1] ]
+                dim as boolean inExpression = false
+                select case prev_.Kind
+                    case TK_COMMA, TK_LPAREN : inExpression = true
+                    case TK_OP
+                        dim as string op_ = TokenText( text_, prev_ )
+                        inExpression = ( op_ <> "." andalso op_ <> "->" )
+                    case TK_KEYWORD          : inExpression = ( prev_.Kw = KW_OTHER orelse prev_.Kw = KW_THEN )
+                end select
+                if( inExpression = false ) then continue for
+                dim as long nx = NextStmtAt_( tokens, i )
+                if( nx >= 0 andalso StmtHasArrow_( text_, tokens, nx ) ) then
+                    PushBlock( st, KW_MATCH, "", t )
+                    openedLambda = true
+                    openedMatch = true
+                    exit for
+                end if
+            next
+        end if
+
+        '' An arm of a match used as a value: `Point( x, y ) if x = y => ...`.
+        if( openedMatch = false andalso TopKind_( st ) = KW_MATCH ) then
+            dim as long arrowAt = -1, guardAt = -1, d = 0
+            for k as long = first_ to stmt.Count( ) - 1
+                dim as Token t = tokens[ stmt[k] ]
+                select case t.Kind
+                    case TK_LPAREN, TK_LBRACKET : d += 1
+                    case TK_RPAREN, TK_RBRACKET : d -= 1
+                    case TK_KEYWORD
+                        if( d = 0 andalso t.Kw = KW_IF andalso guardAt < 0 ) then guardAt = k
+                    case TK_OP
+                        if( d = 0 andalso TokenText( text_, t ) = "=>" ) then arrowAt = k : exit for
+                end select
+            next
+            if( arrowAt > first_ ) then
+                dim as Token lastT = tokens[ stmt[ stmt.Count( ) - 1 ] ]
+                AddMatchBindings_( st, text_, tokens, stmt, first_, iif( guardAt >= 0, guardAt, arrowAt ), _
+                                   tokens[ stmt[first_] ].Start_, lastT.Start_ + lastT.Length_ )
+            end if
+        end if
 
         if( unclosedParens > 0 andalso unclosedAt >= 0 ) then
             if( openedLambda ) then

@@ -96,6 +96,32 @@ private sub TestIndent( )
                  "end select" & LF, _
                  "CASE is indented inside its SELECT, and its arm one further" )
 
+    AssertEqStr( Fmt( "match l" & LF & _
+                      "case Red" & LF & _
+                      "print 1" & LF & _
+                      "case else : print 2" & LF & _
+                      "end match" & LF ), _
+                 "match l" & LF & _
+                 "    case Red" & LF & _
+                 "        print 1" & LF & _
+                 "    case else : print 2" & LF & _
+                 "end match" & LF, _
+                 "a match statement indents like select case" )
+
+    AssertEqStr( Fmt( "sub S( )" & LF & _
+                      "dim as string s = match code" & LF & _
+                      "200 => ""OK""" & LF & _
+                      "else => ""other""" & LF & _
+                      "end match" & LF & _
+                      "end sub" & LF ), _
+                 "sub S( )" & LF & _
+                 "    dim as string s = match code" & LF & _
+                 "        200 => ""OK""" & LF & _
+                 "        else => ""other""" & LF & _
+                 "    end match" & LF & _
+                 "end sub" & LF, _
+                 "a match used as a value indents its arms" )
+
     AssertEqStr( Fmt( "select channel" & LF & _
                       "case receive v from ch" & LF & _
                       "print v" & LF & _

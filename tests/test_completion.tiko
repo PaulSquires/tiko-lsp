@@ -336,6 +336,8 @@ scope
     AssertTrue ( Has( "span" ), "and span, the array slice" )
     AssertEqInt( KindOf( "span" ), CMP_STRUCT, "as a type" )
     AssertEqStr( DetailOf( "span" ), "array slice: span( of T ), made by a( lo to hi )", "saying what it is" )
+    AssertTrue ( Has( "match" ), "and match, tiko-lang's pattern match" )
+    AssertEqInt( KindOf( "match" ), CMP_KEYWORD, "as a keyword" )
 end scope
 
 scope

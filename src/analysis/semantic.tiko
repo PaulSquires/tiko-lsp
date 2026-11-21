@@ -98,6 +98,85 @@ private function IsSetSection( byref text_ as string, byref tokens as TokenArray
     return false
 end function
 
+'' tiko-lang's MATCH (RFC-0001-match): `match` is no reserved word -- a variable, a
+'' sub and a function may be called match -- so it is a keyword only where it opens
+'' or closes a match, the same rule parser.tiko applies: after `end`; at a
+'' statement's start with a subject after it and a `case` arm on the next line; in
+'' an expression with a subject after it and a `pattern => value` arm on the next
+'' line. And `starts`, the prefix pattern, right after `case`.
+private function NextLineStart_( byref tokens as TokenArray, byval i as long ) as long
+    while( i < tokens.Count( ) andalso tokens[i].Kind <> TK_EOL andalso tokens[i].Kind <> TK_EOF )
+        i += 1
+    wend
+    while( i < tokens.Count( ) )
+        select case tokens[i].Kind
+            case TK_EOL, TK_COLON, TK_COMMENT : i += 1
+            case TK_EOF                       : return -1
+            case else                         : return i
+        end select
+    wend
+    return -1
+end function
+
+private function LineHasArrow_( byref text_ as string, byref tokens as TokenArray, byval i as long ) as boolean
+    dim as long depth = 0
+    while( i < tokens.Count( ) )
+        dim as Token t = tokens[i]
+        select case t.Kind
+            case TK_EOL, TK_EOF : return false
+            case TK_LPAREN, TK_LBRACKET : depth += 1
+            case TK_RPAREN, TK_RBRACKET : depth -= 1
+            case TK_OP
+                if( depth = 0 andalso TokenText( text_, t ) = "=>" ) then return true
+        end select
+        i += 1
+    wend
+    return false
+end function
+
+private function IsMatchKeyword( byref text_ as string, byref tokens as TokenArray, byval i as long ) as boolean
+    dim as string w = lcase( TokenText( text_, tokens[i] ) )
+    if( w <> "match" andalso w <> "starts" ) then return false
+    dim as Token prev_
+    dim as boolean hasPrev = ( i > 0 )
+    if( hasPrev ) then prev_ = tokens[i - 1]
+    if( w = "starts" ) then
+        return hasPrev andalso prev_.Kind = TK_KEYWORD andalso lcase( TokenText( text_, prev_ ) ) = "case"
+    end if
+    if( hasPrev andalso prev_.Kind = TK_KEYWORD andalso prev_.Kw = KW_END ) then return true
+    if( i + 1 >= tokens.Count( ) ) then return false
+    dim as Token subj = tokens[i + 1]
+    select case subj.Kind
+        case TK_EOL, TK_EOF, TK_COLON, TK_COMMENT, TK_COMMA, TK_RPAREN : return false
+        case TK_OP
+            select case TokenText( text_, subj )
+                case "=", "=>", ".", "->", "+=", "-=", "*=", "/=", "\=", "^=", "&=" : return false
+            end select
+    end select
+    dim as long nx = NextLineStart_( tokens, i )
+    if( nx < 0 ) then return false
+    dim as boolean atStart = ( hasPrev = false )
+    if( hasPrev ) then atStart = ( prev_.Kind = TK_EOL orelse prev_.Kind = TK_COLON )
+    if( atStart ) then
+        if( tokens[nx].Kind = TK_KEYWORD andalso lcase( TokenText( text_, tokens[nx] ) ) = "case" ) then return true
+        if( tokens[nx].Kind = TK_KEYWORD andalso tokens[nx].Kw = KW_END andalso nx + 1 < tokens.Count( ) ) then
+            return lcase( TokenText( text_, tokens[nx + 1] ) ) = "match"
+        end if
+        return false
+    end if
+    select case prev_.Kind
+        case TK_COMMA, TK_LPAREN
+        case TK_OP
+            dim as string op_ = TokenText( text_, prev_ )
+            if( op_ = "." orelse op_ = "->" ) then return false
+        case TK_KEYWORD
+            if( prev_.Kw <> KW_OTHER andalso prev_.Kw <> KW_THEN ) then return false
+        case else
+            return false
+    end select
+    return LineHasArrow_( text_, tokens, nx )
+end function
+
 sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                            byref tokens as TokenArray, byref symbols as SymbolTable, _
                            byref out_ as SemTokenArray )
@@ -154,7 +233,7 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                 '' The declaration site first: it is exact, and it is the only
                 '' place the `declaration` modifier is honest.
                 dim as long packed = 0
-                if( IsSetSection( text_, tokens, i ) ) then
+                if( IsSetSection( text_, tokens, i ) orelse IsMatchKeyword( text_, tokens, i ) ) then
                     packed = SEMTYPE_KEYWORD * 16
                 elseif( declAt.TryGet( tok.Start_, packed ) = false ) then
                     if( byName.TryGet( lcase( TokenText( text_, tok ) ), packed ) = false ) then

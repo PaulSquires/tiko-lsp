@@ -295,6 +295,40 @@ end scope
 '' ----------------------------------------------------------------------------
 TestGroup( "extraction: locals and parameters" )
 
+'' tiko-lang's match: what a pattern binds is a local of the procedure.
+scope
+    Analyse( "sub Show( byval p as Point, byval s as Shape ptr, byref cmd as string )" & LF & _
+             "    match p" & LF & _
+             "        case Point( 0, ry ) : print ry" & LF & _
+             "        case Point( px, py ) if px = py : print px" & LF & _
+             "        case Light.Red, Green" & LF & _
+             "    end match" & LF & _
+             "    dim as double a = match s" & LF & _
+             "        c as Circle => c->r" & LF & _
+             "        ( true, tb ) => 1" & LF & _
+             "        else => 0" & LF & _
+             "    end match" & LF & _
+             "    match cmd" & LF & _
+             "        case starts ""load "" rest : print rest" & LF & _
+             "        case else" & LF & _
+             "    end match" & LF & _
+             "end sub" )
+    dim as long sh = IndexOfName( "Show" )
+    dim as string binds(0 to 5) = { "ry", "px", "py", "c", "tb", "rest" }
+    for k as long = 0 to 5
+        dim as long b = IndexOfName( binds(k) )
+        AssertTrue( b >= 0, "a match pattern binds " & binds(k) )
+        if( b >= 0 ) then
+            AssertTrue ( S_(b).IsLocal, binds(k) & " is a local" )
+            AssertEqInt( S_(b).Parent, sh, binds(k) & " belongs to the procedure" )
+        end if
+    next
+    AssertEqInt( IndexOfName( "Point" ), -1, "the type in Point( x, y ) binds nothing" )
+    AssertEqInt( IndexOfName( "Green" ), -1, "a value pattern binds nothing" )
+    AssertEqInt( IndexOfName( "true" ), -1, "true inside a tuple pattern is a value" )
+    AssertEqInt( IndexOfName( "Circle" ), -1, "the class of a type pattern binds nothing" )
+end scope
+
 '' A TYPED VARIADIC is a parameter like any other (tiko-lang RFC-0001).
 scope
     Analyse( "function Sum( byval k as long, nums() as const long ... ) as long" & LF & _
