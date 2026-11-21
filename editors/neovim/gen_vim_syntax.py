@@ -69,6 +69,19 @@ for group, ws in groups:
 # `select channel` (std/tasks): `channel` is no keyword elsewhere, so only here.
 # A keyword beats a match at the same column, so the match starts AT `channel`.
 w('syn match   tikoControl "\(\<select\s\+\)\@<=channel\>"')
+# `match` (tiko-lang, RFC-0001-match) is contextual, not reserved: it opens a match only when a
+# subject follows it -- not `match = 3`, `match += 1`, `match( 21 )`, `match:`, `dim match as
+# long`, `dim as long match`. A subject is anything but an assignment, `as`, a comment, a
+# separator or the end of the line. A match opens at a statement's start, or where a value goes:
+# after `=`, `(`, `,` or `return` / `print` / `then`. `end match` is one closer.
+MATCH_SUBJ = r"\ze\s\+\%([-+*/\\^&]\==\|as\>\|[',):]\)\@!\S"
+w(r'syn match   tikoControl "^\s*\zsmatch' + MATCH_SUBJ + '"')
+w(r'syn match   tikoControl "\%([=(,]\s*\|\<\%(return\|print\|then\)\s\+\)\@<=match' + MATCH_SUBJ + '"')
+w(r'syn match   tikoControl "\(\<end\s\+\)\@<=match\>"')
+# `starts "pre" rest`, a match pattern: after `case`, or at the start of a value arm (a line
+# with `=>` in it). Elsewhere `starts` is a name.
+w(r'''syn match   tikoControl "\(\<case\s\+\)\@<=starts\ze\s\+[^ \t=,:'<>]"''')
+w(r'''syn match   tikoControl "^\s*\zsstarts\ze\s\+[^ \t=,:'<>].*=>"''')
 # A property's sections: `set` alone on its line, and after `end` (`get` is a keyword already).
 # Neither word is reserved -- `set` names containers.Set -- so only there.
 w('syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|\'\)"')
