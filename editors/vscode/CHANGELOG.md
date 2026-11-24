@@ -2,9 +2,9 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
-## Unreleased
+## 0.1.7
 
-- **`match`** (tiko after 0.1.6): a match statement (`case` arms) and a match used as a value
+- **`match`**: a match statement (`case` arms) and a match used as a value
   (`pattern => value` arms) open a block closed by `end match`, so their arms are no longer
   "case outside a select" errors, format like `select case`, and `Foo( match x` … `end match )`
   balances. `match` and `starts` colour as keywords only there -- a variable, sub or function
