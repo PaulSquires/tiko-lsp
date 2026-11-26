@@ -2,6 +2,10 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## 0.1.8
+
+- No changes to the server or the extension: this version follows tiko 0.1.8.
+
 ## 0.1.7
 
 - **`match`**: a match statement (`case` arms) and a match used as a value

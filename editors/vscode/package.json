@@ -2,7 +2,7 @@
   "name": "tiko-lang",
   "displayName": "tiko-lang",
   "description": "Language support for tiko, a compiled, statically typed programming language: diagnostics, completion, hover, go to definition, references, rename, formatting and more. The language server is included.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "PaulSquires",
   "homepage": "https://tiko-lang.net/",
   "license": "MIT",
