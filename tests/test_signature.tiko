@@ -385,6 +385,28 @@ private sub TestIntrinsics( )
     AssertTrue( ContextAfter( "MID( s, ", ctx ), "MID, in capitals, too" )
     Analyse( "x = if( a, " )
     AssertTrue( ContextAfter( "if( a, ", ctx ) = false, "a keyword with no codetip is no callee" )
+
+    '' tiko-lang RFC 0019's intrinsics: no reserved words, codetips all the same.
+    AssertEqStr( IntrinsicCodetip( "hashvalue" ), "HashValue(k)", "hashvalue" )
+    AssertEqStr( IntrinsicCodetip( "EnumName" ), "EnumName(v)", "enumname" )
+    AssertEqStr( IntrinsicCodetip( "ENUMCOUNT" ), "EnumCount(E)", "enumcount" )
+    AssertTrue( ParseCodetip( IntrinsicCodetip( "enumvalue" ), params ), "enumvalue has a parameter list" )
+    AssertEqInt( params.Count( ), 2, "of two: E, i" )
+    if( params.Count( ) = 2 ) then AssertEqStr( params[1].Label, "i", "the second is i" )
+    Analyse( "print enumvalue( Colour, " )
+    AssertTrue( ContextAfter( "enumvalue( Colour, ", ctx ), "`enumvalue( Colour, ` is a call" )
+    AssertEqStr( lcase( CalleeName( ctx ) ), "enumvalue", "of enumvalue" )
+    AssertEqInt( ctx.ActiveArg, 1, "in its second argument" )
+
+    '' `derive text`'s ToText, made up at query time: its signature parses as a
+    '' declared method's does.
+    Analyse( "type P" & LF & "    derive text" & LF & "end type" )
+    dim as SymbolInfo d
+    dim as string label
+    AssertTrue( DerivedMember( g_Syms.Items[0], 0, "totext", d ), "P derives ToText" )
+    AssertTrue( ParseSignature( d.Name_, d.Detail_, label, params ), "whose signature parses" )
+    AssertEqStr( label, "ToText() as ustring", "as ToText() as ustring" )
+    AssertEqInt( params.Count( ), 0, "with no parameters" )
 end sub
 
 '' ############################################################################

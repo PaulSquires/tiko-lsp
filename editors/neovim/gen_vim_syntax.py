@@ -82,6 +82,12 @@ w(r'syn match   tikoControl "\(\<end\s\+\)\@<=match\>"')
 # with `=>` in it). Elsewhere `starts` is a name.
 w(r'''syn match   tikoControl "\(\<case\s\+\)\@<=starts\ze\s\+[^ \t=,:'<>]"''')
 w(r'''syn match   tikoControl "^\s*\zsstarts\ze\s\+[^ \t=,:'<>].*=>"''')
+# `derive equal, order, hash, text` (tiko-lang RFC 0019), a TYPE or CLASS body line: `derive`
+# is no reserved word -- `derive as int32` is a field -- so it and its words are keywords only
+# at a line's start with one of the four words after it.
+DERIVE_WORD = r'\%(equal\|order\|hash\|text\)\>'
+w(r'syn match   tikoDeclare "^\s*\zsderive\ze\s\+' + DERIVE_WORD + '"')
+w(r'syn match   tikoDeclare "\%(^\s*derive\s\+\%(' + DERIVE_WORD + r'\s*,\s*\)*\)\@<=' + DERIVE_WORD + '"')
 # A property's sections: `set` alone on its line, and after `end` (`get` is a keyword already).
 # Neither word is reserved -- `set` names containers.Set -- so only there.
 w('syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|\'\)"')

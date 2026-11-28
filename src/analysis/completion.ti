@@ -110,6 +110,14 @@ declare function CompletionContextAt( byref text_ as string, byref tokens as Tok
 declare function ReadMemberChain( byref text_ as string, byref tokens as TokenArray, _
                                   byval dotIdx as long, byref ctx as CompletionContext ) as boolean
 
+'' True when `offset` is where a word of a TYPE or CLASS body's derive line goes
+'' (RFC 0019): `derive |`, `derive eq|`, `derive equal, |`. `written` gets the words
+'' already on the line, each as " word " for an instr test. CollectCompletions then
+'' offers the rest of equal, order, hash and text, and nothing else.
+declare function IsDeriveWordAt( byref text_ as string, byref tokens as TokenArray, _
+                                 byref syms as SymbolTable, byval offset as long, _
+                                 byref written as string ) as boolean
+
 '' The candidates at `offset`. `keywords` may be false to leave the reserved
 '' words out, which is what a member context wants.
 declare sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _

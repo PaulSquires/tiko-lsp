@@ -130,6 +130,9 @@ private function MemberHover_( byref srv as Server, byval doc as TextDocumentPtr
                 dim as SymbolInfo m = srv.Index->SymbolAt( f, i )
                 if( m.Parent = t andalso m.LowerName = member_ ) then return SymbolHoverMarkdown( m )
             next
+            '' A member the type's derive line gives (RFC 0019): `derive text`'s ToText.
+            dim as SymbolInfo d
+            if( DerivedMember( owner, t, member_, d ) ) then return SymbolHoverMarkdown( d )
         next
     next
     return ""

@@ -126,6 +126,13 @@ contexts:
     - match: '(?i)^\s*(starts)(?=\s+[^\s=,:''<>].*=>)'
       captures:
         1: keyword.control.tiko
+    - match: '(?i)^\s*(derive)\s+(equal|order|hash|text)(?![\w$%&!#])(?:\s*,\s*(equal|order|hash|text)(?![\w$%&!#]))?(?:\s*,\s*(equal|order|hash|text)(?![\w$%&!#]))?(?:\s*,\s*(equal|order|hash|text)(?![\w$%&!#]))?'
+      captures:
+        1: keyword.other.tiko
+        2: keyword.other.tiko
+        3: keyword.other.tiko
+        4: keyword.other.tiko
+        5: keyword.other.tiko
     - match: '(?i)^\s*(get|set)\s*(?=$|'')'
       captures:
         1: keyword.other.tiko

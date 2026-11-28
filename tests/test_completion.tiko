@@ -825,4 +825,58 @@ scope
     AssertEqInt( KindOf( "Point" ), CMP_STRUCT, "as the type it is, not the keyword" )
 end scope
 
+'' ----------------------------------------------------------------------------
+TestGroup( "derive (tiko-lang RFC 0019)" )
+
+scope
+    '' `derive text` gives ToText( ) as ustring, which no declaration names.
+    Analyse( "type Cell" & LF & _
+             "    derive equal, text" & LF & _
+             "    row as long" & LF & _
+             "end type" & LF & _
+             "type Plain" & LF & "    col as long" & LF & "end type" & LF & _
+             "dim c as Cell" & LF & "dim p as Plain" & LF & _
+             "c." & LF & "p.c" & LF )
+    CompleteAfter( "c." )
+    AssertTrue( Has( "row" ) andalso Has( "ToText" ), "c. offers the field and the derived ToText" )
+    AssertEqInt( KindOf( "ToText" ), CMP_METHOD, "as a method" )
+    AssertEqStr( DetailOf( "ToText" ), "() as ustring", "returning ustring" )
+    CompleteAfter( "p.c" )
+    AssertTrue( Has( "col" ) andalso Has( "ToText" ) = false, "a type with no derive text has no ToText" )
+
+    '' A derive line's words, after `derive` and after each comma; the written ones
+    '' are not offered again, and nothing else is.
+    Analyse( "type T" & LF & "    derive " & LF & "end type" )
+    CompleteAfter( "derive " )
+    AssertTrue( Has( "equal" ) andalso Has( "order" ) andalso Has( "hash" ) andalso Has( "text" ), _
+                "after `derive `: the four words" )
+    AssertEqInt( g_Items.Count( ), 4, "and only them" )
+    Analyse( "type T" & LF & "    derive equal, " & LF & "end type" )
+    CompleteAfter( "equal, " )
+    AssertTrue( Has( "equal" ) = false andalso Has( "hash" ), "after a comma: the rest" )
+    Analyse( "type T" & LF & "    derive equal, ha" & LF & "end type" )
+    CompleteAfter( "ha" )
+    AssertTrue( Has( "hash" ) andalso Has( "equal" ) = false, "a partial word too" )
+
+    '' Not in a procedure, nor where `derive` is a field's name.
+    Analyse( "sub f( )" & LF & "    derive " & LF & "end sub" )
+    CompleteAfter( "derive " )
+    AssertTrue( Has( "equal" ) = false, "outside a type body, `derive ` is any name's" )
+    Analyse( "type T" & LF & "    derive as " & LF & "end type" )
+    CompleteAfter( "derive as " )
+    AssertTrue( Has( "equal" ) = false andalso Has( "long" ), "`derive as `: a type comes next" )
+
+    '' The four intrinsics are built-ins with codetips; a user symbol of the name wins.
+    Analyse( "dim x as long" & LF & "x = " & LF )
+    CompleteAfter( "x = " )
+    AssertEqStr( DetailOf( "hashvalue" ), "HashValue(k)", "hashvalue is offered with its codetip" )
+    AssertEqStr( DetailOf( "enumname" ), "EnumName(v)", "enumname" )
+    AssertEqStr( DetailOf( "enumcount" ), "EnumCount(E)", "enumcount" )
+    AssertEqStr( DetailOf( "enumvalue" ), "EnumValue(E, i)", "enumvalue" )
+    Analyse( "function hashvalue( byval s as string ) as long" & LF & "end function" & LF & "x = " & LF )
+    CompleteAfter( "x = " )
+    AssertEqInt( KindOf( "hashvalue" ), CMP_FUNCTION, "a file's own hashvalue keeps the slot" )
+    AssertEqStr( DetailOf( "hashvalue" ), "(byval s as string) as long", "with its own signature" )
+end scope
+
 end TestSummary( "completion" )

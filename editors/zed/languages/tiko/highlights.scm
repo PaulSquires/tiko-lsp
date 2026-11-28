@@ -30,7 +30,7 @@
   "exit" "continue" "end"
   "as" "of" "extends" "field" "explicit" "once"
   "channel" "link"
-  "class" "interface" "inherits" "implements" "partial"
+  "class" "interface" "inherits" "implements" "partial" "derive"
   "private" "public" "protected" "static" "shared"
   "const" "virtual" "abstract" "byref" "byval"
 ] @keyword
@@ -112,6 +112,7 @@
 (interface_method (qualified_name (identifier) @function))
 (inherits_clause (qualified_name (identifier) @type))
 (implements_clause (qualified_name (identifier) @type))
+(derive_clause word: (identifier) @keyword)
 (namespace_definition name: (qualified_name (identifier) @type))
 (generic_parameters (identifier) @type)
 

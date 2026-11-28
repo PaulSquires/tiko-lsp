@@ -212,9 +212,84 @@ function SymbolHoverMarkdown( byref sym as SymbolInfo ) as string
     if( sym.IsLocal ) then out_ &= ", local"
     out_ &= "*"
 
+    '' A type's derive line, and what it gives: the members it writes appear in no
+    '' declaration, so the hover is where a reader learns `p1 < p2` compiles.
+    if( len(sym.Derive_) > 0 ) then
+        dim as string gives = ""
+        if( DerivesWord( sym, "equal" ) ) then gives &= ", `=` `<>`"
+        if( DerivesWord( sym, "order" ) ) then gives &= ", `<` `>` `<=` `>=`"
+        if( DerivesWord( sym, "hash" ) ) then gives &= ", `hashvalue( )`"
+        if( DerivesWord( sym, "text" ) ) then gives &= ", `ToText( ) as ustring`"
+        dim as string words_ = ""
+        for i as long = 0 to len(sym.Derive_) - 1
+            if( sym.Derive_[i] = 32 ) then words_ &= ", " else words_ &= chr( sym.Derive_[i] )
+        next
+        out_ &= chr(10) & chr(10) & "`derive " & words_ & "`"
+        if( len(gives) > 0 ) then out_ &= ": " & mid( gives, 3 )
+    end if
+
     if( len(sym.Doc_) > 0 ) then out_ &= chr(10) & chr(10) & sym.Doc_
 
     return out_
+end function
+
+'' ############################################################################
+''  Derived members (tiko-lang RFC 0019)
+'' ############################################################################
+
+function DerivesWord( byref owner as SymbolInfo, byref word_ as string ) as boolean
+    if( len(owner.Derive_) = 0 orelse len(word_) = 0 ) then return false
+    return instr( " " & owner.Derive_ & " ", " " & word_ & " " ) > 0
+end function
+
+function DeriveHeadOf( byref text_ as string, byref tokens as TokenArray, _
+                       byref syms as SymbolTable, byval i as long, _
+                       byval requireWord as boolean ) as long
+    if( i < 0 orelse i >= tokens.Count( ) ) then return -1
+
+    '' The line's first token, and nothing but words and commas from there to i.
+    dim as long j = i
+    while( j > 0 )
+        dim as TokenKind k = tokens[j - 1].Kind
+        if( k = TK_EOL orelse k = TK_COLON ) then exit while
+        j -= 1
+    wend
+    if( tokens[j].Kind <> TK_IDENT ) then return -1
+    if( lcase( TokenText( text_, tokens[j] ) ) <> "derive" ) then return -1
+    for k as long = j + 1 to i
+        if( tokens[k].Kind <> TK_IDENT andalso tokens[k].Kind <> TK_COMMA ) then return -1
+    next
+    if( requireWord ) then
+        if( j + 1 >= tokens.Count( ) ) then return -1
+        if( tokens[j + 1].Kind <> TK_IDENT ) then return -1
+    end if
+
+    '' In a TYPE or CLASS body: the innermost symbol around it is the type itself.
+    dim as long s = syms.InnermostAt( tokens[j].Start_ )
+    if( s < 0 ) then return -1
+    if( syms.Items[s].Kind_ <> SYM_STRUCT andalso syms.Items[s].Kind_ <> SYM_CLASS ) then return -1
+    if( lcase( syms.Items[s].Detail_ ) = "union" ) then return -1   '' a UNION is a SYM_STRUCT too
+    return j
+end function
+
+function DerivedMember( byref owner as SymbolInfo, byval parent as long, _
+                        byref lowerName as string, byref out_ as SymbolInfo ) as boolean
+    if( lowerName <> "totext" ) then return false
+    if( DerivesWord( owner, "text" ) = false ) then return false
+
+    dim as SymbolInfo m
+    m.Name_     = "ToText"
+    m.LowerName = "totext"
+    m.Kind_     = SYM_METHOD
+    m.Detail_   = "() as ustring"
+    m.Doc_      = "Written by the compiler for `derive text`: `" & owner.Name_ & "(field=value, ...)`."
+    m.Parent    = parent
+    m.RangeStart = owner.RangeStart
+    m.RangeEnd   = owner.RangeEnd
+    m.NameStart = -1
+    m.NameEnd   = -1
+    out_ = m
+    return true
 end function
 
 '' The size of the type a fixed-width name stands for.
