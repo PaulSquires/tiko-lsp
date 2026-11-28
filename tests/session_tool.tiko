@@ -1285,6 +1285,34 @@ private function IncSessionBytes( byref wsRoot as string, byref initOpts as stri
     ''     same way -- through the import, the re-export and the forward alias.
     s &= Req_( 16, "textDocument/hover", At_( impUri, 7, 7 ) )
 
+    '' 17-20. tiko-lang RFC 0019's DERIVE, in a buffer of its own (on no disk):
+    ''
+    ''     0  type Cell
+    ''     1      derive equal, text
+    ''     2      row as long
+    ''     3  end type
+    ''     4  dim as Cell c
+    ''     5  c.
+    ''     6  print c.ToText( )
+    ''
+    '' `derive text` gives Cell a ToText( ) as ustring that no line declares: it is
+    '' offered after `c.` (17), hovered (18) and signature-helped (19) all the same,
+    '' through the index's member walk. 20: a space after `derive` offers its words.
+    dim as string drvUri = PathToUri( wsRoot & "\derive.bas" )
+    s &= Note_( "textDocument/didOpen", "{" & Q & "textDocument" & Q & ":{" & _
+                Q & "uri" & Q & ":" & Q & drvUri & Q & "," & _
+                Q & "languageId" & Q & ":" & Q & "tiko" & Q & "," & Q & "version" & Q & ":1," & _
+                Q & "text" & Q & ":" & JsonQuote( "type Cell" & LF & "    derive equal, text" & LF & _
+                "    row as long" & LF & "end type" & LF & "dim as Cell c" & LF & "c." & LF & _
+                "print c.ToText( )" & LF ) & "}}" )
+    s &= Req_( 17, "textDocument/completion", At_( drvUri, 5, 2 ) )
+    s &= Req_( 18, "textDocument/hover", At_( drvUri, 6, 9 ) )
+    s &= Req_( 19, "textDocument/signatureHelp", At_( drvUri, 6, 15 ) )
+    dim as string at20 = At_( drvUri, 1, 11 )
+    s &= Req_( 20, "textDocument/completion", left( at20, len(at20) - 1 ) & "," & _
+               Q & "context" & Q & ":{" & Q & "triggerKind" & Q & ":2," & _
+               Q & "triggerCharacter" & Q & ":" & Q & " " & Q & "}}" )
+
     s &= Frame( "{" & Q & "jsonrpc" & Q & ":" & Q & "2.0" & Q & "," & Q & "id" & Q & ":10," & _
                 Q & "method" & Q & ":" & Q & "shutdown" & Q & "}" )
     s &= Note_( "exit", "null" )
@@ -1494,6 +1522,47 @@ private function CheckIncSession( byref path as string, byref wantSource as stri
         d.Parse( ResponseFor_( messages, 16 ) )
         AssertContains( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( ), _
                         "Spin", "hover on the member g.Spin: Gadget_'s declaration" )
+    end scope
+
+    '' derive (RFC 0019): the member no declaration names, and the line's words.
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 17 ) )
+        dim as string labels = ""
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & lcase( it.Member( "label" ).AsString( ) ) & " "
+        next
+        AssertContains( labels, " totext ", "c. offers derive text's ToText" )
+        AssertContains( labels, " row ", "beside the field" )
+    end scope
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 18 ) )
+        AssertContains( d.Root( ).Member( "result" ).Member( "contents" ).Member( "value" ).AsString( ), _
+                        "ToText () as ustring", "hover on c.ToText: the derived member" )
+    end scope
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 19 ) )
+        dim as JsonValue sigs = d.Root( ).Member( "result" ).Member( "signatures" )
+        dim as string label = ""
+        for each it in ArrayOf( sigs )
+            label = it.Member( "label" ).AsString( )
+            exit for
+        next
+        AssertEqStr( label, "ToText() as ustring", "signature help inside c.ToText( )" )
+    end scope
+    scope
+        dim as JsonDoc d
+        d.Parse( ResponseFor_( messages, 20 ) )
+        dim as string labels = ""
+        dim as long n = 0
+        for each it in ArrayOf( d.Root( ).Member( "result" ).Member( "items" ) )
+            labels &= " " & lcase( it.Member( "label" ).AsString( ) ) & " "
+            n += 1
+        next
+        AssertContains( labels, " equal ", "a space after derive offers its words" )
+        AssertEqInt( n, 4, "the four, and nothing an include declares" )
     end scope
 
     return TestSummary( "toolchain-header session" )

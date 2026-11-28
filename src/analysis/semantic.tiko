@@ -177,6 +177,17 @@ private function IsMatchKeyword( byref text_ as string, byref tokens as TokenArr
     return LineHasArrow_( text_, tokens, nx )
 end function
 
+'' tiko-lang's DERIVE line (RFC 0019): `derive equal, hash` at the start of a line in
+'' a TYPE or CLASS body, an identifier after it -- `derive as int32` is a field, and
+'' outside a type body `derive` is any name. The words after it are a fixed set, read
+'' like `case else`'s, so they are keywords too: a file's own `text` variable does not
+'' colour the `text` of `derive text`.
+private function IsDeriveKeyword( byref text_ as string, byref tokens as TokenArray, _
+                                  byref symbols as SymbolTable, byval i as long ) as boolean
+    if( tokens[i].Kind <> TK_IDENT ) then return false
+    return DeriveHeadOf( text_, tokens, symbols, i, true ) >= 0
+end function
+
 sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                            byref tokens as TokenArray, byref symbols as SymbolTable, _
                            byref out_ as SemTokenArray )
@@ -233,7 +244,8 @@ sub ComputeSemanticTokens( byref text_ as string, byref idx as LineIndex, _
                 '' The declaration site first: it is exact, and it is the only
                 '' place the `declaration` modifier is honest.
                 dim as long packed = 0
-                if( IsSetSection( text_, tokens, i ) orelse IsMatchKeyword( text_, tokens, i ) ) then
+                if( IsSetSection( text_, tokens, i ) orelse IsMatchKeyword( text_, tokens, i ) orelse _
+                    IsDeriveKeyword( text_, tokens, symbols, i ) ) then
                     packed = SEMTYPE_KEYWORD * 16
                 elseif( declAt.TryGet( tok.Start_, packed ) = false ) then
                     if( byName.TryGet( lcase( TokenText( text_, tok ) ), packed ) = false ) then

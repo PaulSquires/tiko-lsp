@@ -64,6 +64,13 @@ MATCH_VALUE_AT = (r'(?:(?<=[=(,])|(?<=(?<![\w.])return)|(?<=(?<![\w.])print)'
                   r'|(?<=(?<![\w.])then))\s*')
 
 
+# `derive equal, order, hash, text` (tiko-lang RFC 0019), a TYPE or CLASS body line: `derive`
+# is no reserved word -- `derive as int32` is a field -- so it and its words are keywords only
+# at a line's start with one of the four words after it. Same pattern as gen_tmlanguage.py.
+DERIVE_WORD = r'(equal|order|hash|text)' + WORD_END
+DERIVE_LINE = r'(?i)^\s*(derive)\s+' + DERIVE_WORD + (r'(?:\s*,\s*' + DERIVE_WORD + ')?') * 3
+
+
 def q(s):
     """A YAML single-quoted scalar."""
     return "'" + s.replace("'", "''") + "'"
@@ -199,6 +206,11 @@ w('        2: keyword.control.tiko')
 w('    - match: ' + q(r"(?i)^\s*(starts)(?=\s+[^\s=,:'<>].*=>)"))
 w('      captures:')
 w('        1: keyword.control.tiko')
+# `derive equal, hash` (RFC 0019): DERIVE_LINE above says when.
+w('    - match: ' + q(DERIVE_LINE))
+w('      captures:')
+for n in range(1, 6):
+    w('        {}: keyword.other.tiko'.format(n))
 # A property's sections, `get` / `set` alone on their line and `end get` / `end set`: neither
 # word is reserved -- `set` names containers.Set -- so only there.
 w('    - match: ' + q(r"(?i)^\s*(get|set)\s*(?=$|')"))

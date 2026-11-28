@@ -236,6 +236,26 @@
           }
         },
         {
+          "match": "(?i)^\\s*(derive)\\s+(equal|order|hash|text)(?![\\w$%&!#])(?:\\s*,\\s*(equal|order|hash|text)(?![\\w$%&!#]))?(?:\\s*,\\s*(equal|order|hash|text)(?![\\w$%&!#]))?(?:\\s*,\\s*(equal|order|hash|text)(?![\\w$%&!#]))?",
+          "captures": {
+            "1": {
+              "name": "keyword.other.tiko"
+            },
+            "2": {
+              "name": "keyword.other.tiko"
+            },
+            "3": {
+              "name": "keyword.other.tiko"
+            },
+            "4": {
+              "name": "keyword.other.tiko"
+            },
+            "5": {
+              "name": "keyword.other.tiko"
+            }
+          }
+        },
+        {
           "match": "(?i)^\\s*(get|set)\\s*(?=$|')",
           "captures": {
             "1": {

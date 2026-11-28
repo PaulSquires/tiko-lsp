@@ -484,6 +484,18 @@ private function MemberChild_( byref syms as SymbolTable, byval parent as long, 
     return fallback
 end function
 
+'' The type NAME of the member `lowerName` of container `parent`, a chain's next link:
+'' a declared member's (MemberChild_), else one its derive line gives -- `p.ToText( )`
+'' is a ustring. "" when there is no such member, or it has no type.
+private function MemberChildType_( byref syms as SymbolTable, byval parent as long, _
+                                   byref lowerName as string ) as string
+    dim as long m = MemberChild_( syms, parent, lowerName )
+    if( m >= 0 ) then return lcase( MemberTypeName( syms.Items[m] ) )
+    dim as SymbolInfo d
+    if( DerivedMember( syms.Items[parent], parent, lowerName, d ) ) then return lcase( MemberTypeName( d ) )
+    return ""
+end function
+
 function InitializerChain( byref sym as SymbolInfo, byref ctx as CompletionContext ) as boolean
     if( len(sym.Init_) = 0 ) then return false
 
@@ -568,9 +580,7 @@ private function ResolveMemberBase( byref syms as SymbolTable, byref ctx as Comp
     '' Then each link of the chain: the member's type is the next container.
     for k as long = 0 to ctx.Chain.Count( ) - 1
         if( c < 0 ) then return -1
-        dim as long m = MemberChild_( syms, c, ctx.Chain[k] )
-        if( m < 0 ) then return -1
-        dim as string typeName = lcase( MemberTypeName( syms.Items[m] ) )
+        dim as string typeName = MemberChildType_( syms, c, ctx.Chain[k] )
         if( len(typeName) = 0 ) then return -1
         c = ContainerNamed_( syms, typeName )
     next
@@ -631,7 +641,43 @@ private sub AddMembersOf( byref syms as SymbolTable, byref items as CompletionIt
             if( IsOfferedMember( syms.Items[i] ) ) then AddSymbolItem( items, syms.Items[i], CMPGROUP_MEMBER )
         end if
     next
+
+    '' ...and what its derive line gives, which no declaration names. Last, so a
+    '' written ToText -- an error beside `derive text`, but there -- keeps the slot.
+    dim as SymbolInfo d
+    if( DerivedMember( syms.Items[parent], parent, "totext", d ) ) then AddSymbolItem( items, d, CMPGROUP_MEMBER )
 end sub
+
+function IsDeriveWordAt( byref text_ as string, byref tokens as TokenArray, _
+                         byref syms as SymbolTable, byval offset as long, _
+                         byref written as string ) as boolean
+    written = ""
+    dim as long i = TokenBefore( tokens, offset )
+    if( i < 0 ) then return false
+    dim as Token last_ = tokens[i]
+    dim as long lastEnd = last_.Start_ + last_.Length_
+
+    '' The token the word being typed follows: `derive |`, `derive equal, |` -- past
+    '' it on the same line -- or the one before a partial word, `derive eq|`.
+    dim as long before_ = -1
+    if( offset > lastEnd ) then
+        if( instr( mid( text_, lastEnd + 1, offset - lastEnd ), chr(10) ) > 0 ) then return false
+        before_ = i
+    elseif( last_.Kind = TK_IDENT andalso i > 0 ) then
+        before_ = i - 1
+    else
+        return false
+    end if
+
+    dim as long head = DeriveHeadOf( text_, tokens, syms, before_, false )
+    if( head < 0 ) then return false
+    if( before_ <> head andalso tokens[before_].Kind <> TK_COMMA ) then return false
+
+    for k as long = head + 1 to before_
+        if( tokens[k].Kind = TK_IDENT ) then written &= " " & lcase( TokenText( text_, tokens[k] ) ) & " "
+    next
+    return true
+end function
 
 sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
                         byref syms as SymbolTable, byval offset as long, _
@@ -642,6 +688,17 @@ sub CollectCompletions( byref text_ as string, byref tokens as TokenArray, _
 
     '' -- nowhere -------------------------------------------------------------
     if( ctx.Kind_ = CMPCTX_NONE ) then exit sub
+
+    '' -- after a type body's `derive` (RFC 0019): its four words, less those written
+    dim as string written
+    if( ctx.Kind_ = CMPCTX_SCOPE andalso IsDeriveWordAt( text_, tokens, syms, offset, written ) ) then
+        dim ws as containers.Array( of string ) = strings.Split( DERIVE_WORDS, " " )
+        for k as long = 0 to ws.Count( ) - 1
+            if( instr( written, " " & ws[k] & " " ) > 0 ) then continue for
+            AddItem( items, ws[k], CMP_KEYWORD, "derive " & ws[k], "", CMPGROUP_KEYWORD )
+        next
+        exit sub
+    end if
 
     '' -- after a dot ---------------------------------------------------------
     if( ctx.Kind_ = CMPCTX_MEMBER ) then

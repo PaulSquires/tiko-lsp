@@ -47,6 +47,12 @@ MATCH_SUBJ = r"(?=\s+(?![-+*/\\^&]?=|as(?![\w$%&!#])|[',):])\S)"
 MATCH_VALUE_AT = (r'(?:(?<=[=(,])|(?<=(?<![\w.])return)|(?<=(?<![\w.])print)'
                   r'|(?<=(?<![\w.])then))\s*')
 
+# `derive equal, order, hash, text` (tiko-lang RFC 0019), a TYPE or CLASS body line: `derive`
+# is no reserved word -- `derive as int32` is a field -- so it and its words are keywords only
+# at a line's start with one of the four words after it. Up to four, each its own capture.
+DERIVE_WORD = r'(equal|order|hash|text)(?![\w$%&!#])'
+DERIVE_LINE = r'(?i)^\s*(derive)\s+' + DERIVE_WORD + (r'(?:\s*,\s*' + DERIVE_WORD + ')?') * 3
+
 kw_control = alt(w for w in structural if w in control)
 kw_modifier = alt(modifiers)
 kw_decl = alt(w for w in structural if w not in control and w not in modifiers)
@@ -149,6 +155,9 @@ g = {
                               "2": {"name": "keyword.control.tiko"}}},
                 {"match": r"(?i)^\s*(starts)(?=\s+[^\s=,:'<>].*=>)",
                  "captures": {"1": {"name": "keyword.control.tiko"}}},
+                # `derive equal, hash` (RFC 0019): DERIVE_LINE above says when.
+                {"match": DERIVE_LINE,
+                 "captures": {str(n): {"name": "keyword.other.tiko"} for n in range(1, 6)}},
                 # A property's sections, `get` / `set` alone on their line and `end get` /
                 # `end set`: neither word is reserved -- `set` names containers.Set -- so
                 # only there.

@@ -88,6 +88,12 @@ type SymbolInfo
     '' `as <type>` to read its type from. Completion resolves it as a member chain (InitializerChain).
     '' Empty for everything that has a declared type.
     Init_         as string
+
+    '' A TYPE or CLASS's `derive equal, order, hash, text` line (tiko-lang RFC 0019): its
+    '' words, lower-cased and space-separated in the order written -- "equal hash text".
+    '' The line declares no symbol; what it gives -- the operators, and `derive text`'s
+    '' `ToText( ) as ustring` -- is offered at query time (DerivedMember). Empty otherwise.
+    Derive_       as string
 end type
 
 type SymbolArray as containers.Array( of SymbolInfo )
@@ -152,6 +158,33 @@ declare function BuiltinTypedefHoverMarkdown( byref text_ as string, byref token
 '' ...and tiko-lang's predeclared constant, nullptr, on the same terms.
 declare function BuiltinConstantHoverMarkdown( byref text_ as string, byref tokens as TokenArray, _
                                                byval offset as long ) as string
+
+'' ----------------------------------------------------------------------------
+''  Derived members (tiko-lang RFC 0019)
+'' ----------------------------------------------------------------------------
+
+'' The four words a `derive` line may name, in the RFC's order.
+const DERIVE_WORDS = "equal order hash text"
+
+'' True when `owner`'s derive line names `word_` (lower case).
+declare function DerivesWord( byref owner as SymbolInfo, byref word_ as string ) as boolean
+
+'' The member `lowerName` that `owner`'s derive line gives it, made up for the query
+'' and never stored: `derive text` gives `ToText( ) as ustring`. False for any other
+'' name, and for a type that derives no text. `parent` is the owner's index, set as
+'' the member's Parent; the member has no position in source (NameStart -1).
+declare function DerivedMember( byref owner as SymbolInfo, byval parent as long, _
+                                byref lowerName as string, byref out_ as SymbolInfo ) as boolean
+
+'' When token `i` is on a derive line -- the `derive` itself or one of its words or
+'' commas -- the index of that `derive`, else -1. The parser's rule: `derive` starts a
+'' line (or follows a `:`) in the body of a TYPE or CLASS, and only identifiers and
+'' commas follow it. `requireWord` adds "an identifier follows" -- what makes the line
+'' a derive line rather than a field (`derive as int32`); completion, asked while the
+'' first word is still to be typed, passes false.
+declare function DeriveHeadOf( byref text_ as string, byref tokens as TokenArray, _
+                               byref syms as SymbolTable, byval i as long, _
+                               byval requireWord as boolean ) as long
 
 '' The human name for a kind, used in hover text.
 declare function SymbolKindName( byval kind as SymbolKind ) as string

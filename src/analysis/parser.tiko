@@ -242,6 +242,21 @@ private function CurrentScope( byref st as ParseState ) as long
     return -1
 end function
 
+'' The symbol of the TYPE or CLASS whose body is being read -- the innermost container
+'' must be one, not a UNION, ENUM or INTERFACE, nor a procedure inside it -- or -1.
+'' What a `derive` line belongs to.
+private function DeriveOwner_( byref st as ParseState ) as long
+    for i as long = st.Stack_.Count( ) - 1 to 0 step -1
+        select case st.Stack_[i].Kind_
+            case KW_TYPE, KW_CLASS : return st.Stack_[i].SymbolIndex
+            case KW_UNION, KW_ENUM, KW_INTERFACE, KW_SUB, KW_FUNCTION, KW_PROPERTY, _
+                 KW_CONSTRUCTOR, KW_DESTRUCTOR, KW_OPERATOR
+                return -1
+        end select
+    next
+    return -1
+end function
+
 '' The innermost open block that is a TYPE, UNION, ENUM or INTERFACE, or
 '' KW_NONE. Fields and enum members only exist inside one. A CLASS is a TYPE
 '' here: it holds fields, methods and access specifiers just as one does.
@@ -1631,6 +1646,28 @@ sub ParseTokens( byref text_ as string, byref tokens as TokenArray, _
                 lcase( TokenText( text_, head ) ) = "partial" ) then
                 first_ += 1
                 head = afterHead
+            end if
+        end if
+
+        '' `derive equal, order, hash, text`: a contextual body line of a TYPE or CLASS
+        '' (tiko-lang RFC 0019 R1), recognised only when an identifier follows -- `derive as
+        '' int32` is a field named derive, and goes to the field rule below. Its words are
+        '' recorded on the type; the line declares nothing, so it makes no symbol.
+        if( head.Kind = TK_IDENT andalso first_ + 1 < stmt.Count( ) andalso st.Symbols_ <> 0 ) then
+            if( IsWord_( text_, head, "derive" ) andalso tokens[ stmt[first_ + 1] ].Kind = TK_IDENT ) then
+                dim as long owner = DeriveOwner_( st )
+                if( owner >= 0 ) then
+                    dim as string words_ = st.Symbols_->Items[owner].Derive_
+                    for k as long = first_ + 1 to stmt.Count( ) - 1
+                        dim as Token w = tokens[ stmt[k] ]
+                        if( w.Kind <> TK_IDENT ) then continue for
+                        dim as string lw = lcase( TokenText( text_, w ) )
+                        if( instr( " " & words_ & " ", " " & lw & " " ) > 0 ) then continue for
+                        if( len(words_) > 0 ) then words_ &= " "
+                        words_ &= lw
+                    next
+                    st.Symbols_->Items[owner].Derive_ = words_
+                end if
             end if
         end if
 

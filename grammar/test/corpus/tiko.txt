@@ -434,3 +434,58 @@ dim as long span = 1
     (identifier)
     (identifier))
   (number))
+
+================================================================================
+derive lines, and derive used as a name
+================================================================================
+
+type Cell
+    derive equal, hash, text
+    as int32 row, col
+end type
+
+class Ver
+    DERIVE equal
+    derive order
+end class
+
+type Holder
+    derive as long
+end type
+
+dim as long derive = 2
+derive = derive + 1
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_definition
+    (identifier)
+    (derive_clause
+      (identifier)
+      (identifier)
+      (identifier))
+    (type_annotation
+      (identifier)
+      (identifier))
+    (identifier))
+  (class_definition
+    (identifier)
+    (derive_clause
+      (identifier))
+    (derive_clause
+      (identifier)))
+  (type_definition
+    (identifier)
+    (identifier)
+    (type_annotation
+      (identifier)))
+  (identifier)
+  (type_annotation
+    (identifier)
+    (identifier))
+  (number)
+  (identifier)
+  (identifier)
+  (operator)
+  (number))

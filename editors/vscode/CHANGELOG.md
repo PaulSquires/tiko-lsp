@@ -2,6 +2,20 @@
 
 The extension's version is the version of the tiko-lsp server it includes.
 
+## Unreleased
+
+- **`derive`** (tiko after 0.1.8): a `derive equal, order, hash, text` line in a type or
+  class body declares no field and reports nothing, and `derive` and its words colour as
+  keywords only there -- `derive as int32` is still a field called `derive`, and a variable
+  or sub called `derive` stays a name. Completion offers the four words after `derive`,
+  leaving out the ones already written. A type that derives `text` gets `ToText( ) as
+  ustring`, which no line declares: it completes after `p.`, hovers and has signature help.
+  Hovering the type shows its derive line and what it gives (`=` `<>`, `<` `>` `<=` `>=`,
+  `hashvalue( )`, `ToText( )`).
+- **`hashvalue`, `enumname`, `enumcount` and `enumvalue`** complete, hover and have
+  signature help as built-in procedures; a procedure of your own with one of those names
+  still takes their place.
+
 ## 0.1.8
 
 - No changes to the server or the extension: this version follows tiko 0.1.8.

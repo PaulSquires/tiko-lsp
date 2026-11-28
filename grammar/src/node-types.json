@@ -515,6 +515,10 @@
           "named": true
         },
         {
+          "type": "derive_clause",
+          "named": true
+        },
+        {
           "type": "do_statement",
           "named": true
         },
@@ -779,6 +783,22 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "derive_clause",
+    "named": true,
+    "fields": {
+      "word": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -5799,6 +5819,10 @@
           "named": true
         },
         {
+          "type": "derive_clause",
+          "named": true
+        },
+        {
           "type": "do_statement",
           "named": true
         },
@@ -6025,6 +6049,10 @@
         },
         {
           "type": "declare_statement",
+          "named": true
+        },
+        {
+          "type": "derive_clause",
           "named": true
         },
         {
@@ -6738,6 +6766,10 @@
   },
   {
     "type": "declare",
+    "named": false
+  },
+  {
+    "type": "derive",
     "named": false
   },
   {

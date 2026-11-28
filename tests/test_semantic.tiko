@@ -350,6 +350,26 @@ private sub TestMatch( )
     AssertTrue( TypeAt( 7, 8 ) <> SEMTYPE_KEYWORD, "nor ... = match + 1" )
 end sub
 
+private sub TestDerive( )
+    TestGroup( "tiko-lang's derive, a contextual keyword (RFC 0019)" )
+
+    Analyse( "dim as long text = 1" & LF & _                '' line 0
+             "type Cell" & LF & _                          '' line 1
+             "    derive equal, text" & LF & _             '' line 2
+             "    derive as long" & LF & _                 '' line 3
+             "end type" & LF & _                           '' line 4
+             "sub derive( byval n as long )" & LF & _      '' line 5
+             "end sub" & LF & _                            '' line 6
+             "derive text" & LF )                          '' line 7
+
+    AssertEqInt( TypeAt( 2, 4 ), SEMTYPE_KEYWORD, "derive opening a type body's derive line is a keyword" )
+    AssertEqInt( TypeAt( 2, 11 ), SEMTYPE_KEYWORD, "and so are its words" )
+    AssertEqInt( TypeAt( 2, 18 ), SEMTYPE_KEYWORD, "text too, though the file has a variable called text" )
+    AssertTrue( TypeAt( 3, 4 ) <> SEMTYPE_KEYWORD, "a field called derive is not" )
+    AssertTrue( TypeAt( 7, 0 ) <> SEMTYPE_KEYWORD, "nor a call to sub derive outside a type" )
+    AssertTrue( TypeAt( 7, 7 ) <> SEMTYPE_KEYWORD, "nor its argument" )
+end sub
+
 '' ############################################################################
 ''  Main
 '' ############################################################################
@@ -364,5 +384,6 @@ TestFixedWidthTypes( )
 TestBuiltinConstants( )
 TestPropertySections( )
 TestMatch( )
+TestDerive( )
 
 end TestSummary( "semantic tokens" )

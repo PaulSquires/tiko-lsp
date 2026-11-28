@@ -2294,6 +2294,57 @@
         }
       ]
     },
+    "derive_clause": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_derive_kw"
+          },
+          "named": false,
+          "value": "derive"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "word",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": ","
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "word",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "identifier"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_line_end"
+        }
+      ]
+    },
     "implements_clause": {
       "type": "SEQ",
       "members": [
@@ -2634,6 +2685,10 @@
         {
           "type": "SYMBOL",
           "name": "inherits_clause"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "derive_clause"
         },
         {
           "type": "SYMBOL",
@@ -7910,6 +7965,10 @@
     {
       "type": "SYMBOL",
       "name": "_match_value_kw"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_derive_kw"
     }
   ],
   "inline": [],

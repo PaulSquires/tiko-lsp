@@ -285,6 +285,20 @@ private function AddIncludedMembers( byref srv as Server, byval doc as TextDocum
                 it.SortGroup  = CMPGROUP_MEMBER
                 items.Push( it )
             next
+
+            '' ...and the member its derive line gives (RFC 0019), declared nowhere.
+            dim as SymbolInfo d
+            if( DerivedMember( owner, t, "totext", d ) andalso seen_.Contains( d.LowerName ) = false ) then
+                seen_.Put( d.LowerName, true )
+                dim as CompletionItem it
+                it.Label      = d.Name_
+                it.LowerLabel = d.LowerName
+                it.Kind_      = CompletionKindOf( d.Kind_ )
+                it.Detail_    = d.Detail_
+                it.Doc_       = d.Doc_
+                it.SortGroup  = CMPGROUP_MEMBER
+                items.Push( it )
+            end if
             exit for
         next
     next
@@ -330,6 +344,11 @@ private function IndexMemberOf_( byref srv as Server, byref visible as container
                     found = true
                 end if
             next
+            '' A member no declaration names, given by the type's derive line.
+            if( count = 0 andalso DerivedMember( owner, t, lowerName, out_ ) ) then
+                count = 1
+                return true
+            end if
             '' One declaration of the type is enough; a header seen twice is not two.
             if( count > 0 ) then return found
         next
@@ -482,8 +501,11 @@ private function OnCompletion( byref srv as Server, _
     '' A space asks only where a type comes next -- a declaration's `as`
     '' (`dim p as `), a generic's `( of ` or a comma in its list; anywhere
     '' else it is just a space, and the answer is nothing, at once.
+    '' ...and the words of a type body's derive line (`derive |`, `derive equal, |`).
     dim as string trigger = req.Params( ).Member( "context" ).Member( "triggerCharacter" ).AsString( "" )
-    if( trigger = " " ) then
+    dim as string deriveWritten
+    dim as boolean onDerive = IsDeriveWordAt( doc->Text( ), doc->Tokens( ), doc->Symbols( ), offset, deriveWritten )
+    if( trigger = " " andalso onDerive = false ) then
         if( CompletionContextAt( doc->Text( ), doc->Tokens( ), offset ).Kind_ <> CMPCTX_TYPE ) then
             return rb.NewArray( )
         end if
@@ -519,7 +541,9 @@ private function OnCompletion( byref srv as Server, _
         onModule = IsImportAlias_( doc, ctx.BaseName )
     end if
 
-    if( ( ctx.Kind_ = CMPCTX_SCOPE orelse ctx.Kind_ = CMPCTX_TYPE ) andalso indexUsable ) then
+    if( onDerive ) then
+        '' The four words are the whole answer: nothing an include declares goes there.
+    elseif( ( ctx.Kind_ = CMPCTX_SCOPE orelse ctx.Kind_ = CMPCTX_TYPE ) andalso indexUsable ) then
         EnsureWorkspaceIndex( srv )
         incomplete_ = AddIncludedSymbols( srv, doc, ctx.Prefix, ctx.Kind_ = CMPCTX_TYPE, items )
 

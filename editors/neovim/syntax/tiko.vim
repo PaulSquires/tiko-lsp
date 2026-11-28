@@ -45,6 +45,8 @@ syn match   tikoControl "\%([=(,]\s*\|\<\%(return\|print\|then\)\s\+\)\@<=match\
 syn match   tikoControl "\(\<end\s\+\)\@<=match\>"
 syn match   tikoControl "\(\<case\s\+\)\@<=starts\ze\s\+[^ \t=,:'<>]"
 syn match   tikoControl "^\s*\zsstarts\ze\s\+[^ \t=,:'<>].*=>"
+syn match   tikoDeclare "^\s*\zsderive\ze\s\+\%(equal\|order\|hash\|text\)\>"
+syn match   tikoDeclare "\%(^\s*derive\s\+\%(\%(equal\|order\|hash\|text\)\>\s*,\s*\)*\)\@<=\%(equal\|order\|hash\|text\)\>"
 syn match   tikoDeclare "^\s*\zsset\ze\s*\($\|'\)"
 syn match   tikoDeclare "\(\<end\s\+\)\@<=set\>"
 syn match   tikoType "\<span\ze\s*(\s*of\>"

@@ -25,6 +25,10 @@
 // a field, nor `interface = 3`. Anything else is left to the lexer, which
 // reads the word as an identifier.
 //
+// `derive` (tiko-lang RFC 0019) is the same kind of word: the head of a TYPE or
+// CLASS body line, `derive equal, hash`, only where the parser can take it and a
+// name follows -- `derive as int32` is a field named derive.
+//
 // `as view` ENDS AT A WORD BOUNDARY.
 //
 // tiko's view-kind type, `type Lexer as view`, is a block where `type X as Y`
@@ -55,6 +59,7 @@ enum TokenType {
     PARTIAL_KW,
     MATCH_KW,
     MATCH_VALUE_KW,
+    DERIVE_KW,
 };
 
 void *tree_sitter_tiko_external_scanner_create(void) { return NULL; }
@@ -300,6 +305,7 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
     bool want_partial = valid_symbols[PARTIAL_KW];
     bool want_match = valid_symbols[MATCH_KW];
     bool want_match_value = valid_symbols[MATCH_VALUE_KW];
+    bool want_derive = valid_symbols[DERIVE_KW];
     if (want_interface && want_inherits && valid_symbols[EOF_LINE_END]) return false;
     if (want_as_view && (want_interface || want_inherits)) return false;
 
@@ -309,7 +315,8 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
         }
         return scan_as_view(lexer);
     }
-    if (!want_interface && !want_inherits && !want_partial && !want_match && !want_match_value) {
+    if (!want_interface && !want_inherits && !want_partial && !want_match && !want_match_value &&
+        !want_derive) {
         return false;
     }
 
@@ -331,6 +338,8 @@ bool tree_sitter_tiko_external_scanner_scan(void *payload, TSLexer *lexer,
         found = INTERFACE_KW;
     } else if (want_inherits && n == 8 && same(word, "inherits", 8)) {
         found = INHERITS_KW;
+    } else if (want_derive && n == 6 && same(word, "derive", 6)) {
+        found = DERIVE_KW;
     } else if (want_partial && n == 7 && same(word, "partial", 7)) {
         lexer->mark_end(lexer);
         if (!type_follows(lexer)) return false;

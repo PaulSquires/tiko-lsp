@@ -647,6 +647,55 @@ scope
 end scope
 
 '' ----------------------------------------------------------------------------
+TestGroup( "derive lines (tiko-lang RFC 0019)" )
+
+scope
+    '' A body line of a TYPE or CLASS: its words go on the type, and it declares
+    '' nothing -- no field, no member, no diagnostic.
+    Analyse( "type Cell" & LF & _
+             "    derive equal, hash, text" & LF & _
+             "    as int32 row, col" & LF & _
+             "end type" & LF & _
+             "class Ver" & LF & _
+             "    derive equal" & LF & _
+             "    derive order" & LF & _
+             "    major as long" & LF & _
+             "end class" )
+    dim as long c = Expect( "Cell", SYM_STRUCT, "a type with a derive line" )
+    AssertEqStr( S_(c).Derive_, "equal hash text", "records its words, in order" )
+    AssertTrue( DerivesWord( S_(c), "text" ) andalso DerivesWord( S_(c), "order" ) = false, _
+                "DerivesWord reads them" )
+    AssertEqInt( g_Syms.Count( ), 5, "and declares nothing: Cell, row, col, Ver, major" )
+    AssertEqInt( g_Diags.Count( ), 0, "with no diagnostic" )
+    dim as long v = Expect( "Ver", SYM_CLASS, "a class" )
+    AssertEqStr( S_(v).Derive_, "equal order", "two derive lines add up" )
+
+    '' `derive as int32` is a field named derive; a bare `derive` outside a type is
+    '' any name; an enum, a union and a method body have no derive line.
+    Analyse( "type T" & LF & "    derive as int32" & LF & "end type" & LF & _
+             "enum E" & LF & "    derive" & LF & "end enum" & LF & _
+             "union U" & LF & "    derive equal" & LF & "    x as long" & LF & "end union" & LF & _
+             "sub derive( byval n as long )" & LF & "end sub" )
+    Expect( "derive", SYM_FIELD, "`derive as int32` stays a field" )
+    AssertEqStr( S_( IndexOfName( "T" ) ).Derive_, "", "and gives T no derive" )
+    AssertEqStr( S_( IndexOfName( "U" ) ).Derive_, "", "a union records none" )
+
+    '' What `derive text` gives, made up at query time and never stored.
+    Analyse( "type P" & LF & "    derive equal, text" & LF & "    x as long" & LF & "end type" )
+    dim as long p = IndexOfName( "P" )
+    dim as SymbolInfo d
+    AssertTrue( DerivedMember( S_(p), p, "totext", d ), "derive text gives ToText" )
+    AssertEqStr( d.Name_ & " " & d.Detail_, "ToText () as ustring", "as `ToText( ) as ustring`" )
+    AssertTrue( d.Kind_ = SYM_METHOD andalso d.Parent = p, "a method of P" )
+    AssertEqInt( IndexOfName( "ToText" ), -1, "which is no symbol in the table" )
+    AssertFalse( DerivedMember( S_(p), p, "tostring", d ), "and gives nothing else" )
+    AssertTrue( instr( SymbolHoverMarkdown( S_(p) ), "`derive equal, text`: `=` `<>`, `ToText( ) as ustring`" ) > 0, _
+                "the type's hover names its derive line and what it gives" )
+    Analyse( "type Q" & LF & "    derive equal" & LF & "end type" )
+    AssertFalse( DerivedMember( S_(0), 0, "totext", d ), "a type that derives no text has no ToText" )
+end scope
+
+'' ----------------------------------------------------------------------------
 TestGroup( "half-typed code" )
 
 scope

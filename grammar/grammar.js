@@ -136,9 +136,9 @@ module.exports = grammar({
   ],
 
   // `interface` and `inherits` are contextual: src/scanner.c says why.
-  // `match` too, as two tokens -- the statement form and the value form.
+  // `match` too, as two tokens -- the statement form and the value form. And `derive`.
   externals: $ => [$._eof, $._interface_kw, $._inherits_kw, $._as_view_kw, $._partial_kw,
-                   $._match_kw, $._match_value_kw],
+                   $._match_kw, $._match_value_kw, $._derive_kw],
 
   word: $ => $._word,
 
@@ -491,6 +491,15 @@ module.exports = grammar({
       $._line_end,
     ),
 
+    // tiko-lang RFC 0019's derive line, `derive equal, order, hash, text`: the
+    // compiler writes `=` `<>`, `<` `>` `<=` `>=`, a hash and `ToText( )` from the
+    // fields. Contextual as `inherits` is -- `derive as int32` is a field.
+    derive_clause: $ => seq(
+      alias($._derive_kw, 'derive'),
+      commaSep1(field('word', $.identifier)),
+      $._line_end,
+    ),
+
     implements_clause: $ => seq(
       kw('implements'),
       commaSep1(field('interface', $.qualified_name)),
@@ -537,6 +546,7 @@ module.exports = grammar({
       $.preproc,
       $.access_specifier,
       $.inherits_clause,
+      $.derive_clause,
       $.implements_clause,
       $.procedure_definition,
       $.declare_statement,
